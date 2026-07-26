@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLE — Niveau A1 — Dossier 0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#182a6b;
+  --navy-deep:#0f1c4d;
+  --brand-blue:#3a6df0;
+  --gold:#ffb703;
+  --gold-dark:#b8790a;
+  --gold-light:#ffe08a;
+  --cream:#fff8ef;
+  --paper:#ffffff;
+  --ink:#20232b;
+  --grey:#6b7280;
+  --line:#ece1cf;
+  --ok:#06a77d;
+  --ok-bg:#e2f8f0;
+  --bad:#ef476f;
+  --bad-bg:#fde5eb;
+  --pt:#b8791b;
+  --accent:#3a6df0;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--cream);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+.app{display:flex; min-height:100vh;}
+
+/* ---- Sidebar ---- */
+.sidebar{
+  width:230px; flex:none;
+  background:var(--navy);
+  color:#fff;
+  padding:28px 18px 18px;
+  position:relative;
+  background-image:
+    radial-gradient(circle at 14px 0, transparent 6px, var(--navy) 7px);
+  background-size:28px 34px;
+  background-repeat:repeat-y;
+  background-position: -8px 10px;
+}
+.cover-label{
+  font-family:'Fraunces',serif;
+  font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--gold-light); margin:0 0 2px 10px;
+}
+.cover-title{
+  font-family:'Fraunces',serif; font-weight:700;
+  font-size:30px; line-height:1.05; margin:0 0 4px 10px; color:#fff;
+}
+.cover-sub{
+  margin:0 0 20px 10px; font-size:12.5px; color:#c9d3e6; line-height:1.5;
+}
+.student-badge{
+  margin:0 10px 20px; padding:10px 12px; background:rgba(255,255,255,.08);
+  border-radius:9px; font-size:12.5px; line-height:1.5;
+}
+.student-badge b{color:#fff; display:block; font-size:14px; margin-bottom:2px;}
+nav.weeks{display:flex; flex-direction:column; gap:6px;}
+.nav-btn{
+  display:flex; align-items:center; gap:10px;
+  text-align:left; background:transparent; border:none; color:#dbe3f2;
+  font-family:'Inter',sans-serif; font-size:14px; font-weight:500;
+  padding:11px 12px 11px 14px; border-radius:8px; cursor:pointer; width:100%;
+  transition:background .15s ease, color .15s ease;
+}
+.nav-btn .tag{
+  font-family:'Fraunces',serif; font-weight:700; font-size:13px;
+  color:var(--tag-color, var(--gold-light)); min-width:20px;
+}
+.nav-btn:hover{background:rgba(255,255,255,.1);}
+.nav-btn.active{background:var(--tag-color, var(--gold)); color:#fff; font-weight:700;}
+.nav-btn.active .tag{color:#fff;}
+.nav-sep{border-top:1px solid rgba(255,255,255,.15); margin:14px 0;}
+.sidebar-foot{
+  margin-top:20px; padding:14px 12px; border-top:1px solid rgba(255,255,255,.15);
+  font-size:11.5px; color:#a9b6d2; line-height:1.5;
+}
+.teacher-link{
+  display:block; margin-top:10px; font-size:12px; color:var(--gold-light);
+  text-decoration:none; font-weight:600; cursor:pointer;
+}
+.teacher-link:hover{text-decoration:underline;}
+
+/* ---- Main content ---- */
+main.content{flex:1; padding:34px 44px 70px; max-width:920px;}
+.eyebrow{
+  font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold-dark);
+  font-weight:700; margin:0 0 6px;
+}
+h1.page-title{
+  font-family:'Fraunces',serif; font-weight:700; color:var(--navy);
+  font-size:32px; margin:0 0 12px; line-height:1.1;
+}
+.objectif-box{
+  background:var(--paper); border:1px solid var(--line); border-left:5px solid var(--accent, var(--navy));
+  border-radius:8px; padding:16px 18px; margin-bottom:26px;
+}
+.objectif-box .fr{font-size:15px; line-height:1.55;}
+.objectif-box .pt{font-size:13.5px; line-height:1.5; color:var(--pt); font-style:italic; margin-top:6px;}
+.label-fr{font-weight:700; color:var(--navy);}
+.label-pt{font-weight:700;}
+
+/* ---- login screen ---- */
+.login-wrap{display:flex; align-items:center; justify-content:center; min-height:70vh;}
+.login-card{
+  background:var(--paper); border:1px solid var(--line); border-radius:14px;
+  padding:36px 36px 30px; max-width:420px; width:100%; box-shadow:0 4px 22px rgba(20,20,20,.06);
+}
+.login-card h1{font-family:'Fraunces',serif; color:var(--navy); font-size:26px; margin:0 0 4px;}
+.login-card p.sub{color:var(--grey); font-size:14px; margin:0 0 22px;}
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:12.5px; font-weight:700; color:var(--navy); margin-bottom:5px;}
+.field input{
+  width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:8px; font-size:15px;
+  font-family:'Inter',sans-serif;
+}
+.level-pill{
+  display:inline-flex; align-items:center; gap:6px; background:var(--gold-light); color:var(--navy-deep);
+  font-weight:700; font-size:13px; padding:6px 12px; border-radius:20px; margin-bottom:18px;
+}
+.primary-btn{
+  width:100%; padding:12px; border:none; border-radius:8px; background:var(--brand-blue); color:#fff;
+  font-weight:700; font-size:15px; cursor:pointer; margin-top:6px;
+}
+.primary-btn:hover{filter:brightness(0.92);}
+.login-err{color:var(--bad); font-size:13px; margin-top:8px; display:none;}
+.auth-tabs{display:flex; gap:6px; margin-bottom:20px; background:var(--cream); border-radius:9px; padding:4px;}
+.auth-tab{
+  flex:1; padding:9px 10px; border:none; border-radius:7px; background:transparent; cursor:pointer;
+  font-weight:700; font-size:13px; color:var(--grey); font-family:'Inter',sans-serif;
+}
+.auth-tab.active{background:var(--brand-blue); color:#fff;}
+
+/* teacher tabs */
+.teacher-tabs{display:flex; gap:8px; margin-bottom:20px;}
+.tab-btn{
+  padding:9px 16px; border:1px solid var(--line); border-radius:8px; background:#fff;
+  font-weight:700; font-size:13.5px; cursor:pointer; color:var(--navy);
+}
+.tab-btn.active{background:var(--brand-blue); color:#fff; border-color:var(--brand-blue);}
+
+/* ---- dossiers grid ---- */
+.dossier-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:8px;}
+.dossier-card{
+  background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:18px 16px;
+  text-align:left; cursor:pointer; position:relative; min-height:120px;
+  display:flex; flex-direction:column; justify-content:space-between;
+}
+.dossier-card .num{font-family:'Fraunces',serif; font-weight:700; font-size:26px; color:var(--brand-blue);}
+.dossier-card .name{font-size:13.5px; font-weight:600; margin-top:4px;}
+.dossier-card .status{font-size:11.5px; margin-top:10px; font-weight:700;}
+.dossier-card.open{border-color:var(--ok); border-width:2px;}
+.dossier-card.open .status{color:var(--ok);}
+.dossier-card.open:hover{box-shadow:0 3px 14px rgba(20,20,20,.08); transform:translateY(-1px);}
+.dossier-card.locked{opacity:.55; cursor:default; background:#f4f2ec;}
+.dossier-card.locked .status{color:var(--grey);}
+
+/* day cards (as before) */
+.day-grid{display:flex; flex-direction:column; gap:18px;}
+.day-card{
+  background:var(--paper); border:1px solid var(--line); border-radius:12px;
+  padding:20px 22px; box-shadow:0 1px 2px rgba(20,20,20,.03);
+}
+.day-top{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px;}
+.day-num{
+  font-family:'Fraunces',serif; font-weight:700; color:#fff; background:var(--accent, var(--navy));
+  border-radius:6px; padding:3px 10px; font-size:13px;
+}
+.day-dur{font-size:12px; color:var(--grey); font-weight:600;}
+h3.day-title{
+  font-family:'Fraunces',serif; font-size:19px; font-weight:600; color:var(--ink);
+  margin:6px 0 2px;
+}
+p.day-title-pt{font-size:13.5px; color:var(--pt); font-style:italic; margin:0 0 14px;}
+
+.media-block{margin:10px 0 16px;}
+.media-block audio{width:100%; height:36px;}
+.media-block iframe{width:100%; height:210px; border:0; border-radius:8px;}
+.source-link{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--brand-blue);
+  text-decoration:none; font-weight:600; margin-top:6px;
+}
+.source-link:hover{text-decoration:underline;}
+.section-label{
+  font-size:11px; text-transform:uppercase; letter-spacing:.1em; font-weight:700;
+  color:var(--grey); margin:14px 0 6px;
+}
+
+/* exercise */
+.exo-box{background:var(--cream); border:1.5px dashed var(--accent, var(--gold)); border-radius:8px; padding:12px 14px; margin-top:6px;}
+.exo-consigne{font-size:13.5px; margin:0 0 2px;}
+.exo-consigne-pt{font-size:12px; color:var(--pt); font-style:italic; margin:0 0 10px;}
+.exo-question{font-weight:600; font-size:14.5px; margin-bottom:10px;}
+.exo-options{display:flex; flex-direction:column; gap:7px;}
+.exo-opt{
+  text-align:left; padding:8px 12px; border-radius:7px; border:1px solid var(--line);
+  background:#fff; cursor:pointer; font-size:14px; font-family:'Inter',sans-serif;
+  transition:all .12s ease;
+}
+.exo-opt:hover:not(:disabled){border-color:var(--accent, var(--navy));}
+.exo-opt.correct{background:var(--ok-bg); border-color:var(--ok); color:var(--ok); font-weight:700;}
+.exo-opt.wrong{background:var(--bad-bg); border-color:var(--bad); color:var(--bad); font-weight:700;}
+.exo-opt:disabled{cursor:default;}
+.exo-feedback{font-size:13px; margin-top:8px; font-weight:600;}
+.exo-feedback.ok{color:var(--ok);}
+.exo-feedback.bad{color:var(--bad);}
+.exo-text-row{display:flex; gap:8px; margin-top:4px;}
+.exo-text-row input{
+  flex:1; padding:8px 10px; border-radius:7px; border:1px solid var(--line); font-size:14px;
+  font-family:'Inter',sans-serif;
+}
+.exo-text-row button{
+  padding:8px 14px; border-radius:7px; border:none; background:var(--accent, var(--brand-blue)); color:#fff;
+  font-weight:600; cursor:pointer; font-size:13.5px;
+}
+.exo-text-row button:hover{filter:brightness(0.9);}
+
+/* recorder */
+.rec-box{
+  margin-top:14px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+  border-left:5px solid var(--accent, var(--gold));
+}
+.rec-consigne{font-size:13.5px; margin:0 0 2px;}
+.rec-consigne-pt{font-size:12px; color:var(--pt); font-style:italic; margin:0 0 10px;}
+.rec-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.rec-btn{
+  display:inline-flex; align-items:center; gap:7px;
+  border:none; border-radius:20px; padding:8px 16px; font-weight:700; font-size:13.5px;
+  cursor:pointer; background:var(--accent, var(--brand-blue)); color:#fff;
+}
+.rec-btn.recording{background:var(--bad); animation:pulse 1.2s infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,71,111,.4);}70%{box-shadow:0 0 0 8px rgba(239,71,111,0);}100%{box-shadow:0 0 0 0 rgba(239,71,111,0);}}
+.rec-time{font-size:13px; color:var(--grey); font-variant-numeric:tabular-nums;}
+.rec-audio{margin-top:10px; width:100%;}
+.rec-dl{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--brand-blue);
+  font-weight:700; text-decoration:none; margin-top:8px;
+}
+.rec-dl:hover{text-decoration:underline;}
+.rec-status{font-size:12px; color:var(--grey); margin-top:6px;}
+.rec-status.ok{color:var(--ok); font-weight:600;}
+.rec-status.bad{color:var(--bad); font-weight:600;}
+
+/* oral session box */
+.oral-box{margin-top:28px; background:var(--accent, var(--navy)); color:#fff; border-radius:12px; padding:22px 24px;}
+.oral-box h4{
+  font-family:'Fraunces',serif; font-size:18px; margin:0 0 4px; color:#fff;
+  display:flex; align-items:center; gap:8px;
+}
+.oral-box .pt-title{font-size:12.5px; color:rgba(255,255,255,.75); font-style:italic; margin:0 0 14px;}
+.oral-list{margin:0; padding-left:20px;}
+.oral-list li{margin-bottom:10px; font-size:14px; line-height:1.5;}
+.oral-list li .pt{display:block; font-size:12.5px; color:#c9d3e6; font-style:italic; margin-top:2px;}
+
+.week-footer{display:flex; justify-content:space-between; margin-top:30px;}
+.week-footer button{
+  background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:10px 18px;
+  font-weight:600; color:var(--navy); cursor:pointer; font-size:13.5px;
+}
+.week-footer button:hover{border-color:var(--navy);}
+.week-footer button:disabled{opacity:.3; cursor:default;}
+
+/* bilan */
+.bilan-table{width:100%; border-collapse:collapse; margin-top:8px;}
+.bilan-table th,.bilan-table td{border:1px solid var(--line); padding:10px 12px; font-size:14px; text-align:left;}
+.bilan-table th{background:var(--accent, var(--navy)); color:#fff; font-weight:600;}
+.bilan-table tr:nth-child(even) td{background:#f4f1ea;}
+.bilan-table td.check{text-align:center; width:70px;}
+.bilan-table input[type=checkbox]{width:18px; height:18px;}
+
+/* teacher panel */
+.teacher-toolbar{display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center;}
+.teacher-toolbar input{flex:1; min-width:200px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px;}
+.teacher-toolbar button{padding:10px 14px; border:1px solid var(--line); border-radius:8px; background:#fff; font-weight:600; cursor:pointer; font-size:13px;}
+.teacher-entry{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:12px;}
+.teacher-entry .who{font-weight:700; color:var(--navy); font-size:14.5px;}
+.teacher-entry .meta{font-size:12.5px; color:var(--grey); margin:2px 0 8px;}
+.teacher-entry audio{width:100%; height:34px; margin-top:4px;}
+.teacher-entry-actions{display:flex; gap:14px; margin-top:8px; align-items:center;}
+.teacher-entry-actions a, .teacher-entry-actions button{
+  font-size:12.5px; font-weight:700; color:var(--brand-blue); background:none; border:none; cursor:pointer;
+  text-decoration:none;
+}
+.teacher-entry-actions button.del{color:var(--bad);}
+.teacher-entry-actions select{
+  padding:7px 10px; border-radius:7px; border:1px solid var(--line); font-size:13px; font-family:'Inter',sans-serif;
+}
+.teacher-entry-actions button:not(.del){
+  background:var(--brand-blue); color:#fff; padding:7px 14px; border-radius:7px;
+}
+.teacher-empty{color:var(--grey); font-size:14px; padding:20px 0;}
+.storage-note{
+  background:var(--gold-light); color:var(--navy-deep); border-radius:8px; padding:12px 14px;
+  font-size:13px; margin-bottom:20px; line-height:1.5;
+}
+
+@media (max-width:820px){
+  .app{flex-direction:column;}
+  .sidebar{width:100%; padding:20px 14px;}
+  nav.weeks{flex-direction:row; overflow-x:auto; gap:8px; padding-bottom:4px;}
+  .nav-btn{white-space:nowrap;}
+  main.content{padding:24px 18px 50px;}
+  .sidebar-foot{display:none;}
+  .dossier-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="content" id="content"></main>
+</div>
+
+<!-- ======================= FIREBASE (SDK "compat", pas de build nécessaire) ======================= -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-firestore-compat.min.js"></script>
+<script>
+/* ======================= CONFIGURATION FIREBASE ======================= */
+/* 1. Remplace ces valeurs par celles de TON projet Firebase                */
+/*    (Console Firebase > ⚙️ Paramètres du projet > Tes applications > Web) */
+const firebaseConfig = {
+  apiKey: "AIzaSyAVT-VM8QyTfOg16P_9juX3dbJsR3e3z3c",
+  authDomain: "fle-profmelissaradde.firebaseapp.com",
+  projectId: "fle-profmelissaradde",
+  storageBucket: "fle-profmelissaradde.firebasestorage.app",
+  messagingSenderId: "670442169351",
+  appId: "1:670442169351:web:535dca29a998c80dc636a2"
+};
+/* 2. Remplace par l'UID Firebase Auth de TON compte professeure           */
+/*    (Console Firebase > Authentication > Users > colonne "User UID")     */
+const TEACHER_UID = "REMPLACE_MOI_PAR_TON_UID";
+
+/* 3. Remplace par l'URL de ton Google Apps Script déployé en "Web app"    */
+/*    (voir GUIDE_INSTALLATION.md, section Google Drive)                    */
+const APPS_SCRIPT_URL = "REMPLACE_MOI_PAR_URL_APPS_SCRIPT";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ======================= ÉTAT GLOBAL ======================= */
+let niveau = null;        // A1 | A2 | B1 | B2 | C1 | C2 — attribué par la professeure
+let screen = "login";     // login | waiting | dossiers | week | bilan | teacher
+let authMode = "signup";  // signup | signin (onglet de l'écran de connexion)
+let student = {prenom:"", nom:"", email:"", telephone:"", uid:"", uniteCourante:null, frequence:null};
+let current = 1;          // semaine active 1..5
+
+let teacherTab = "eleves"; // eleves | rec
+let isTeacher = false;
+const BILAN_COLOR = "#d98c00";
+
+/* ======================= DONNÉES : NIVEAUX (liste utilisée par la professeure) ======================= */
+const niveauxMenu = [
+  {code:"A1", name:"Débutant"},
+  {code:"A2", name:"Élémentaire"},
+  {code:"B1", name:"Intermédiaire"},
+  {code:"B2", name:"Intermédiaire avancé"},
+  {code:"C1", name:"Avancé"},
+  {code:"C2", name:"Maîtrise"},
+];
+
+/* ======================= DONNÉES : DOSSIERS ======================= */
+const dossiersMenu = [
+  {num:0, name:"Se présenter & phonétique", open:true},
+  {num:1, name:"À venir", open:false},
+  {num:2, name:"À venir", open:false},
+  {num:3, name:"À venir", open:false},
+  {num:4, name:"À venir", open:false},
+  {num:5, name:"À venir", open:false},
+  {num:6, name:"À venir", open:false},
+  {num:7, name:"À venir", open:false},
+  {num:8, name:"À venir", open:false},
+];
+
+/* ======================= DONNÉES : SEMAINES (Dossier 0) ======================= */
+const weeks = [
+  {
+    id:1, tag:"S1", color:"#3a6df0",
+    title_fr:"La phonétique complète du français",
+    title_pt:"A fonética completa do francês",
+    objectif_fr:"Poser des bases solides de prononciation (alphabet, voyelles orales et nasales, consonnes difficiles, accentuation, liaison) avant d'aborder le vocabulaire et la grammaire.",
+    objectif_pt:"Construir uma base sólida de pronúncia (alfabeto, vogais orais e nasais, consoantes difíceis, acentuação, ligação) antes de avançar para vocabulário e gramática.",
+    days:[
+      {num:"Jour 1", dur:"15 min",
+        title_fr:"L'alphabet français : écouter, répéter, épeler",
+        title_pt:"O alfabeto francês: ouvir, repetir, soletrar",
+        media:[{type:"audio", url:"https://www.podcastfrancaisfacile.com/wp-content/uploads/files/alphabet.mp3", label:"Écouter l'alphabet (audio)"}],
+        link:{url:"https://www.podcastfrancaisfacile.com/premiers-pas/alphabet.html", label:"Voir la leçon complète — Podcast Français Facile"},
+        exo:{type:"qcm", q:"Quelle lettre n'existe pas dans l'alphabet français ?", options:["W","K","Ñ","Y"], correct:2},
+        rec:{fr:"Épelle ton prénom et ton nom de famille, lettre par lettre.", pt:"Soletre seu nome e sobrenome, letra por letra."}},
+      {num:"Jour 2", dur:"15 min",
+        title_fr:"Les voyelles orales du français",
+        title_pt:"As vogais orais do francês",
+        link:{url:"https://www.podcastfrancaisfacile.com/phonetique-prononciation/tableau-des-sons-du-francais.html", label:"Tableau des sons du français — Podcast Français Facile"},
+        exo:{type:"qcm", q:"Quelle graphie correspond au son [u] (comme dans « vous ») ?", options:["OU","U","EU","OI"], correct:0},
+        rec:{fr:"Répète à voix haute : chat, chapeau, tableau, beau.", pt:"Repita em voz alta as palavras acima."}},
+      {num:"Jour 3", dur:"15 min",
+        title_fr:"Les voyelles nasales (on, an/en, in, un)",
+        title_pt:"As vogais nasais (on, an/en, in, un)",
+        media:[{type:"video", id:"asboHKWbPsg", label:"Les voyelles nasales — leçon + 50 exercices"}],
+        link:{url:"https://www.francaisavecpierre.com/les-voyelles-nasales-en-francais/", label:"Exercice interactif — Français avec Pierre"},
+        exo:{type:"qcm", q:"Quel mot contient une voyelle nasale ?", options:["chat","bon","ami","tu"], correct:1},
+        rec:{fr:"Répète : bonjour, maman, vin, un, bon, banc.", pt:"Repita as palavras com sons nasais."}},
+      {num:"Jour 4", dur:"15 min",
+        title_fr:"Les consonnes difficiles : R, S/Z, CH/J, U/OU",
+        title_pt:"As consoantes difíceis: R, S/Z, CH/J, U/OU",
+        link:{url:"https://www.francepodcasts.com/category/phonetique/", label:"Fiches de phonétique — France Podcasts"},
+        exo:{type:"qcm", q:"« Rue » et « roue » se distinguent surtout par quel son ?", options:["U vs OU","R vs L","E vs I"], correct:0},
+        rec:{fr:"Répète ces paires : tu/tout, rue/roue, chou/joue.", pt:"Repita esses pares de palavras."}},
+      {num:"Jour 5", dur:"15 min",
+        title_fr:"L'accentuation et la liaison",
+        title_pt:"A acentuação e a ligação (liaison)",
+        media:[{type:"video", id:"xsfdNAPfwoU", label:"Voyelles nasales, liaisons et syllabes complexes"}],
+        exo:{type:"qcm", q:"En français, l'accent tonique tombe toujours sur…", options:["la première syllabe","la dernière syllabe","la syllabe du milieu"], correct:1},
+        rec:{fr:"Lis à voix haute : « Je m'appelle Melissa et je suis française et brésilienne. »", pt:"Leia essa frase em voz alta."}}
+    ],
+    oral_title_fr:"Sons et prononciation", oral_title_pt:"Sons e pronúncia",
+    oral:[
+      {fr:"Épeler à voix haute son prénom, son nom, puis 3 mots vus dans la semaine.", pt:"Soletrar em voz alta seu nome e sobrenome, depois 3 palavras vistas na semana."},
+      {fr:"Jeu d'écoute : le professeur dit un mot, l'élève doit dire quel son il entend.", pt:"Jogo de escuta: a professora diz uma palavra, o aluno diz que som ouviu."},
+      {fr:"Répétition guidée des sons les plus difficiles pour un lusophone.", pt:"Repetição guiada dos sons mais difíceis para um lusófono."},
+      {fr:"Lecture à voix haute de 5 phrases courtes en travaillant l'accent final et la liaison.", pt:"Leitura em voz alta de 5 frases curtas trabalhando o acento final e a ligação."}
+    ]
+  },
+  {
+    id:2, tag:"S2", color:"#06a77d",
+    title_fr:"Se présenter et faire connaissance",
+    title_pt:"Se apresentar e conhecer alguém",
+    objectif_fr:"Saluer, dire son nom et prénom, épeler son identité, utiliser les verbes être et s'appeler, accorder les adjectifs de nationalité au masculin/féminin.",
+    objectif_pt:"Cumprimentar, dizer nome e sobrenome, soletrar sua identidade, usar os verbos être e s'appeler, fazer a concordância dos adjetivos de nacionalidade.",
+    days:[
+      {num:"Jour 1", dur:"15 min",
+        title_fr:"Saluer : bonjour, bonsoir, au revoir",
+        title_pt:"Cumprimentar: bonjour, bonsoir, au revoir",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Salutations de base + 15 dialogues"},
+        exo:{type:"qcm", q:"Quelle salutation utilise-t-on le soir, en arrivant ?", options:["Bonjour","Bonsoir","Bonne nuit"], correct:1},
+        rec:{fr:"Dis : bonjour, bonsoir, au revoir, à bientôt.", pt:"Diga essas quatro saudações em voz alta."}},
+      {num:"Jour 2", dur:"15 min",
+        title_fr:"Se présenter : phrases modèles",
+        title_pt:"Se apresentar: frases-modelo",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Se présenter, phrases modèles + modèles DELF A1"},
+        exo:{type:"texte", q:"Complète : « Je ___ Melissa. »", accept:["m'appelle","mappelle","m appelle"]},
+        rec:{fr:"Présente-toi en 2 phrases (nom, prénom).", pt:"Apresente-se em 2 frases (nome, sobrenome)."}},
+      {num:"Jour 3", dur:"15 min",
+        title_fr:"Les verbes être et s'appeler",
+        title_pt:"Os verbos être e s'appeler",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Page débutant — verbes et présentation"},
+        exo:{type:"qcm", q:"Comment conjugue-t-on ÊTRE à la 1ère personne (je) ?", options:["suis","es","est"], correct:0},
+        rec:{fr:"Dis à voix haute : je suis, tu es, il est / je m'appelle, tu t'appelles.", pt:"Diga essa conjugação em voz alta."}},
+      {num:"Jour 4", dur:"15 min",
+        title_fr:"Masculin/féminin des nationalités",
+        title_pt:"Masculino/feminino das nacionalidades",
+        link:{url:"https://www.francepodcasts.com/2019/12/23/les-nationalites/", label:"Les nationalités — règles et exemples"},
+        exo:{type:"texte", q:"Quel est le féminin de « brésilien » ?", accept:["brésilienne","bresilienne"]},
+        rec:{fr:"Dis 3 nationalités au masculin, puis au féminin.", pt:"Diga 3 nacionalidades no masculino e no feminino."}},
+      {num:"Jour 5", dur:"15 min",
+        title_fr:"Épeler son identité + révision",
+        title_pt:"Soletrar sua identidade + revisão",
+        link:{url:"https://www.podcastfrancaisfacile.com/premiers-pas/alphabet.html", label:"Rappel : l'alphabet (audio)"},
+        exo:{type:"qcm", q:"Quelle lettre suit le K dans l'alphabet ?", options:["J","L","M"], correct:1},
+        rec:{fr:"Enregistre ta présentation complète (4 phrases) pour la séance orale.", pt:"Grave sua apresentação completa (4 frases) para a aula."}}
+    ],
+    oral_title_fr:"Se présenter", oral_title_pt:"Se apresentar",
+    oral:[
+      {fr:"Chacun se présente à tour de rôle (nom, prénom, nationalité) sans support écrit.", pt:"Cada um se apresenta por vez, sem apoio escrito."},
+      {fr:"Jeu de rôle : « rencontre dans un café ».", pt:"Jogo de papéis: 'encontro em um café'."},
+      {fr:"Questions/réponses libres : « Comment tu t'appelles ? », « Tu es d'où ? »", pt:"Perguntas e respostas livres sobre nome e origem."}
+    ]
+  },
+  {
+    id:3, tag:"S3", color:"#ef476f",
+    title_fr:"Nationalités, pays et langues",
+    title_pt:"Nacionalidades, países e línguas",
+    objectif_fr:"Nommer des pays et nationalités (accord masculin/féminin), utiliser les articles définis et le genre des noms de pays, dire quelle(s) langue(s) on parle.",
+    objectif_pt:"Nomear países e nacionalidades, usar os artigos definidos e o gênero dos nomes de países, dizer qual(is) língua(s) se fala.",
+    days:[
+      {num:"Jour 1", dur:"15 min",
+        title_fr:"Pays, habitants, capitales",
+        title_pt:"Países, habitantes, capitais",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Liste pays / habitants / capitales (audio)"},
+        exo:{type:"qcm", q:"Quelle est la capitale de la France ?", options:["Lyon","Marseille","Paris"], correct:2},
+        rec:{fr:"Dis le nom de 5 pays et leur capitale.", pt:"Diga o nome de 5 países e suas capitais."}},
+      {num:"Jour 2", dur:"15 min",
+        title_fr:"Les nationalités en vidéo",
+        title_pt:"As nacionalidades em vídeo",
+        media:[{type:"video", id:"zt1Se2Knufo", label:"Les nationalités — vocabulaire niveau A1"}],
+        exo:{type:"texte", q:"Comment dit-on « brésiliennes » (féminin pluriel) ?", accept:["brésiliennes","bresiliennes"]},
+        rec:{fr:"Dis 5 nationalités au féminin.", pt:"Diga 5 nacionalidades no feminino."}},
+      {num:"Jour 3", dur:"15 min",
+        title_fr:"Genre des pays + articles définis",
+        title_pt:"Gênero dos países + artigos definidos",
+        link:{url:"https://www.francepodcasts.com/2019/12/23/les-nationalites/", label:"Le genre des noms de pays — France Podcasts"},
+        exo:{type:"qcm", q:"Quel article utilise-t-on avec « Brésil » ?", options:["le","la","les"], correct:0},
+        rec:{fr:"Dis : le Brésil, la France, les États-Unis.", pt:"Diga esses três nomes de países com o artigo."}},
+      {num:"Jour 4", dur:"15 min",
+        title_fr:"Dire quelle langue on parle",
+        title_pt:"Dizer qual língua se fala",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Page débutant — langues et nationalités"},
+        exo:{type:"texte", q:"Complète : « Au Brésil, on parle ___. »", accept:["portugais"]},
+        rec:{fr:"Dis : Je parle... / Au Brésil, on parle...", pt:"Diga essas duas frases sobre você e seu país."}},
+      {num:"Jour 5", dur:"15 min",
+        title_fr:"Mots transparents + personnalités",
+        title_pt:"Palavras transparentes + personalidades",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Page débutant — mots et personnalités françaises"},
+        exo:{type:"qcm", q:"Lequel de ces mots est presque identique en français et en portugais ?", options:["hôpital / hospital","chien / cachorro","table / mesa"], correct:0},
+        rec:{fr:"Nomme 3 personnalités françaises connues.", pt:"Diga o nome de 3 personalidades francesas conhecidas."}}
+    ],
+    oral_title_fr:"Pays, langues, nationalités", oral_title_pt:"Países, línguas, nacionalidades",
+    oral:[
+      {fr:"Tour du monde à l'oral : « Je viens du Brésil, je suis brésilien(ne), je parle portugais. »", pt:"Volta ao mundo oral."},
+      {fr:"Jeu de devinettes sur les nationalités et pays.", pt:"Jogo de adivinhação sobre nacionalidades e países."},
+      {fr:"Discussion libre sur des personnalités françaises ou brésiliennes connues.", pt:"Conversa livre sobre personalidades conhecidas."}
+    ]
+  },
+  {
+    id:4, tag:"S4", color:"#e8590c",
+    title_fr:"Compter de 0 à 69",
+    title_pt:"Contar de 0 a 69",
+    objectif_fr:"Comprendre et dire les nombres de 0 à 69, noter un nombre entendu, donner et comprendre un numéro de téléphone.",
+    objectif_pt:"Compreender e dizer os números de 0 a 69, anotar um número ouvido, dar e entender um número de telefone.",
+    days:[
+      {num:"Jour 1", dur:"15 min",
+        title_fr:"Les nombres de 0 à 9",
+        title_pt:"Os números de 0 a 9",
+        link:{url:"https://www.francepodcasts.com/2019/04/13/les-chiffres-de-0-a-9-compter-en-francais/", label:"Les chiffres de 0 à 9 (audio)"},
+        exo:{type:"qcm", q:"Comment écrit-on 7 en lettres ?", options:["sept","six","huit"], correct:0},
+        rec:{fr:"Compte à voix haute de 0 à 9.", pt:"Conte em voz alta de 0 a 9."}},
+      {num:"Jour 2", dur:"15 min",
+        title_fr:"Les nombres de 10 à 19",
+        title_pt:"Os números de 10 a 19",
+        link:{url:"https://www.podcastfrancaisfacile.com/nombre/nombres_francais_compter-de-zero-a-100_les_nombres_en_francais_facile_apprendre_a_compter.html", label:"Compter de zéro à 100 (vidéo par étapes)"},
+        exo:{type:"qcm", q:"Quel nombre vient après « treize » ?", options:["quatorze","quinze","douze"], correct:0},
+        rec:{fr:"Compte à voix haute de 10 à 19.", pt:"Conte em voz alta de 10 a 19."}},
+      {num:"Jour 3", dur:"15 min",
+        title_fr:"Les nombres de 20 à 69",
+        title_pt:"Os números de 20 a 69",
+        media:[{type:"audio", url:"https://www.podcastfrancaisfacile.com/wp-content/uploads/2021/11/serie-1.mp3", label:"Écoute : série de nombres 1"}],
+        link:{url:"https://www.podcastfrancaisfacile.com/nombre/entrainement-nombres-de-1-a-100-exercice-decoute.html", label:"Entraînement nombres de 1 à 100"},
+        exo:{type:"qcm", q:"Comment dit-on 47 ?", options:["quarante-sept","quatre-sept","cinquante-sept"], correct:0},
+        rec:{fr:"Compte à voix haute de 20 à 69, par dizaines.", pt:"Conte em voz alta de 20 a 69, de dez em dez."}},
+      {num:"Jour 4", dur:"15 min",
+        title_fr:"Le numéro de téléphone",
+        title_pt:"O número de telefone",
+        media:[{type:"audio", url:"https://www.podcastfrancaisfacile.com/wp-content/uploads/files/serie-1-1.mp3", label:"Écoute : numéros de téléphone"}],
+        link:{url:"https://www.podcastfrancaisfacile.com/nombre/les-numeros-de-telephone.html", label:"Exercice complet — numéros de téléphone"},
+        exo:{type:"qcm", q:"Dans l'audio, quel est le numéro de téléphone de Pierre ?", options:["02 38 47 21 52","06 41 58 30 12","03 54 32 31 49"], correct:0},
+        rec:{fr:"Dis ton numéro de téléphone en français.", pt:"Diga seu número de telefone em francês."}},
+      {num:"Jour 5", dur:"15 min",
+        title_fr:"Dictée de nombres + révision",
+        title_pt:"Ditado de números + revisão",
+        link:{url:"https://www.podcastfrancaisfacile.com/apprendre-le-francais/apprendre-les-nombres-en-francais", label:"Index complet — apprendre les nombres"},
+        exo:{type:"qcm", q:"60 + 6 = ?", options:["soixante-six","soixante-dix-neuf","cinquante-six"], correct:0},
+        rec:{fr:"Dicte 5 nombres entre 0 et 69, pour réviser.", pt:"Dite 5 números entre 0 e 69, para revisar."}}
+    ],
+    oral_title_fr:"Les nombres", oral_title_pt:"Os números",
+    oral:[
+      {fr:"Compter à voix haute ensemble de 0 à 69, puis à l'envers.", pt:"Contar em voz alta juntos de 0 a 69, depois ao contrário."},
+      {fr:"Dicter et faire dicter des numéros de téléphone.", pt:"Ditar e pedir para ditar números de telefone."},
+      {fr:"Petit jeu de calcul oral simple.", pt:"Pequeno jogo de cálculo oral."}
+    ]
+  },
+  {
+    id:5, tag:"S5", color:"#8338ec",
+    title_fr:"Personnalités, classe et bilan",
+    title_pt:"Personalidades, sala de aula e balanço",
+    objectif_fr:"Identifier des personnalités françaises connues, utiliser des formules pour communiquer en classe, consolider l'ensemble du module à l'oral.",
+    objectif_pt:"Identificar personalidades francesas conhecidas, usar fórmulas para se comunicar em sala de aula, consolidar todo o módulo.",
+    days:[
+      {num:"Jour 1", dur:"15 min",
+        title_fr:"Personnalités françaises connues",
+        title_pt:"Personalidades francesas conhecidas",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Page débutant — culture et personnalités"},
+        exo:{type:"qcm", q:"Quel était le métier d'Édith Piaf ?", options:["Chanteuse","Actrice","Écrivaine"], correct:0},
+        rec:{fr:"Présente une personnalité française en 2 phrases.", pt:"Apresente uma personalidade francesa em 2 frases."}},
+      {num:"Jour 2", dur:"15 min",
+        title_fr:"Communiquer en classe",
+        title_pt:"Comunicar-se em sala de aula",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"50 phrases pour communiquer en classe"},
+        exo:{type:"qcm", q:"Comment demande-t-on une répétition ?", options:["Vous pouvez répéter ?","Vous pouvez chanter ?","Vous pouvez dormir ?"], correct:0},
+        rec:{fr:"Dis 5 formules utiles en classe.", pt:"Diga 5 fórmulas úteis para a sala de aula."}},
+      {num:"Jour 3", dur:"15 min",
+        title_fr:"Révision : phonétique + nombres",
+        title_pt:"Revisão: fonética + números",
+        link:{url:"https://www.podcastfrancaisfacile.com/phonetique-prononciation/tableau-des-sons-du-francais.html", label:"Rappel — tableau des sons du français"},
+        exo:{type:"qcm", q:"Quel nombre contient une voyelle nasale ?", options:["cinq","un","deux"], correct:1},
+        rec:{fr:"Compte de 0 à 69 en variant le rythme.", pt:"Conte de 0 a 69 variando o ritmo."}},
+      {num:"Jour 4", dur:"15 min",
+        title_fr:"Révision : se présenter + nationalités",
+        title_pt:"Revisão: se apresentar + nacionalidades",
+        link:{url:"https://www.podcastfrancaisfacile.com/francais-debutant-apprendre-le-francais", label:"Rappel — se présenter et nationalités"},
+        exo:{type:"texte", q:"Complète : « Je suis brésilienne, je ___ du Brésil. »", accept:["viens"]},
+        rec:{fr:"Refais ta présentation complète.", pt:"Refaça sua apresentação completa."}},
+      {num:"Jour 5", dur:"15 min",
+        title_fr:"Bilan et auto-évaluation",
+        title_pt:"Balanço e autoavaliação",
+        link:{url:"https://www.podcastfrancaisfacile.com/", label:"Podcast Français Facile — pour continuer"},
+        exo:null,
+        rec:{fr:"Enregistre un bilan oral : ce que tu as appris ce mois-ci.", pt:"Grave um balanço oral do que você aprendeu."}}
+    ],
+    oral_title_fr:"Bilan oral du module", oral_title_pt:"Balanço oral do módulo",
+    oral:[
+      {fr:"Présentation orale complète : nom, nationalité, pays, langues, un numéro.", pt:"Apresentação oral completa."},
+      {fr:"Mini-entretien type DELF A1.", pt:"Mini-entrevista tipo DELF A1."},
+      {fr:"Utilisation active des formules de classe.", pt:"Uso ativo das fórmulas de sala de aula."},
+      {fr:"Retour oral du professeur.", pt:"Retorno oral da professora."}
+    ]
+  }
+];
+
+const bilanItems = [
+  "Reconnaître et prononcer les sons du français (voyelles orales, nasales)",
+  "Épeler mon nom et mon prénom en français",
+  "Me présenter (nom, prénom, nationalité)",
+  "Dire quelle(s) langue(s) je parle et d'où je viens",
+  "Compter de 0 à 69 et donner un numéro de téléphone",
+  "Utiliser des formules pour communiquer en classe"
+];
+
+/* ======================= UTILITAIRES ======================= */
+function slug(s){
+  return (s||"").toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'') || "eleve";
+}
+function norm(s){
+  return s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,"'");
+}
+function fmtDate(ts){
+  try{
+    const d = ts && ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return ''; }
+}
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onloadend = ()=> resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+/* Appel au Google Apps Script (upload/suppression dans le Drive de la prof).
+   Content-Type text/plain volontaire : ça évite le préflight CORS qui bloquerait
+   sinon les requêtes vers un Web App Apps Script depuis un autre nom de domaine. */
+async function callDriveScript(payload){
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error('Réponse HTTP ' + res.status);
+  return await res.json();
+}
+
+/* ======================= SIDEBAR ======================= */
+function renderSidebar(){
+  const sb = document.getElementById('sidebar');
+  let html = `
+    <p class="cover-label">${niveau ? 'Niveau '+niveau+(screen==='week'||screen==='bilan'?' · Dossier 0':'') : 'Français langue étrangère'}</p>
+    <h1 class="cover-title">FLE</h1>
+  `;
+  if(student.prenom && screen!=='login' && screen!=='teacher'){
+    html += `<div class="student-badge"><b>${student.prenom} ${student.nom}</b>${niveau ? 'Niveau '+niveau : "En attente d'attribution"}</div>`;
+  }
+  if(screen==='week' || screen==='bilan'){
+    html += `<button class="nav-btn" onclick="goDossiers()">← Retour aux dossiers</button><div class="nav-sep"></div><nav class="weeks">`;
+    weeks.forEach(w=>{
+      html += `<button class="nav-btn ${(screen==='week'&&current===w.id)?'active':''}" style="--tag-color:${w.color}" onclick="goWeek(${w.id})"><span class="tag">${w.tag}</span> ${w.title_fr}</button>`;
+    });
+    html += `<button class="nav-btn ${screen==='bilan'?'active':''}" style="--tag-color:${BILAN_COLOR}" onclick="goBilan()"><span class="tag">✓</span> Bilan final</button></nav>`;
+  }
+  if(screen==='login' || screen==='waiting'){
+    html += `<div class="sidebar-foot">🎙️ Les exercices audio sont enregistrés et envoyés directement à ta professeure.<br><br>
+    <a class="teacher-link" onclick="goTeacher()">🔑 Espace professeure</a></div>`;
+  }
+  if(screen==='teacher'){
+    html += `<div class="sidebar-foot"><a class="teacher-link" onclick="goLogin()">← Retour à l'accueil</a></div>`;
+  }
+  sb.innerHTML = html;
+}
+
+/* ======================= NAVIGATION ======================= */
+function goLogin(){ isTeacher=false; teacherTab='eleves'; try{ auth.signOut(); }catch(e){} screen='login'; render(); }
+function goWaiting(){ screen='waiting'; render(); }
+function goDossiers(){ screen='dossiers'; render(); }
+function goWeek(id){
+  screen='week'; current=id;
+  const w = weeks.find(x=>x.id===id);
+  if(w) saveProgress(w.tag);
+  render();
+}
+function goBilan(){ screen='bilan'; render(); }
+function goTeacher(){ screen='teacher'; render(); }
+
+function afterAuth(uid, record){
+  student = {
+    prenom:record.prenom, nom:record.nom, email:record.email, telephone:record.telephone, uid,
+    uniteCourante: record.uniteCourante || null, frequence: record.frequence || null
+  };
+  if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
+  else { niveau = null; screen = 'waiting'; }
+  render();
+}
+async function saveProgress(tag){
+  student.uniteCourante = tag;
+  if(!student.uid) return;
+  try{ await db.collection('eleves').doc(student.uid).update({uniteCourante: tag}); }
+  catch(e){ /* non bloquant */ }
+}
+
+/* ======================= ÉCRAN : CONNEXION / INSCRIPTION ======================= */
+function renderLogin(){
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="auth-tabs">
+          <button class="auth-tab ${authMode==='signup'?'active':''}" onclick="setAuthMode('signup')">Créer un compte</button>
+          <button class="auth-tab ${authMode==='signin'?'active':''}" onclick="setAuthMode('signin')">Se connecter</button>
+        </div>
+        <div id="auth-body"></div>
+      </div>
+    </div>
+  `;
+  renderAuthBody();
+}
+function setAuthMode(mode){ authMode = mode; renderLogin(); }
+function renderAuthBody(){
+  const el = document.getElementById('auth-body');
+  if(!el) return;
+  if(authMode==='signup'){
+    el.innerHTML = `
+      <p class="sub">Crée ton compte. Ta professeure t'attribuera ensuite ton niveau.</p>
+      <div class="field"><label>Prénom</label><input id="su-prenom" type="text" placeholder="Ex. João"></div>
+      <div class="field"><label>Nom de famille</label><input id="su-nom" type="text" placeholder="Ex. Silva"></div>
+      <div class="field"><label>E-mail</label><input id="su-email" type="email" placeholder="joao@exemple.com"></div>
+      <div class="field"><label>Numéro de téléphone</label><input id="su-tel" type="tel" placeholder="+55 21 9XXXX-XXXX"></div>
+      <div class="field"><label>Mot de passe</label><input id="su-pw" type="password" placeholder="8 caractères minimum"></div>
+      <div class="field"><label>Confirmer le mot de passe</label><input id="su-pw2" type="password" placeholder="••••••••"></div>
+      <button class="primary-btn" id="su-btn" onclick="doSignup()">Créer mon compte →</button>
+      <p class="login-err" id="auth-err"></p>
+    `;
+  } else {
+    el.innerHTML = `
+      <p class="sub">Connecte-toi avec ton e-mail et ton mot de passe.</p>
+      <div class="field"><label>E-mail</label><input id="si-email" type="email" placeholder="joao@exemple.com"></div>
+      <div class="field"><label>Mot de passe</label><input id="si-pw" type="password" placeholder="••••••••"></div>
+      <button class="primary-btn" id="si-btn" onclick="doSignin()">Se connecter →</button>
+      <p class="login-err" id="auth-err"></p>
+    `;
+  }
+}
+function showAuthErr(msg){
+  const err = document.getElementById('auth-err');
+  if(err){ err.textContent = msg; err.style.display = 'block'; }
+}
+function friendlyAuthError(code){
+  const map = {
+    'auth/email-already-in-use': "Un compte existe déjà avec cet e-mail. Connecte-toi plutôt.",
+    'auth/invalid-email': "Cet e-mail ne semble pas valide.",
+    'auth/weak-password': "Le mot de passe doit contenir au moins 6 caractères.",
+    'auth/user-not-found': "Aucun compte avec cet e-mail. Crée un compte.",
+    'auth/wrong-password': "Mot de passe incorrect.",
+    'auth/invalid-credential': "E-mail ou mot de passe incorrect.",
+    'auth/too-many-requests': "Trop de tentatives. Réessaie dans quelques minutes."
+  };
+  return map[code] || "Une erreur est survenue. Réessaie.";
+}
+async function doSignup(){
+  const prenom = document.getElementById('su-prenom').value.trim();
+  const nom = document.getElementById('su-nom').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const telephone = document.getElementById('su-tel').value.trim();
+  const pw = document.getElementById('su-pw').value;
+  const pw2 = document.getElementById('su-pw2').value;
+  if(!prenom || !nom || !email || !telephone || !pw || !pw2){ showAuthErr('Merci de remplir tous les champs.'); return; }
+  if(!isValidEmail(email)){ showAuthErr("Cet e-mail ne semble pas valide."); return; }
+  if(pw.length < 8){ showAuthErr('Le mot de passe doit contenir au moins 8 caractères.'); return; }
+  if(pw !== pw2){ showAuthErr('Les deux mots de passe ne correspondent pas.'); return; }
+  const btn = document.getElementById('su-btn'); if(btn){ btn.disabled = true; btn.textContent = 'Création…'; }
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(email, pw);
+    const record = {
+      prenom, nom, email, telephone, niveau: null, frequence: null, uniteCourante: null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('eleves').doc(cred.user.uid).set(record);
+    afterAuth(cred.user.uid, record);
+  }catch(e){
+    showAuthErr(friendlyAuthError(e.code));
+    if(btn){ btn.disabled = false; btn.textContent = 'Créer mon compte →'; }
+  }
+}
+async function doSignin(){
+  const email = document.getElementById('si-email').value.trim();
+  const pw = document.getElementById('si-pw').value;
+  if(!email || !pw){ showAuthErr('Merci de renseigner ton e-mail et ton mot de passe.'); return; }
+  const btn = document.getElementById('si-btn'); if(btn){ btn.disabled = true; btn.textContent = 'Connexion…'; }
+  try{
+    const cred = await auth.signInWithEmailAndPassword(email, pw);
+    const doc = await db.collection('eleves').doc(cred.user.uid).get();
+    if(!doc.exists){ showAuthErr("Ce compte n'a pas de profil élève associé."); return; }
+    afterAuth(cred.user.uid, doc.data());
+  }catch(e){
+    showAuthErr(friendlyAuthError(e.code));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Se connecter →'; }
+  }
+}
+
+/* ======================= ÉCRAN : EN ATTENTE D'ATTRIBUTION ======================= */
+function renderWaiting(){
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-card">
+        <h1>Compte créé ✅</h1>
+        <p class="sub">Merci ${student.prenom} ! Ta professeure doit maintenant t'attribuer ton niveau. Reviens un peu plus tard, ou clique sur « Vérifier » une fois qu'elle te l'a confirmé.</p>
+        <p class="sub" style="color:var(--pt); font-style:italic;">🇧🇷 Obrigado, ${student.prenom}! Sua professora ainda precisa atribuir seu nível. Volte mais tarde, ou clique em "Verificar" depois que ela confirmar.</p>
+        <button class="primary-btn" onclick="refreshNiveau()">↻ Vérifier mon niveau</button>
+      </div>
+    </div>
+  `;
+}
+async function refreshNiveau(){
+  try{
+    const doc = await db.collection('eleves').doc(student.uid).get();
+    if(doc.exists){
+      const rec = doc.data();
+      if(rec.niveau){ niveau = rec.niveau; screen = 'dossiers'; render(); return; }
+    }
+  }catch(e){}
+  alert("Ton niveau n'a pas encore été attribué par ta professeure. Réessaie un peu plus tard.");
+}
+
+/* ======================= ÉCRAN : DOSSIERS ======================= */
+function renderDossiers(){
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <p class="eyebrow">Niveau ${niveau}</p>
+    <h1 class="page-title">Dossiers du niveau ${niveau}</h1>
+    <div class="objectif-box">
+      <p class="fr">Le niveau ${niveau} comptera <b>9 dossiers</b> au total. Pour l'instant, le <b>Dossier 0</b> est disponible — les suivants arriveront au fur et à mesure. Chaque dossier est découpé en <b>5 unités</b> ; tu avances à ton rythme, que tu aies 1, 2, 3, 4 ou 5 séances par semaine avec ta professeure — rien n'est bloqué par le calendrier.</p>
+      <p class="pt">🇧🇷 O nível ${niveau} terá 9 módulos ao todo. Por enquanto, o Módulo 0 está disponível — os próximos chegarão aos poucos. Cada módulo tem <b>5 unidades</b>; você avança no seu próprio ritmo, tenha 1, 2, 3, 4 ou 5 aulas por semana — nada é travado pelo calendário.</p>
+    </div>
+    <div class="dossier-grid" id="dossier-grid"></div>
+  `;
+  const grid = document.getElementById('dossier-grid');
+  dossiersMenu.forEach(d=>{
+    const isOpen = d.open && niveau === 'A1';
+    const el = document.createElement('div');
+    el.className = 'dossier-card ' + (isOpen ? 'open' : 'locked');
+    let statusText = isOpen ? '● Disponible' : '🔒 Bientôt disponible';
+    if(isOpen && student.uniteCourante){
+      const w = weeks.find(x=>x.tag===student.uniteCourante);
+      if(w) statusText = `↻ Reprendre — Unité ${w.id}/5`;
+    }
+    el.innerHTML = `
+      <div><div class="num">${d.num}</div><div class="name">${d.name}</div></div>
+      <div class="status">${statusText}</div>
+    `;
+    if(isOpen){
+      el.onclick = ()=>{
+        const w = weeks.find(x=>x.tag===student.uniteCourante);
+        goWeek(w ? w.id : 1);
+      };
+    }
+    grid.appendChild(el);
+  });
+}
+
+/* ======================= MÉDIA / EXERCICE / ENREGISTREMENT ======================= */
+function mediaHTML(day){
+  let html = '';
+  if(day.media){
+    day.media.forEach(m=>{
+      if(m.type==='audio'){
+        html += `<div class="media-block"><p class="section-label">🎧 Écouter — Ouvir</p><audio controls src="${m.url}"></audio></div>`;
+      } else if(m.type==='video'){
+        html += `<div class="media-block"><p class="section-label">▶ Regarder — Assistir</p><iframe src="https://www.youtube.com/embed/${m.id}" loading="lazy" allowfullscreen></iframe></div>`;
+      }
+    });
+  }
+  if(day.link){
+    html += `<a class="source-link" href="${day.link.url}" target="_blank" rel="noopener">🔗 ${day.link.label}</a>`;
+  }
+  return html;
+}
+function exoHTML(day, uid){
+  if(!day.exo) return '';
+  if(day.exo.type==='qcm'){
+    const opts = day.exo.options.map((o,i)=>`<button class="exo-opt" onclick="answerQCM('${uid}',${i},${day.exo.correct})">${o}</button>`).join('');
+    return `<div class="exo-box">
+      <p class="exo-consigne"><span class="label-fr">Consigne —</span> Choisis la bonne réponse.</p>
+      <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
+      <p class="exo-question">${day.exo.q}</p>
+      <div class="exo-options" id="opts-${uid}">${opts}</div>
+      <p class="exo-feedback" id="fb-${uid}"></p>
+    </div>`;
+  }
+  if(day.exo.type==='texte'){
+    return `<div class="exo-box">
+      <p class="exo-consigne"><span class="label-fr">Consigne —</span> Complète la phrase.</p>
+      <p class="exo-consigne-pt">🇧🇷 Complete a frase.</p>
+      <p class="exo-question">${day.exo.q}</p>
+      <div class="exo-text-row">
+        <input type="text" id="in-${uid}" placeholder="Ta réponse / Sua resposta">
+        <button onclick='checkTexte("${uid}", ${JSON.stringify(day.exo.accept)})'>Vérifier</button>
+      </div>
+      <p class="exo-feedback" id="fb-${uid}"></p>
+    </div>`;
+  }
+  return '';
+}
+function recHTML(day, uid){
+  return `<div class="rec-box">
+    <p class="rec-consigne"><span class="label-fr">🎙️ À enregistrer —</span> ${day.rec.fr}</p>
+    <p class="rec-consigne-pt">🇧🇷 ${day.rec.pt}</p>
+    <div class="rec-controls">
+      <button class="rec-btn" id="btn-${uid}" onclick="toggleRec('${uid}')">● Enregistrer</button>
+      <span class="rec-time" id="time-${uid}">00:00</span>
+    </div>
+    <div id="player-${uid}"></div>
+    <p class="rec-status" id="status-${uid}">Ton enregistrement sera envoyé automatiquement à ta professeure.</p>
+  </div>`;
+}
+
+/* ======================= ÉCRAN : SEMAINE ======================= */
+function renderWeek(w){
+  const c = document.getElementById('content');
+  const idx = weeks.findIndex(x=>x.id===w.id);
+  c.innerHTML = `
+    <p class="eyebrow">Dossier 0 · Unité ${w.id} / 5</p>
+    <h1 class="page-title">${w.title_fr}</h1>
+    <div class="objectif-box">
+      <p class="fr"><span class="label-fr">Objectif —</span> ${w.objectif_fr}</p>
+      <p class="pt">🇧🇷 <span class="label-pt">Objetivo —</span> ${w.objectif_pt}</p>
+    </div>
+    <div class="day-grid" id="day-grid"></div>
+    <div class="oral-box">
+      <h4>🗣️ Séance orale (1h) — ${w.oral_title_fr}</h4>
+      <p class="pt-title">🇧🇷 ${w.oral_title_pt}</p>
+      <ul class="oral-list">${w.oral.map(o=>`<li>${o.fr}<span class="pt">🇧🇷 ${o.pt}</span></li>`).join('')}</ul>
+    </div>
+    <div class="week-footer">
+      <button id="prevBtn" ${idx===0?'disabled':''}>← Unité précédente</button>
+      <button id="nextBtn">${idx===weeks.length-1 ? 'Voir le bilan final →' : 'Unité suivante →'}</button>
+    </div>
+  `;
+  const grid = document.getElementById('day-grid');
+  w.days.forEach((day,i)=>{
+    const uid = `w${w.id}d${i+1}`;
+    const el = document.createElement('div');
+    el.className = 'day-card';
+    el.innerHTML = `
+      <div class="day-top"><span class="day-num">${day.num}</span><span class="day-dur">${day.dur}</span></div>
+      <h3 class="day-title">${day.title_fr}</h3>
+      <p class="day-title-pt">🇧🇷 ${day.title_pt}</p>
+      ${mediaHTML(day)}
+      ${exoHTML(day, uid)}
+      ${recHTML(day, uid)}
+    `;
+    grid.appendChild(el);
+  });
+  document.getElementById('prevBtn').onclick = ()=>{ if(weeks[idx-1]) goWeek(weeks[idx-1].id); };
+  document.getElementById('nextBtn').onclick = ()=>{ if(weeks[idx+1]) goWeek(weeks[idx+1].id); else goBilan(); };
+}
+
+/* ======================= ÉCRAN : BILAN ======================= */
+function renderBilan(){
+  const c = document.getElementById('content');
+  const rows = bilanItems.map((t,i)=>`
+    <tr><td>${t}</td><td class="check"><input type="checkbox" id="chk-${i}"></td>
+    <td><input type="text" style="width:100%; border:1px solid var(--line); border-radius:5px; padding:5px 7px;" placeholder="Note / Nota"></td></tr>`).join('');
+  c.innerHTML = `
+    <p class="eyebrow">Dossier 0 · Bilan final</p>
+    <h1 class="page-title">Grille d'auto-évaluation</h1>
+    <div class="objectif-box">
+      <p class="fr"><span class="label-fr">À remplir —</span> à la fin de l'unité 5, avant la séance de bilan.</p>
+      <p class="pt">🇧🇷 <span class="label-pt">Preencher —</span> no final da unidade 5, antes da aula de balanço.</p>
+    </div>
+    <table class="bilan-table"><thead><tr><th>Je sais... / Eu sei...</th><th>OK</th><th>Note / Nota</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="week-footer"><button onclick="goWeek(5)">← Retour à l'unité 5</button><div></div></div>
+  `;
+}
+
+/* ======================= ÉCRAN : ESPACE PROFESSEURE ======================= */
+function renderTeacher(){
+  const c = document.getElementById('content');
+  if(!isTeacher){
+    c.innerHTML = `
+      <div class="login-wrap">
+        <div class="login-card">
+          <h1>Espace professeure</h1>
+          <p class="sub">Connecte-toi avec ton compte professeure pour gérer les comptes élèves et récupérer les enregistrements.</p>
+          <div class="field"><label>E-mail</label><input id="teacher-email" type="email" placeholder="prof@exemple.com"></div>
+          <div class="field"><label>Mot de passe</label><input id="teacher-pw" type="password" placeholder="••••••••"></div>
+          <button class="primary-btn" onclick="checkTeacherLogin()">Entrer →</button>
+          <p class="login-err" id="teacher-err"></p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  c.innerHTML = `
+    <p class="eyebrow">Espace professeure</p>
+    <h1 class="page-title">${teacherTab==='eleves' ? 'Élèves & attribution des niveaux' : 'Enregistrements des élèves'}</h1>
+    <div class="storage-note">🔒 Les profils et niveaux vivent dans Firestore (règles de sécurité), les fichiers audio dans ton Google Drive personnel — les deux ne sont pleinement accessibles qu'à ton compte professeure.</div>
+    <div class="teacher-tabs">
+      <button class="tab-btn ${teacherTab==='eleves'?'active':''}" onclick="setTeacherTab('eleves')">👤 Élèves & niveaux</button>
+      <button class="tab-btn ${teacherTab==='rec'?'active':''}" onclick="setTeacherTab('rec')">🎙️ Enregistrements</button>
+    </div>
+    <div id="teacher-body"><p class="teacher-empty">Chargement…</p></div>
+  `;
+  if(teacherTab==='eleves') loadTeacherStudents(); else loadTeacherRecordings();
+}
+async function checkTeacherLogin(){
+  const email = document.getElementById('teacher-email').value.trim();
+  const pw = document.getElementById('teacher-pw').value;
+  const err = document.getElementById('teacher-err');
+  if(!email || !pw){ err.textContent = 'Merci de renseigner ton e-mail et ton mot de passe.'; err.style.display='block'; return; }
+  try{
+    const cred = await auth.signInWithEmailAndPassword(email, pw);
+    if(cred.user.uid !== TEACHER_UID){
+      err.textContent = "Ce compte n'a pas accès à l'espace professeure.";
+      err.style.display = 'block';
+      await auth.signOut();
+      return;
+    }
+    isTeacher = true;
+    render();
+  }catch(e){
+    err.textContent = friendlyAuthError(e.code);
+    err.style.display = 'block';
+  }
+}
+function setTeacherTab(tab){ teacherTab = tab; render(); }
+
+/* ---- Onglet : Élèves & niveaux ---- */
+let studentsData = [];
+async function loadTeacherStudents(){
+  const body = document.getElementById('teacher-body');
+  if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
+  try{
+    const snap = await db.collection('eleves').orderBy('nom').get();
+    studentsData = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){ studentsData = []; }
+  renderTeacherStudentsList();
+}
+function renderTeacherStudentsList(){
+  const body = document.getElementById('teacher-body');
+  if(!body) return;
+  if(studentsData.length===0){ body.innerHTML = '<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>'; return; }
+  body.innerHTML = studentsData.map(s=>{
+    const niveauOpts = ['', ...niveauxMenu.map(n=>n.code)].map(code=>
+      `<option value="${code}" ${((s.niveau||'')===code) ? 'selected' : ''}>${code || '— Non assigné —'}</option>`
+    ).join('');
+    const freqOpts = ['', 1, 2, 3, 4, 5].map(f=>
+      `<option value="${f}" ${(String(s.frequence||'')===String(f)) ? 'selected' : ''}>${f ? f+' séance'+(f>1?'s':'')+'/semaine' : '— Rythme non défini —'}</option>`
+    ).join('');
+    let progressText = 'Pas encore commencé';
+    if(s.uniteCourante){
+      const w = weeks.find(x=>x.tag===s.uniteCourante);
+      if(w) progressText = `Unité ${w.id}/5 — ${w.title_fr}`;
+    }
+    return `<div class="teacher-entry">
+      <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
+      <div class="meta">${s.email} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
+      <div class="meta">📍 Progression : ${progressText}</div>
+      <div class="teacher-entry-actions">
+        <select id="niv-${s.id}">${niveauOpts}</select>
+        <select id="freq-${s.id}">${freqOpts}</select>
+        <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function saveStudentNiveau(id){
+  const niv = document.getElementById('niv-'+id).value;
+  const freq = document.getElementById('freq-'+id).value;
+  try{
+    await db.collection('eleves').doc(id).update({
+      niveau: niv || null,
+      frequence: freq ? parseInt(freq, 10) : null
+    });
+  }catch(e){ alert("Impossible d'enregistrer pour le moment."); }
+  await loadTeacherStudents();
+}
+
+/* ---- Onglet : Enregistrements ---- */
+let teacherData = [];
+async function loadTeacherRecordings(){
+  const body = document.getElementById('teacher-body');
+  if(body){
+    body.innerHTML = `
+      <div class="teacher-toolbar">
+        <input id="teacher-filter" type="text" placeholder="Filtrer par prénom, nom, e-mail, semaine…">
+        <button onclick="loadTeacherRecordings()">↻ Actualiser</button>
+      </div>
+      <div id="teacher-list"><p class="teacher-empty">Chargement…</p></div>
+    `;
+    document.getElementById('teacher-filter').oninput = renderTeacherList;
+  }
+  try{
+    const snap = await db.collection('enregistrements').orderBy('ts','desc').limit(300).get();
+    teacherData = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }catch(e){
+    teacherData = [];
+  }
+  renderTeacherList();
+}
+function renderTeacherList(){
+  const list = document.getElementById('teacher-list');
+  if(!list) return;
+  const filterEl = document.getElementById('teacher-filter');
+  const filter = filterEl ? norm(filterEl.value) : '';
+  const filtered = teacherData.filter(it=>{
+    if(!filter) return true;
+    const hay = norm(`${it.prenom} ${it.nom} ${it.email||''} ${it.semaine} ${it.jour} ${it.activite}`);
+    return hay.includes(filter);
+  });
+  if(filtered.length===0){
+    list.innerHTML = '<p class="teacher-empty">Aucun enregistrement pour le moment.</p>';
+    return;
+  }
+  list.innerHTML = filtered.map(it=>{
+    return `<div class="teacher-entry">
+      <div class="who">${it.prenom} ${it.nom} · ${it.niveau} · ${it.dossier}</div>
+      <div class="meta">${it.email || ''} · ${it.semaine} — ${it.jour} · ${it.activite || ''} · ${fmtDate(it.ts)}</div>
+      <div class="teacher-entry-actions">
+        <a href="${it.driveUrl}" target="_blank" rel="noopener">▶ Écouter / ouvrir dans Drive</a>
+        <button class="del" onclick="deleteRecording('${it.id}','${it.driveFileId||''}')">🗑 Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function deleteRecording(id, driveFileId){
+  if(!confirm('Supprimer définitivement cet enregistrement (et le fichier dans le Drive) ?')) return;
+  try{
+    if(driveFileId){ await callDriveScript({action:'delete', fileId: driveFileId}); }
+  }catch(e){ /* le document Firestore est quand même supprimé ci-dessous */ }
+  try{ await db.collection('enregistrements').doc(id).delete(); }catch(e){ /* ignore */ }
+  await loadTeacherRecordings();
+}
+
+/* ======================= RENDU PRINCIPAL ======================= */
+function render(){
+  renderSidebar();
+  const contentEl = document.getElementById('content');
+  let accent = "#3a6df0";
+  if(screen==='week'){ const w = weeks.find(x=>x.id===current); if(w) accent = w.color; }
+  else if(screen==='bilan'){ accent = BILAN_COLOR; }
+  contentEl.style.setProperty('--accent', accent);
+  if(screen==='login') renderLogin();
+  else if(screen==='waiting') renderWaiting();
+  else if(screen==='dossiers') renderDossiers();
+  else if(screen==='week') renderWeek(weeks.find(w=>w.id===current));
+  else if(screen==='bilan') renderBilan();
+  else if(screen==='teacher') renderTeacher();
+  window.scrollTo(0,0);
+}
+
+/* ======================= EXERCICES ======================= */
+function answerQCM(uid, chosen, correct){
+  const container = document.getElementById('opts-'+uid);
+  const buttons = container.querySelectorAll('.exo-opt');
+  buttons.forEach((b,i)=>{
+    b.disabled = true;
+    if(i===correct) b.classList.add('correct');
+    if(i===chosen && chosen!==correct) b.classList.add('wrong');
+  });
+  const fb = document.getElementById('fb-'+uid);
+  if(chosen===correct){ fb.textContent = '✔ Correct ! / Correto!'; fb.className = 'exo-feedback ok'; }
+  else{ fb.textContent = '✘ La bonne réponse est en vert. / A resposta certa está em verde.'; fb.className = 'exo-feedback bad'; }
+}
+function checkTexte(uid, accepted){
+  const input = document.getElementById('in-'+uid);
+  const fb = document.getElementById('fb-'+uid);
+  const val = norm(input.value);
+  const ok = accepted.some(a=>norm(a)===val);
+  if(ok){ fb.textContent = '✔ Correct ! / Correto!'; fb.className = 'exo-feedback ok'; }
+  else{ fb.textContent = `✘ Réponse attendue : « ${accepted[0]} ».`; fb.className = 'exo-feedback bad'; }
+}
+
+/* ======================= ENREGISTREMENT AUDIO ======================= */
+const recorders = {};
+
+function findDayByUid(uid){
+  const m = uid.match(/^w(\d+)d(\d+)$/);
+  if(!m) return null;
+  const w = weeks.find(x=>x.id===parseInt(m[1]));
+  if(!w) return null;
+  const day = w.days[parseInt(m[2])-1];
+  return {week:w, day};
+}
+
+async function toggleRec(uid){
+  const btn = document.getElementById('btn-'+uid);
+  const status = document.getElementById('status-'+uid);
+  if(!recorders[uid] || !recorders[uid].active){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr = new MediaRecorder(stream);
+      const chunks = [];
+      mr.ondataavailable = e=>chunks.push(e.data);
+      mr.onstop = async ()=>{
+        const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+        const url = URL.createObjectURL(blob);
+        const player = document.getElementById('player-'+uid);
+        player.innerHTML = `<audio class="rec-audio" controls src="${url}"></audio><br>
+          <a class="rec-dl" href="${url}" download="${uid}-secours.webm">⬇ Copie locale (secours) / Cópia local</a>`;
+        stream.getTracks().forEach(t=>t.stop());
+        clearInterval(recorders[uid].timer);
+        status.textContent = 'Envoi en cours…';
+        status.className = 'rec-status';
+        try{
+          const ctx = findDayByUid(uid);
+          const ext = (blob.type||'').includes('mp4') ? 'm4a' : 'webm';
+          const fileName = `${niveau}_${slug(student.prenom)}-${slug(student.nom)}_${ctx.week.tag}-${slug(ctx.day.num)}_${Date.now()}.${ext}`;
+          const b64 = await blobToBase64(blob);
+          const result = await callDriveScript({
+            action: 'upload',
+            fileName,
+            mimeType: blob.type || 'audio/webm',
+            base64: b64
+          });
+          if(!result || !result.ok) throw new Error(result && result.error || 'échec Drive');
+          await db.collection('enregistrements').add({
+            uid: student.uid,
+            prenom: student.prenom, nom: student.nom, email: student.email, telephone: student.telephone,
+            niveau: niveau, dossier: "Dossier 0",
+            semaine: ctx.week.tag, jour: ctx.day.num, activite: ctx.day.title_fr,
+            driveUrl: result.viewUrl, driveFileId: result.fileId,
+            ts: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          status.textContent = '✅ Enregistrement envoyé à ta professeure.'; status.className = 'rec-status ok';
+        }catch(e){
+          status.textContent = "⚠ Échec de l'envoi — utilise la copie locale ci-dessus.";
+          status.className = 'rec-status bad';
+        }
+      };
+      mr.start();
+      let seconds = 0;
+      const timeEl = document.getElementById('time-'+uid);
+      const timer = setInterval(()=>{
+        seconds++;
+        const m = String(Math.floor(seconds/60)).padStart(2,'0');
+        const s = String(seconds%60).padStart(2,'0');
+        timeEl.textContent = `${m}:${s}`;
+      }, 1000);
+      recorders[uid] = {mr, active:true, timer};
+      btn.textContent = '■ Arrêter';
+      btn.classList.add('recording');
+      status.textContent = 'Enregistrement en cours…';
+      status.className = 'rec-status';
+    }catch(err){
+      status.textContent = "Micro non disponible : autorise l'accès au micro dans ton navigateur.";
+      status.className = 'rec-status bad';
+    }
+  } else {
+    recorders[uid].mr.stop();
+    recorders[uid].active = false;
+    btn.textContent = '● Enregistrer';
+    btn.classList.remove('recording');
+  }
+}
+
+render();
+</script>
+</body>
+</html>
