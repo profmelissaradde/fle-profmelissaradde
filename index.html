@@ -3389,30 +3389,93 @@ async function deleteRecording(id, driveFileId){
 
 /* ======================= RENDU PRINCIPAL ======================= */
 function render(){
+
+  const currentUser = auth.currentUser;
+
+  // =====================================================
+  // SÉCURITÉ — COMPTE ÉLÈVE NON VÉRIFIÉ
+  // =====================================================
+  // Tant que l'adresse e-mail n'est pas vérifiée :
+  // - aucun menu
+  // - aucune réservation
+  // - aucun forum
+  // - aucun historique
+  // - uniquement l'écran de vérification
+
+  if (
+    currentUser &&
+    currentUser.uid !== TEACHER_UID &&
+    !currentUser.emailVerified
+  ) {
+    screen = 'verify';
+
+    // On ne génère surtout pas la sidebar
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+      sidebar.innerHTML = '';
+      sidebar.style.display = 'none';
+    }
+
+    renderVerify();
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  // =====================================================
+  // UTILISATEUR AUTORISÉ
+  // =====================================================
+
+  // Réaffiche la sidebar si elle avait été cachée
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.style.display = '';
+  }
+
   renderSidebar();
+
   const contentEl = document.getElementById('content');
+
   let accent = "#3a6df0";
-  if(screen==='week'){ const w = weeks.find(x=>x.id===current); if(w) accent = w.color; }
-  else if(screen==='bilan'){ accent = BILAN_COLOR; }
-  else if(screen==='survie'){ accent = "#ef476f"; }
-  else if(screen==='temas'){ accent = "#e08a1e"; }
-  else if(screen==='reserver'){ accent = "#06a77d"; }
-  else if(screen==='forum'){ accent = "#6f42c1"; }
-  else if(screen==='historique'){ accent = "#8338ec"; }
+
+  if(screen === 'week'){
+    const w = weeks.find(x => x.id === current);
+    if(w) accent = w.color;
+  }
+  else if(screen === 'bilan'){
+    accent = BILAN_COLOR;
+  }
+  else if(screen === 'survie'){
+    accent = "#ef476f";
+  }
+  else if(screen === 'temas'){
+    accent = "#e08a1e";
+  }
+  else if(screen === 'reserver'){
+    accent = "#06a77d";
+  }
+  else if(screen === 'forum'){
+    accent = "#6f42c1";
+  }
+  else if(screen === 'historique'){
+    accent = "#8338ec";
+  }
+
   contentEl.style.setProperty('--accent', accent);
-  if(screen==='login') renderLogin();
-  else if(screen==='verify') renderVerify();
-  else if(screen==='waiting') renderWaiting();
-  else if(screen==='dossiers') renderDossiers();
-  else if(screen==='survie') renderSurvie();
-  else if(screen==='temas') renderTemas();
-  else if(screen==='reserver') renderReserver();
-  else if(screen==='forum') renderForum();
-  else if(screen==='historique') renderHistorique();
-  else if(screen==='week') renderWeek(weeks.find(w=>w.id===current));
-  else if(screen==='bilan') renderBilan();
-  else if(screen==='teacher') renderTeacher();
-  window.scrollTo(0,0);
+
+  if(screen === 'login') renderLogin();
+  else if(screen === 'verify') renderVerify();
+  else if(screen === 'waiting') renderWaiting();
+  else if(screen === 'dossiers') renderDossiers();
+  else if(screen === 'survie') renderSurvie();
+  else if(screen === 'temas') renderTemas();
+  else if(screen === 'reserver') renderReserver();
+  else if(screen === 'forum') renderForum();
+  else if(screen === 'historique') renderHistorique();
+  else if(screen === 'week') renderWeek(weeks.find(w => w.id === current));
+  else if(screen === 'bilan') renderBilan();
+  else if(screen === 'teacher') renderTeacher();
+
+  window.scrollTo(0, 0);
 }
 
 /* ======================= EXERCICES ======================= */
