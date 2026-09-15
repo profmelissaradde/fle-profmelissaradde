@@ -2877,7 +2877,7 @@ function renderTeacher(){
     goLogin();
     return;
   }
-  const titles = {eleves:'Élèves & attribution des niveaux', rec:'Enregistrements des élèves', temas:'Thème de la semaine — suivi & notes', dispo:'Disponibilités & réservations', historique:'Historique des cours'};
+  const titles = {eleves:'Élèves & attribution des niveaux', rec:'Enregistrements des élèves', temas:'Thème de la semaine — suivi & notes', dispo:'Disponibilités & réservations', experimental:'Cours expérimental', historique:'Historique des cours'};
   c.innerHTML = `
     <p class="eyebrow">Admin</p>
     <h1 class="page-title">${titles[teacherTab]}</h1>
@@ -2887,6 +2887,7 @@ function renderTeacher(){
       <button class="tab-btn ${teacherTab==='rec'?'active':''}" onclick="setTeacherTab('rec')">🎙️ Enregistrements</button>
       <button class="tab-btn ${teacherTab==='temas'?'active':''}" onclick="setTeacherTab('temas')">🍅 Thème de la semaine</button>
       <button class="tab-btn ${teacherTab==='dispo'?'active':''}" onclick="setTeacherTab('dispo')">📅 Disponibilités</button>
+      <button class="tab-btn ${teacherTab==='experimental'?'active':''}" onclick="setTeacherTab('experimental')">🧪 Cours expérimental</button>
       <button class="tab-btn ${teacherTab==='historique'?'active':''}" onclick="setTeacherTab('historique')">📚 Historique</button>
     </div>
     <div id="teacher-body"><p class="teacher-empty">Chargement…</p></div>
@@ -2896,8 +2897,67 @@ function renderTeacher(){
   else if(teacherTab==='historique') loadTeacherHistorique();
   else if(teacherTab==='temas') loadTeacherTemas();
   else if(teacherTab==='dispo') loadAdminDispo();
+  else if(teacherTab==='experimental') renderExperimentalAdmin();
 }
 function setTeacherTab(tab){ teacherTab = tab; render(); }
+
+/* ---- Onglet : Cours expérimental ---- */
+let experimentalLink = '';
+function experimentalToken(){
+  const a = new Uint8Array(18);
+  crypto.getRandomValues(a);
+  return Array.from(a, x=>x.toString(16).padStart(2,'0')).join('');
+}
+function renderExperimentalAdmin(){
+  const body = document.getElementById('teacher-body');
+  if(!body || !isTeacher) return;
+  body.innerHTML = `
+    <div class="teacher-entry" style="max-width:680px;">
+      <div class="who">Créer un cours expérimental</div>
+      <div class="meta" style="margin-bottom:16px;">Choisis le créneau puis génère le lien unique à envoyer à l'élève.</div>
+      <div class="field" style="max-width:420px;"><label>Date et heure</label><input id="experimental-date" type="datetime-local"></div>
+      <div class="meta" style="margin:-4px 0 16px;">Durée du cours expérimental : 45 minutes.</div>
+      <button class="primary-btn" style="width:auto;padding:11px 18px;" onclick="createExperimentalCourse()">Créer le cours expérimental</button>
+      <div id="experimental-error" class="login-err" style="margin-top:10px;"></div>
+      <div id="experimental-result" style="display:none;margin-top:18px;background:#f3f6ff;border:1px solid #dbe4ff;border-radius:10px;padding:16px;">
+        <div style="font-weight:700;color:var(--navy);margin-bottom:8px;">Lien élève créé</div>
+        <div id="experimental-link" style="font-size:13px;word-break:break-all;margin-bottom:12px;"></div>
+        <button class="rec-btn" onclick="copyExperimentalLink()">Copier le lien</button>
+        <span id="experimental-copy-ok" style="font-size:12.5px;color:var(--ok);margin-left:10px;"></span>
+      </div>
+    </div>`;
+}
+async function createExperimentalCourse(){
+  if(!isTeacher || auth.currentUser?.uid !== TEACHER_UID) return;
+  const dateEl = document.getElementById('experimental-date');
+  const err = document.getElementById('experimental-error');
+  const result = document.getElementById('experimental-result');
+  err.style.display = 'none'; err.textContent = ''; result.style.display = 'none';
+  if(!dateEl.value){ err.textContent = 'Choisis une date et une heure.'; err.style.display = 'block'; return; }
+  const iso = new Date(dateEl.value).toISOString();
+  if(new Date(iso).getTime() <= Date.now()){ err.textContent = 'Choisis un créneau dans le futur.'; err.style.display = 'block'; return; }
+  const token = experimentalToken();
+  try{
+    const ref = await db.collection('disponibilites').add({
+      date: iso, duree: 45, isExperimental: true,
+      courseType: 'experimental', courseTitle: 'Cours expérimental', experimentalToken: token,
+      reservedBy: null, reservedName: null, reservedEmail: null,
+      reminderSent: false, confirmed: false,
+      createdBy: TEACHER_UID, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    const page = new URL('cours-experimental.html', window.location.href);
+    page.searchParams.set('token', token); page.searchParams.set('slot', ref.id);
+    experimentalLink = page.href;
+    document.getElementById('experimental-link').textContent = experimentalLink;
+    result.style.display = 'block';
+  }catch(e){ console.error(e); err.textContent = 'Impossible de créer le cours expérimental.'; err.style.display = 'block'; }
+}
+async function copyExperimentalLink(){
+  if(!experimentalLink) return;
+  const ok = document.getElementById('experimental-copy-ok');
+  try{ await navigator.clipboard.writeText(experimentalLink); ok.textContent = 'Lien copié.'; }
+  catch(e){ ok.textContent = 'Copie le lien affiché ci-dessus.'; }
+}
 
 /* ---- Onglet : Élèves & niveaux ---- */
 let studentsData = [];
