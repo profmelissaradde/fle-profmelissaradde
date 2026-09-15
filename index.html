@@ -1119,7 +1119,26 @@ async function doSignup(){
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     await db.collection('eleves').doc(cred.user.uid).set(record);
-    try{ await cred.user.sendEmailVerification(); }catch(e){}
+    try {
+  await cred.user.sendEmailVerification();
+
+  alert(
+    "Firebase a accepté l'envoi du mail de vérification à : " +
+    cred.user.email
+  );
+
+} catch (e) {
+
+  console.error("ERREUR FIREBASE VERIFICATION", e);
+
+  alert(
+    "ERREUR FIREBASE\n\n" +
+    "Code : " + (e.code || "inconnu") + "\n\n" +
+    "Message : " + (e.message || "inconnu")
+  );
+
+  throw e;
+}
     student = {prenom, nom, email, telephone, whatsappCode, country, timezone, uid: cred.user.uid};
     screen = 'verify';
     render();
