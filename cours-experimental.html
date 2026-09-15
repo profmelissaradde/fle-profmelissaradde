@@ -33,9 +33,9 @@ button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;
     <div class="field"><label>Prénom</label><input id="prenom" autocomplete="given-name" required></div>
     <div class="field"><label>Nom de famille</label><input id="nom" autocomplete="family-name" required></div>
     <div class="field full"><label>E-mail</label><input id="email" type="email" autocomplete="email" required></div>
-    <div class="field"><label>Pays</label><select id="country"><option value="BR">Brésil (+55)</option><option value="FR">France (+33)</option></select></div>
-    <div class="field"><label>Numéro de téléphone / WhatsApp</label><div class="phone-row"><span class="prefix" id="prefix">+55</span><input id="telephone" type="tel" autocomplete="tel-national" placeholder="(21) 99876-5432" required></div></div>
-    <div class="field full" id="cpfWrap"><label>CPF</label><input id="cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></div>
+    <div class="field full"><label>Pays de résidence</label><input id="country" type="text" autocomplete="country-name" placeholder="Ex. France, Brésil, Portugal" required></div>
+    <div class="field full"><label>WhatsApp</label><div class="phone-row"><select id="waCode" style="max-width:230px"></select><input id="telephone" type="tel" autocomplete="tel-national" placeholder="Numéro WhatsApp" required></div></div>
+    <div class="field full"><label>CPF</label><input id="cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required></div>
     <div class="field full"><label>Fuseau horaire</label><select id="timezone"></select></div>
     <div class="field"><label>Mot de passe</label><input id="password" type="password" autocomplete="new-password" minlength="8" required></div>
     <div class="field"><label>Confirmer le mot de passe</label><input id="password2" type="password" autocomplete="new-password" minlength="8" required></div>
@@ -60,11 +60,12 @@ let slot=null;
 function digitsOnly(v){return(v||'').replace(/\D/g,'')}
 function formatCPF(v){const d=digitsOnly(v).slice(0,11);return d.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1-$2')}
 function validCPF(v){const c=digitsOnly(v);if(c.length!==11||/^(\d)\1{10}$/.test(c))return false;let s=0;for(let i=0;i<9;i++)s+=+c[i]*(10-i);let d=(s*10)%11;if(d===10)d=0;if(d!==+c[9])return false;s=0;for(let i=0;i<10;i++)s+=+c[i]*(11-i);d=(s*10)%11;if(d===10)d=0;return d===+c[10]}
-function normalizePhone(country,v){let d=digitsOnly(v);if(country==='BR'){if(d.startsWith('55'))d=d.slice(2);if(![10,11].includes(d.length))return null;return'+55'+d}if(d.startsWith('33'))d=d.slice(2);if(d.startsWith('0'))d=d.slice(1);if(d.length!==9)return null;return'+33'+d}
+const WHATSAPP_CODES=[['+55','Brésil'],['+33','France'],['+351','Portugal'],['+1','États-Unis / Canada'],['+34','Espagne'],['+39','Italie'],['+44','Royaume-Uni'],['+49','Allemagne'],['+41','Suisse'],['+32','Belgique'],['+352','Luxembourg'],['+31','Pays-Bas'],['+54','Argentine'],['+56','Chili'],['+57','Colombie'],['+51','Pérou'],['+52','Mexique'],['+598','Uruguay'],['+595','Paraguay'],['+591','Bolivie'],['+593','Équateur'],['+58','Venezuela'],['+81','Japon'],['+82','Corée du Sud'],['+86','Chine'],['+61','Australie']];
+function normalizeWhatsApp(code,v){let d=digitsOnly(v),p=digitsOnly(code);if(d.startsWith(p))d=d.slice(p.length);while(d.startsWith('0'))d=d.slice(1);if(d.length<6||d.length>14)return null;return'+'+p+d}
+function fillWhatsAppCodes(){$('waCode').innerHTML=WHATSAPP_CODES.map(([c,n])=>`<option value="${c}" ${c==='+55'?'selected':''}>${c} — ${n}</option>`).join('')}
 function detectedTimezone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'Europe/Paris'}catch(e){return'Europe/Paris'}}
 function fillTimezones(){let z=[];try{z=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):[]}catch(e){}if(!z.length)z=['Europe/Paris','America/Sao_Paulo','America/Manaus','America/Fortaleza','America/Recife','America/Bahia'];const cur=detectedTimezone();if(!z.includes(cur))z.unshift(cur);$('timezone').innerHTML=z.map(x=>`<option value="${x}" ${x===cur?'selected':''}>${x}</option>`).join('')}
-function updateCountry(){const br=$('country').value==='BR';$('prefix').textContent=br?'+55':'+33';$('telephone').placeholder=br?'(21) 99876-5432':'06 12 34 56 78';$('cpfWrap').style.display=br?'block':'none'}
-$('country').addEventListener('change',updateCountry);$('cpf').addEventListener('input',e=>e.target.value=formatCPF(e.target.value));fillTimezones();updateCountry();
+$('cpf').addEventListener('input',e=>e.target.value=formatCPF(e.target.value));fillWhatsAppCodes();fillTimezones();
 
 async function init(){
   if(!token||!slotId){$('status').textContent='Ce lien de cours expérimental est incomplet.';return}
@@ -91,18 +92,18 @@ async function createZoom(name){
 async function reserveTrial(){
   $('err').textContent='';
   const prenom=$('prenom').value.trim(),nom=$('nom').value.trim(),email=$('email').value.trim();
-  const country=$('country').value,telephone=normalizePhone(country,$('telephone').value);
-  const cpf=country==='BR'?digitsOnly($('cpf').value):null;
+  const country=$('country').value.trim(),whatsappCode=$('waCode').value,telephone=normalizeWhatsApp(whatsappCode,$('telephone').value);
+  const cpf=digitsOnly($('cpf').value);
   const timezone=$('timezone').value||detectedTimezone(),password=$('password').value,password2=$('password2').value;
-  if(!prenom||!nom||!email||!telephone||!password||!password2){$('err').textContent='Complète tous les champs obligatoires.';return}
-  if(country==='BR'&&!validCPF(cpf)){$('err').textContent='Le CPF renseigné n’est pas valide.';return}
+  if(!prenom||!nom||!email||!country||!telephone||!cpf||!timezone||!password||!password2){$('err').textContent='Complète tous les champs.';return}
+  if(!validCPF(cpf)){$('err').textContent='Le CPF renseigné n’est pas valide.';return}
   if(password!==password2){$('err').textContent='Les deux mots de passe ne correspondent pas.';return}
   if(password.length<8){$('err').textContent='Le mot de passe doit contenir au moins 8 caractères.';return}
   $('reserve').disabled=true;
   try{
     const cred=await auth.createUserWithEmailAndPassword(email,password),uid=cred.user.uid;
     await db.collection('eleves').doc(uid).set({
-      prenom,nom,email,telephone,country,cpf,timezone,uid,niveau:null,frequence:null,uniteCourante:null,
+      prenom,nom,email,telephone,whatsappCode,country,cpf,timezone,uid,niveau:null,frequence:null,uniteCourante:null,
       status:'experimental',registrationSource:'cours-experimental',experimentalLesson:true,experimentalCompleted:false,
       createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
