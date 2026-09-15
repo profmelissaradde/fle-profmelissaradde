@@ -51,7 +51,7 @@ button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 const firebaseConfig={apiKey:'AIzaSyAVT-VM8QyTfOg16P_9juX3dbJsR3e3z3c',authDomain:'fle-profmelissaradde.firebaseapp.com',projectId:'fle-profmelissaradde',storageBucket:'fle-profmelissaradde.firebasestorage.app',messagingSenderId:'670442169351',appId:'1:670442169351:web:535dca29a998c80dc636a2'};
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwm16gqYmqBunp3BFMwQfbrUgKJijeY6cPQG__yAZY7O5sQJVDaadArmtorPOb2OI7pTQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzz-46uWRyydKp9aMD3n8o3P4U5d58QegqCfEKLh0n2xmeL4rn6_a78nOqoD3aYXc_L1g/exec";
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore(),params=new URLSearchParams(location.search),token=params.get('token'),slotId=params.get('slot');
 const $=id=>document.getElementById(id);
