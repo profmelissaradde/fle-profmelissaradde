@@ -1,1 +1,127 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cours expérimental — Prof. Melissa Radde</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>:root{--navy:#182a6b;--blue:#3a6df0;--cream:#fff8ef;--line:#ece1cf;--grey:#6b7280;--ok:#067a5d;--bad:#c92b4b}*{box-sizing:border-box}body{margin:0;background:var(--cream);font-family:Inter,sans-serif;color:#20232b}.wrap{max-width:720px;margin:38px auto;padding:0 18px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:30px;box-shadow:0 4px 22px #0000000f}h1,h2{font-family:Fraunces,serif;color:var(--navy)}h1{margin:0 0 8px}.sub{color:var(--grey);line-height:1.5}.slot{background:#f3f6ff;border-left:4px solid var(--blue);padding:15px 16px;border-radius:8px;margin:20px 0}.rules{font-size:13px;color:#555;line-height:1.6;background:#fffaf0;padding:14px;border-radius:8px;margin:14px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:13px}.field.full{grid-column:1/-1}label{display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px}input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit}button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;text-align:center;text-decoration:none}.secondary{background:var(--navy);margin-top:10px}.err{color:var(--bad);font-size:13px;margin-top:10px}.success{color:var(--ok)}#formPanel,#success{display:none}@media(max-width:600px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}}</style></head><body><main class="wrap"><section class="card"><h1>Cours expérimental</h1><p class="sub">Complète tes coordonnées pour réserver le créneau transmis par la Prof. Melissa Radde.</p><div id="status">Vérification du lien…</div><div id="formPanel"><div class="slot"><strong>Ton cours expérimental</strong><br><span id="slotText"></span></div><div class="grid"><div class="field"><label for="prenom">Prénom</label><input id="prenom" autocomplete="given-name" required></div><div class="field"><label for="nom">Nom de famille</label><input id="nom" autocomplete="family-name" required></div><div class="field full"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required></div><div class="field full"><label for="telephone">Numéro de téléphone</label><input id="telephone" type="tel" autocomplete="tel" required></div><div class="field"><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="new-password" minlength="6" required></div><div class="field"><label for="password2">Confirmer le mot de passe</label><input id="password2" type="password" autocomplete="new-password" minlength="6" required></div></div><div class="rules">Tu peux annuler ou demander le déplacement de ton cours jusqu’à 24 heures avant l’horaire prévu. À moins de 24 heures, le créneau ne peut plus être déplacé. En cas d’absence ou d’annulation tardive, un nouveau cours expérimental gratuit ne pourra pas être réservé et le prochain cours devra être réglé.<br><br>24 heures avant le cours, tu recevras un e-mail te demandant de confirmer ta présence. Le lien Zoom sera disponible dans ton espace de cours.</div><button id="reserve" type="button">Créer mon compte et réserver</button><div id="err" class="err"></div></div><div id="success"><h2 class="success">Cours expérimental réservé</h2><p>Ton compte a été créé et ton cours apparaît maintenant dans ton espace. La réunion Zoom est créée sous le titre « Cours expérimental — ton nom ».</p><a class="button secondary" href="./index.html">Accéder à mon espace de cours</a></div></section></main><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script><script>const firebaseConfig={apiKey:'AIzaSyAVT-VM8QyTfOg16P_9juX3dbJsR3e3z3c',authDomain:'fle-profmelissaradde.firebaseapp.com',projectId:'fle-profmelissaradde',storageBucket:'fle-profmelissaradde.firebasestorage.app',messagingSenderId:'670442169351',appId:'1:670442169351:web:535dca29a998c80dc636a2'};const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwrF61vTIyO-o8CYSzFTOvg0fPOC7Wd5MmQLfxGWSc957bLx8-t_TgzJkJumLS4qX8Jww/exec';firebase.initializeApp(firebaseConfig);const auth=firebase.auth(),db=firebase.firestore(),params=new URLSearchParams(location.search),token=params.get('token'),slotId=params.get('slot');const statusEl=document.getElementById('status'),formPanel=document.getElementById('formPanel'),successEl=document.getElementById('success'),slotText=document.getElementById('slotText'),reserveBtn=document.getElementById('reserve'),errEl=document.getElementById('err');const prenomEl=document.getElementById('prenom'),nomEl=document.getElementById('nom'),emailEl=document.getElementById('email'),telephoneEl=document.getElementById('telephone'),passwordEl=document.getElementById('password'),password2El=document.getElementById('password2');let slot=null;async function init(){if(!token||!slotId){statusEl.textContent='Ce lien de cours expérimental est incomplet.';return}try{const doc=await db.collection('disponibilites').doc(slotId).get();if(!doc.exists){statusEl.textContent='Ce créneau n’existe plus.';return}slot=doc.data();if(!slot.isExperimental||slot.experimentalToken!==token){statusEl.textContent='Ce lien n’est pas valide.';return}if(slot.reservedBy){statusEl.textContent='Ce cours expérimental a déjà été réservé.';return}slotText.textContent=new Date(slot.date).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})+' — '+(slot.duree||45)+' min';statusEl.style.display='none';formPanel.style.display='block'}catch(e){console.error(e);statusEl.textContent='Impossible de vérifier le créneau pour le moment.'}}async function createZoom(name){const topic='Cours expérimental — '+name;try{const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createZoomMeeting',topic:topic,startTime:slot.date,duration:slot.duree||45})});const data=await r.json();if(data&&data.ok&&data.joinUrl){await db.collection('disponibilites').doc(slotId).update({zoomJoinUrl:data.joinUrl,zoomTopic:topic})}else{await db.collection('disponibilites').doc(slotId).update({zoomTopic:topic})}}catch(e){console.warn('Zoom non créé automatiquement',e);try{await db.collection('disponibilites').doc(slotId).update({zoomTopic:topic})}catch(_){}}}async function reserveTrial(){errEl.textContent='';const prenom=prenomEl.value.trim(),nom=nomEl.value.trim(),email=emailEl.value.trim(),telephone=telephoneEl.value.trim(),password=passwordEl.value,password2=password2El.value;if(!prenom||!nom||!email||!telephone||!password||!password2){errEl.textContent='Complète tous les champs.';return}if(password!==password2){errEl.textContent='Les deux mots de passe ne correspondent pas.';return}if(password.length<6){errEl.textContent='Le mot de passe doit contenir au moins 6 caractères.';return}reserveBtn.disabled=true;try{const cred=await auth.createUserWithEmailAndPassword(email,password);const uid=cred.user.uid;await db.collection('eleves').doc(uid).set({prenom,nom,email,telephone,uid,niveau:null,createdAt:firebase.firestore.FieldValue.serverTimestamp(),registrationSource:'cours-experimental',experimentalLesson:true},{merge:true});await db.collection('disponibilites').doc(slotId).update({reservedBy:uid,reservedName:prenom+' '+nom,reservedEmail:email,reservedPhone:telephone,isExperimental:true,courseType:'experimental',courseTitle:'Cours expérimental',confirmed:false,reminderSent:false,experimentalRegisteredAt:firebase.firestore.FieldValue.serverTimestamp()});await createZoom(prenom+' '+nom);formPanel.style.display='none';successEl.style.display='block'}catch(e){console.error(e);if(e.code==='auth/email-already-in-use'){errEl.textContent='Cette adresse e-mail possède déjà un compte. Connecte-toi à l’application avec ce compte, puis contacte la professeure pour associer le cours expérimental.'}else if(e.code==='auth/invalid-email'){errEl.textContent='L’adresse e-mail n’est pas valide.'}else if(e.code==='auth/weak-password'){errEl.textContent='Le mot de passe est trop faible.'}else{errEl.textContent='Impossible de créer le compte ou de réserver pour le moment.'}reserveBtn.disabled=false}}reserveBtn.addEventListener('click',reserveTrial);init();</script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cours expérimental — Prof. Melissa Radde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#182a6b;--blue:#3a6df0;--cream:#fff8ef;--line:#ece1cf;--grey:#6b7280;--ok:#067a5d;--bad:#c92b4b}
+*{box-sizing:border-box} body{margin:0;background:var(--cream);font-family:Inter,sans-serif;color:#20232b}
+.wrap{max-width:720px;margin:38px auto;padding:0 18px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:30px;box-shadow:0 4px 22px #0000000f}
+h1,h2{font-family:Fraunces,serif;color:var(--navy)}h1{margin:0 0 8px}.sub{color:var(--grey);line-height:1.5}
+.slot{background:#f3f6ff;border-left:4px solid var(--blue);padding:15px 16px;border-radius:8px;margin:20px 0}
+.rules{font-size:13px;color:#555;line-height:1.6;background:#fffaf0;padding:14px;border-radius:8px;margin:14px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:13px}.field.full{grid-column:1/-1}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+.phone-row{display:flex;gap:8px}.prefix{padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--cream);font-weight:700;white-space:nowrap}
+button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;text-align:center;text-decoration:none}
+.secondary{background:var(--navy);margin-top:10px}.err{color:var(--bad);font-size:13px;margin-top:10px}.success{color:var(--ok)}
+#formPanel,#success{display:none}@media(max-width:600px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<main class="wrap"><section class="card">
+<h1>Cours expérimental</h1>
+<p class="sub">Complète tes coordonnées pour réserver le créneau transmis par la Prof. Melissa Radde.</p>
+<div id="status">Vérification du lien…</div>
+<div id="formPanel">
+  <div class="slot"><strong>Ton cours expérimental</strong><br><span id="slotText"></span></div>
+  <div class="grid">
+    <div class="field"><label>Prénom</label><input id="prenom" autocomplete="given-name" required></div>
+    <div class="field"><label>Nom de famille</label><input id="nom" autocomplete="family-name" required></div>
+    <div class="field full"><label>E-mail</label><input id="email" type="email" autocomplete="email" required></div>
+    <div class="field"><label>Pays</label><select id="country"><option value="BR">Brésil (+55)</option><option value="FR">France (+33)</option></select></div>
+    <div class="field"><label>Numéro de téléphone / WhatsApp</label><div class="phone-row"><span class="prefix" id="prefix">+55</span><input id="telephone" type="tel" autocomplete="tel-national" placeholder="(21) 99876-5432" required></div></div>
+    <div class="field full" id="cpfWrap"><label>CPF</label><input id="cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></div>
+    <div class="field full"><label>Fuseau horaire</label><select id="timezone"></select></div>
+    <div class="field"><label>Mot de passe</label><input id="password" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="field"><label>Confirmer le mot de passe</label><input id="password2" type="password" autocomplete="new-password" minlength="8" required></div>
+  </div>
+  <div class="rules">Tu peux annuler ou demander le déplacement de ton cours jusqu’à 24 heures avant l’horaire prévu. À moins de 24 heures, le créneau ne peut plus être déplacé. En cas d’absence ou d’annulation tardive, un nouveau cours expérimental gratuit ne pourra pas être réservé et le prochain cours devra être réglé.<br><br>24 heures avant le cours, tu recevras un e-mail te demandant de confirmer ta présence. Le lien Zoom sera disponible dans ton espace de cours.</div>
+  <button id="reserve" type="button">Créer mon compte et réserver</button><div id="err" class="err"></div>
+</div>
+<div id="success"><h2 class="success">Cours expérimental réservé</h2><p>Ton compte a été créé et ton cours apparaît maintenant dans ton espace.</p><a class="button secondary" href="./index.html">Accéder à mon espace de cours</a></div>
+</section></main>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={apiKey:'AIzaSyAVT-VM8QyTfOg16P_9juX3dbJsR3e3z3c',authDomain:'fle-profmelissaradde.firebaseapp.com',projectId:'fle-profmelissaradde',storageBucket:'fle-profmelissaradde.firebasestorage.app',messagingSenderId:'670442169351',appId:'1:670442169351:web:535dca29a998c80dc636a2'};
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbwrF61vTIyO-o8CYSzFTOvg0fPOC7Wd5MmQLfxGWSc957bLx8-t_TgzJkJumLS4qX8Jww/exec';
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth(),db=firebase.firestore(),params=new URLSearchParams(location.search),token=params.get('token'),slotId=params.get('slot');
+const $=id=>document.getElementById(id);
+let slot=null;
+
+function digitsOnly(v){return(v||'').replace(/\D/g,'')}
+function formatCPF(v){const d=digitsOnly(v).slice(0,11);return d.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1-$2')}
+function validCPF(v){const c=digitsOnly(v);if(c.length!==11||/^(\d)\1{10}$/.test(c))return false;let s=0;for(let i=0;i<9;i++)s+=+c[i]*(10-i);let d=(s*10)%11;if(d===10)d=0;if(d!==+c[9])return false;s=0;for(let i=0;i<10;i++)s+=+c[i]*(11-i);d=(s*10)%11;if(d===10)d=0;return d===+c[10]}
+function normalizePhone(country,v){let d=digitsOnly(v);if(country==='BR'){if(d.startsWith('55'))d=d.slice(2);if(![10,11].includes(d.length))return null;return'+55'+d}if(d.startsWith('33'))d=d.slice(2);if(d.startsWith('0'))d=d.slice(1);if(d.length!==9)return null;return'+33'+d}
+function detectedTimezone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'Europe/Paris'}catch(e){return'Europe/Paris'}}
+function fillTimezones(){let z=[];try{z=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):[]}catch(e){}if(!z.length)z=['Europe/Paris','America/Sao_Paulo','America/Manaus','America/Fortaleza','America/Recife','America/Bahia'];const cur=detectedTimezone();if(!z.includes(cur))z.unshift(cur);$('timezone').innerHTML=z.map(x=>`<option value="${x}" ${x===cur?'selected':''}>${x}</option>`).join('')}
+function updateCountry(){const br=$('country').value==='BR';$('prefix').textContent=br?'+55':'+33';$('telephone').placeholder=br?'(21) 99876-5432':'06 12 34 56 78';$('cpfWrap').style.display=br?'block':'none'}
+$('country').addEventListener('change',updateCountry);$('cpf').addEventListener('input',e=>e.target.value=formatCPF(e.target.value));fillTimezones();updateCountry();
+
+async function init(){
+  if(!token||!slotId){$('status').textContent='Ce lien de cours expérimental est incomplet.';return}
+  try{
+    const doc=await db.collection('disponibilites').doc(slotId).get();
+    if(!doc.exists){$('status').textContent='Ce créneau n’existe plus.';return}
+    slot=doc.data();
+    if(!slot.isExperimental||slot.experimentalToken!==token){$('status').textContent='Ce lien n’est pas valide.';return}
+    if(slot.reservedBy){$('status').textContent='Ce cours expérimental a déjà été réservé.';return}
+    $('slotText').textContent=new Date(slot.date).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})+' — 45 min';
+    $('status').style.display='none';$('formPanel').style.display='block';
+  }catch(e){console.error(e);$('status').textContent='Impossible de vérifier le créneau pour le moment.'}
+}
+async function createZoom(name){
+  const topic='Cours expérimental — '+name;
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createZoomMeeting',topic,startTime:slot.date,duration:45})});
+    const data=await r.json();
+    const patch={zoomTopic:topic};
+    if(data&&data.ok&&data.joinUrl)patch.zoomJoinUrl=data.joinUrl;
+    await db.collection('disponibilites').doc(slotId).update(patch);
+  }catch(e){console.warn('Zoom non créé automatiquement',e)}
+}
+async function reserveTrial(){
+  $('err').textContent='';
+  const prenom=$('prenom').value.trim(),nom=$('nom').value.trim(),email=$('email').value.trim();
+  const country=$('country').value,telephone=normalizePhone(country,$('telephone').value);
+  const cpf=country==='BR'?digitsOnly($('cpf').value):null;
+  const timezone=$('timezone').value||detectedTimezone(),password=$('password').value,password2=$('password2').value;
+  if(!prenom||!nom||!email||!telephone||!password||!password2){$('err').textContent='Complète tous les champs obligatoires.';return}
+  if(country==='BR'&&!validCPF(cpf)){$('err').textContent='Le CPF renseigné n’est pas valide.';return}
+  if(password!==password2){$('err').textContent='Les deux mots de passe ne correspondent pas.';return}
+  if(password.length<8){$('err').textContent='Le mot de passe doit contenir au moins 8 caractères.';return}
+  $('reserve').disabled=true;
+  try{
+    const cred=await auth.createUserWithEmailAndPassword(email,password),uid=cred.user.uid;
+    await db.collection('eleves').doc(uid).set({
+      prenom,nom,email,telephone,country,cpf,timezone,uid,niveau:null,frequence:null,uniteCourante:null,
+      status:'experimental',registrationSource:'cours-experimental',experimentalLesson:true,experimentalCompleted:false,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await db.collection('disponibilites').doc(slotId).update({
+      reservedBy:uid,reservedName:prenom+' '+nom,reservedEmail:email,reservedPhone:telephone,
+      isExperimental:true,courseType:'experimental',courseTitle:'Cours expérimental',confirmed:false,reminderSent:false,
+      experimentalRegisteredAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    try{await cred.user.sendEmailVerification()}catch(e){}
+    await createZoom(prenom+' '+nom);
+    $('formPanel').style.display='none';$('success').style.display='block';
+  }catch(e){
+    console.error(e);
+    if(e.code==='auth/email-already-in-use')$('err').textContent='Cette adresse e-mail possède déjà un compte. Connecte-toi à l’application avec ce compte, puis contacte la professeure.';
+    else if(e.code==='auth/invalid-email')$('err').textContent='L’adresse e-mail n’est pas valide.';
+    else $('err').textContent='Impossible de créer le compte ou de réserver pour le moment.';
+    $('reserve').disabled=false;
+  }
+}
+$('reserve').addEventListener('click',reserveTrial);init();
+</script>
+</body></html>
