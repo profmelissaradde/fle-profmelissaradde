@@ -1036,6 +1036,7 @@ async function doSignup(){
     const cred = await auth.createUserWithEmailAndPassword(email, pw);
     const record = {
       prenom, nom, email, telephone, niveau: null, frequence: null, uniteCourante: null,
+      status: 'active',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     await db.collection('eleves').doc(cred.user.uid).set(record);
@@ -1066,6 +1067,12 @@ async function doSignin(){
     }
     const doc = await db.collection('eleves').doc(cred.user.uid).get();
     if(!doc.exists){ showAuthErr("Ce compte n'a pas de profil élève associé."); return; }
+    const profileData = doc.data();
+    if(profileData.status === 'archived'){
+      await auth.signOut();
+      showAuthErr("Ce compte a été archivé. Contacte la professeure si tu souhaites reprendre les cours.");
+      return;
+    }
     if(!cred.user.emailVerified){
       const d = doc.data();
       student = {prenom:d.prenom, nom:d.nom, email:d.email, telephone:d.telephone, uid: cred.user.uid};
@@ -2897,7 +2904,7 @@ function renderTeacher(){
   else if(teacherTab==='historique') loadTeacherHistorique();
   else if(teacherTab==='temas') loadTeacherTemas();
   else if(teacherTab==='dispo') loadAdminDispo();
-  else if(teacherTab==='experimental') renderExperimentalAdmin();
+  else if(teacherTab==='experimental') loadExperimentalAdmin();
 }
 function setTeacherTab(tab){ teacherTab = tab; render(); }
 
@@ -2908,9 +2915,61 @@ function experimentalToken(){
   crypto.getRandomValues(a);
   return Array.from(a, x=>x.toString(16).padStart(2,'0')).join('');
 }
+let experimentalStudents = [];
+
+async function loadExperimentalAdmin(){
+  const body = document.getElementById('teacher-body');
+  if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
+  try{
+    const snap = await db.collection('eleves').orderBy('nom').get();
+    experimentalStudents = snap.docs
+      .map(d=>({id:d.id, ...d.data()}))
+      .filter(s => s.status === 'experimental' || s.status === 'archived' ||
+        s.experimentalLesson === true || s.registrationSource === 'cours-experimental');
+  }catch(e){
+    console.error(e);
+    experimentalStudents = [];
+  }
+  renderExperimentalAdmin();
+}
+
+function experimentalStatus(s){
+  if(s.status === 'archived') return 'archived';
+  if(s.status === 'active') return 'active';
+  return 'experimental';
+}
+
 function renderExperimentalAdmin(){
   const body = document.getElementById('teacher-body');
   if(!body || !isTeacher) return;
+
+  const prospects = experimentalStudents.filter(s => experimentalStatus(s) === 'experimental');
+  const archived = experimentalStudents.filter(s => experimentalStatus(s) === 'archived');
+
+  const prospectHTML = prospects.length ? prospects.map(s=>`
+    <div class="teacher-entry">
+      <div class="who">${s.prenom || ''} ${s.nom || ''} · <span style="color:var(--gold-dark)">Cours expérimental</span></div>
+      <div class="meta">${s.email || '—'} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
+      <div class="meta">Historique expérimental : ${s.experimentalLesson ? 'oui' : 'enregistré'}${s.experimentalCompleted ? ' · cours effectué' : ''}</div>
+      <div class="teacher-entry-actions">
+        <button onclick="convertExperimentalStudent('${s.id}')">Convertir en élève</button>
+        <button class="del" onclick="archiveExperimentalStudent('${s.id}')">Archiver</button>
+      </div>
+    </div>
+  `).join('') : '<p class="teacher-empty">Aucun élève au stade expérimental.</p>';
+
+  const archivedHTML = archived.length ? archived.map(s=>`
+    <div class="teacher-entry" style="opacity:.78;">
+      <div class="who">${s.prenom || ''} ${s.nom || ''} · <span style="color:var(--grey)">Archivé</span></div>
+      <div class="meta">${s.email || '—'} · ${s.telephone || '—'}</div>
+      <div class="meta">Cours expérimental déjà enregistré${s.experimentalCompleted ? ' · effectué' : ''} · archivé le ${fmtDate(s.archivedAt)}</div>
+      <div class="teacher-entry-actions">
+        <button onclick="restoreExperimentalStudent('${s.id}')">Restaurer en expérimental</button>
+        <button onclick="convertExperimentalStudent('${s.id}')">Convertir en élève</button>
+      </div>
+    </div>
+  `).join('') : '<p class="teacher-empty">Aucun profil expérimental archivé.</p>';
+
   body.innerHTML = `
     <div class="teacher-entry" style="max-width:680px;">
       <div class="who">Créer un cours expérimental</div>
@@ -2925,8 +2984,65 @@ function renderExperimentalAdmin(){
         <button class="rec-btn" onclick="copyExperimentalLink()">Copier le lien</button>
         <span id="experimental-copy-ok" style="font-size:12.5px;color:var(--ok);margin-left:10px;"></span>
       </div>
-    </div>`;
+    </div>
+
+    <h2 class="section-title">Élèves au stade expérimental</h2>
+    <div class="storage-note">Ces profils ne sont pas affichés dans ta liste principale d'élèves. « Archiver » les retire de la plateforme tout en conservant leur identité et la trace du cours expérimental.</div>
+    ${prospectHTML}
+
+    <h2 class="section-title">Archives expérimentales</h2>
+    ${archivedHTML}
+  `;
 }
+
+async function convertExperimentalStudent(id){
+  if(!isTeacher || auth.currentUser?.uid !== TEACHER_UID) return;
+  if(!confirm("Convertir ce profil en élève actif ?")) return;
+  try{
+    await db.collection('eleves').doc(id).update({
+      status: 'active',
+      experimentalLesson: true,
+      experimentalConvertedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      archivedAt: firebase.firestore.FieldValue.delete()
+    });
+    await loadExperimentalAdmin();
+  }catch(e){
+    console.error(e);
+    alert("Impossible de convertir cet élève pour le moment.");
+  }
+}
+
+async function archiveExperimentalStudent(id){
+  if(!isTeacher || auth.currentUser?.uid !== TEACHER_UID) return;
+  if(!confirm("Archiver ce profil ? Il ne sera plus affiché parmi les élèves actifs, mais son historique de cours expérimental sera conservé.")) return;
+  try{
+    await db.collection('eleves').doc(id).update({
+      status: 'archived',
+      experimentalLesson: true,
+      archivedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await loadExperimentalAdmin();
+  }catch(e){
+    console.error(e);
+    alert("Impossible d'archiver ce profil pour le moment.");
+  }
+}
+
+async function restoreExperimentalStudent(id){
+  if(!isTeacher || auth.currentUser?.uid !== TEACHER_UID) return;
+  try{
+    await db.collection('eleves').doc(id).update({
+      status: 'experimental',
+      experimentalLesson: true,
+      archivedAt: firebase.firestore.FieldValue.delete()
+    });
+    await loadExperimentalAdmin();
+  }catch(e){
+    console.error(e);
+    alert("Impossible de restaurer ce profil pour le moment.");
+  }
+}
+
 async function createExperimentalCourse(){
   if(!isTeacher || auth.currentUser?.uid !== TEACHER_UID) return;
   const dateEl = document.getElementById('experimental-date');
@@ -2967,14 +3083,20 @@ async function loadTeacherStudents(){
   if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
   try{
     const snap = await db.collection('eleves').orderBy('nom').get();
-    studentsData = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    studentsData = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(s =>
+      s.status === 'active' ||
+      (!s.status && s.experimentalLesson !== true && s.registrationSource !== 'cours-experimental')
+    );
   }catch(e){ studentsData = []; }
   renderTeacherStudentsList();
 }
 async function loadTeacherStudentsQuiet(){
   try{
     const snap = await db.collection('eleves').orderBy('nom').get();
-    studentsData = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    studentsData = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(s =>
+      s.status === 'active' ||
+      (!s.status && s.experimentalLesson !== true && s.registrationSource !== 'cours-experimental')
+    );
   }catch(e){ studentsData = []; }
 }
 function toggleBilanEditor(id){
