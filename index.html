@@ -838,23 +838,25 @@ function isValidCPF(v){
   let d2 = (sum * 10) % 11; if(d2===10) d2=0;
   return d2 === Number(cpf[10]);
 }
-function normalizePhone(country, value){
-  let d = digitsOnly(value);
-  if(country === 'BR'){
-    if(d.startsWith('55')) d = d.slice(2);
-    if(d.length !== 10 && d.length !== 11) return null;
-    return '+55' + d;
-  }
-  if(country === 'FR'){
-    if(d.startsWith('33')) d = d.slice(2);
-    if(d.startsWith('0')) d = d.slice(1);
-    if(d.length !== 9) return null;
-    return '+33' + d;
-  }
-  return null;
+const WHATSAPP_CODES = [
+  ['+55','Brésil'],['+33','France'],['+351','Portugal'],['+1','États-Unis / Canada'],
+  ['+34','Espagne'],['+39','Italie'],['+44','Royaume-Uni'],['+49','Allemagne'],
+  ['+41','Suisse'],['+32','Belgique'],['+352','Luxembourg'],['+31','Pays-Bas'],
+  ['+353','Irlande'],['+54','Argentine'],['+56','Chili'],['+57','Colombie'],
+  ['+51','Pérou'],['+52','Mexique'],['+598','Uruguay'],['+595','Paraguay'],
+  ['+591','Bolivie'],['+593','Équateur'],['+58','Venezuela'],['+81','Japon'],
+  ['+82','Corée du Sud'],['+86','Chine'],['+61','Australie'],['+64','Nouvelle-Zélande']
+];
+function whatsappCodeOptions(selected='+55'){
+  return WHATSAPP_CODES.map(([code,name])=>`<option value="${code}" ${code===selected?'selected':''}>${code} — ${name}</option>`).join('');
 }
-function phonePlaceholder(country){
-  return country === 'FR' ? '06 12 34 56 78' : '(21) 99876-5432';
+function normalizeWhatsApp(code, value){
+  let d = digitsOnly(value);
+  const prefix = digitsOnly(code);
+  if(d.startsWith(prefix)) d = d.slice(prefix.length);
+  while(d.startsWith('0')) d = d.slice(1);
+  if(d.length < 6 || d.length > 14) return null;
+  return '+' + prefix + d;
 }
 function detectedTimezone(){
   try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris'; }
@@ -869,15 +871,7 @@ function timezoneOptions(selected){
   if(selected && !zones.includes(selected)) zones.unshift(selected);
   return zones.map(z=>`<option value="${z}" ${z===selected?'selected':''}>${z}</option>`).join('');
 }
-function updateSignupCountry(){
-  const country = document.getElementById('su-country')?.value || 'BR';
-  const tel = document.getElementById('su-tel');
-  const prefix = document.getElementById('su-prefix');
-  const cpfWrap = document.getElementById('su-cpf-wrap');
-  if(prefix) prefix.textContent = country === 'FR' ? '+33' : '+55';
-  if(tel) tel.placeholder = phonePlaceholder(country);
-  if(cpfWrap) cpfWrap.style.display = country === 'BR' ? 'block' : 'none';
-}
+
 function maskSignupCPF(el){ el.value = formatCPFValue(el.value); }
 
 function togglePw(id, btn){
@@ -1052,26 +1046,22 @@ function renderAuthBody(){
       <div class="field"><label>Prénom</label><input id="su-prenom" type="text" placeholder="Ex. João"></div>
       <div class="field"><label>Nom de famille</label><input id="su-nom" type="text" placeholder="Ex. Silva"></div>
       <div class="field"><label>E-mail</label><input id="su-email" type="email" placeholder="joao@exemple.com"></div>
-      <div class="field"><label>Pays</label>
-        <select id="su-country" onchange="updateSignupCountry()" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;">
-          <option value="BR">Brésil (+55)</option>
-          <option value="FR">France (+33)</option>
-        </select>
+      <div class="field"><label>Pays de résidence</label>
+        <input id="su-country" type="text" autocomplete="country-name" placeholder="Ex. France, Brésil, Portugal">
       </div>
-      <div class="field"><label>Numéro de téléphone / WhatsApp</label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span id="su-prefix" style="padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--cream);font-weight:700;">+55</span>
-          <input id="su-tel" type="tel" autocomplete="tel-national" placeholder="(21) 99876-5432">
+      <div class="field"><label>WhatsApp</label>
+        <div style="display:grid;grid-template-columns:minmax(150px,42%) 1fr;gap:8px;">
+          <select id="su-wa-code" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;">${whatsappCodeOptions('+55')}</select>
+          <input id="su-tel" type="tel" autocomplete="tel-national" placeholder="Numéro WhatsApp">
         </div>
       </div>
-      <div class="field" id="su-cpf-wrap"><label>CPF</label><input id="su-cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" oninput="maskSignupCPF(this)"></div>
+      <div class="field"><label>CPF</label><input id="su-cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" oninput="maskSignupCPF(this)"></div>
       <div class="field"><label>Fuseau horaire</label><select id="su-timezone" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;">${timezoneOptions(detectedTimezone())}</select></div>
       <div class="field"><label>Mot de passe</label><div class="pw-wrap"><input id="su-pw" type="password" placeholder="8 caractères minimum"><button type="button" class="pw-toggle" onclick="togglePw('su-pw',this)">👁</button></div></div>
       <div class="field"><label>Confirmer le mot de passe</label><div class="pw-wrap"><input id="su-pw2" type="password" placeholder="••••••••"><button type="button" class="pw-toggle" onclick="togglePw('su-pw2',this)">👁</button></div></div>
       <button class="primary-btn" id="su-btn" onclick="doSignup()">Créer mon compte →</button>
       <p class="login-err" id="auth-err"></p>
     `;
-    setTimeout(updateSignupCountry, 0);
   } else {
     el.innerHTML = `
       <p class="sub">Connecte-toi avec ton e-mail et ton mot de passe.</p>
@@ -1102,20 +1092,18 @@ async function doSignup(){
   const prenom = document.getElementById('su-prenom').value.trim();
   const nom = document.getElementById('su-nom').value.trim();
   const email = document.getElementById('su-email').value.trim();
-  const country = document.getElementById('su-country').value;
-  const telephone = normalizePhone(country, document.getElementById('su-tel').value);
-  const cpfRaw = document.getElementById('su-cpf')?.value || '';
-  const cpf = country === 'BR' ? digitsOnly(cpfRaw) : null;
+  const country = document.getElementById('su-country').value.trim();
+  const whatsappCode = document.getElementById('su-wa-code').value;
+  const telephone = normalizeWhatsApp(whatsappCode, document.getElementById('su-tel').value);
+  const cpf = digitsOnly(document.getElementById('su-cpf').value);
   const timezone = document.getElementById('su-timezone').value || detectedTimezone();
   const pw = document.getElementById('su-pw').value;
   const pw2 = document.getElementById('su-pw2').value;
 
-  if(!prenom || !nom || !email || !telephone || !pw || !pw2){
-    showAuthErr('Merci de remplir tous les champs obligatoires.'); return;
+  if(!prenom || !nom || !email || !country || !telephone || !cpf || !timezone || !pw || !pw2){
+    showAuthErr('Merci de remplir tous les champs.'); return;
   }
-  if(country === 'BR' && !isValidCPF(cpf)){
-    showAuthErr('Le CPF renseigné n’est pas valide.'); return;
-  }
+  if(!isValidCPF(cpf)){ showAuthErr('Le CPF renseigné n’est pas valide.'); return; }
   if(!isValidEmail(email)){ showAuthErr("Cet e-mail ne semble pas valide."); return; }
   if(pw.length < 8){ showAuthErr('Le mot de passe doit contenir au moins 8 caractères.'); return; }
   if(pw !== pw2){ showAuthErr('Les deux mots de passe ne correspondent pas.'); return; }
@@ -1125,22 +1113,14 @@ async function doSignup(){
   try{
     const cred = await auth.createUserWithEmailAndPassword(email, pw);
     const record = {
-      prenom, nom, email,
-      telephone,
-      country,
-      cpf,
-      timezone,
-      niveau: null,
-      frequence: null,
-      uniteCourante: null,
-      status: 'active',
-      registrationSource: 'plateforme',
-      experimentalLesson: false,
+      prenom, nom, email, telephone, whatsappCode, country, cpf, timezone,
+      niveau: null, frequence: null, uniteCourante: null,
+      status: 'active', registrationSource: 'plateforme', experimentalLesson: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     await db.collection('eleves').doc(cred.user.uid).set(record);
     try{ await cred.user.sendEmailVerification(); }catch(e){}
-    student = {prenom, nom, email, telephone, country, timezone, uid: cred.user.uid};
+    student = {prenom, nom, email, telephone, whatsappCode, country, timezone, uid: cred.user.uid};
     screen = 'verify';
     render();
   }catch(e){
@@ -1161,6 +1141,12 @@ async function doSignin(){
       student = {prenom:'Melissa', nom:'Radde', email: cred.user.email || email, telephone:'', uid: cred.user.uid, uniteCourante:null, frequence:null, temas:{}};
       teacherTab = 'eleves';
       screen = 'teacher';
+      render();
+      return;
+    }
+    if(!cred.user.emailVerified){
+      student = {prenom:'', nom:'', email:cred.user.email || email, telephone:'', uid:cred.user.uid};
+      screen = 'verify';
       render();
       return;
     }
