@@ -495,7 +495,7 @@ const TEACHER_UID = "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
 
 /* 3. Remplace par l'URL de ton Google Apps Script déployé en "Web app"    */
 /*    (voir GUIDE_INSTALLATION.md, section Google Drive)                    */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzsNkU-NbpgRR9guZXrmMIZeXxzZvn-WMfClmrMqgWOs2riOmLY4_xn4MGwqi9w1oF4BQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrF61vTIyO-o8CYSzFTOvg0fPOC7Wd5MmQLfxGWSc957bLx8-t_TgzJkJumLS4qX8Jww/exec";
 
 /* 4. Remplace par ton lien Zoom personnel (salle fixe et réutilisable).   */
 /*    Sert de secours si la création automatique de lien par réservation   */
@@ -871,7 +871,6 @@ function timezoneOptions(selected){
   if(selected && !zones.includes(selected)) zones.unshift(selected);
   return zones.map(z=>`<option value="${z}" ${z===selected?'selected':''}>${z}</option>`).join('');
 }
-
 function maskSignupCPF(el){ el.value = formatCPFValue(el.value); }
 
 function togglePw(id, btn){
@@ -938,6 +937,7 @@ function renderSidebar(){
     html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='eleves'?'active':''}" onclick="goTeacherTab('eleves')"><span class="tag">👤</span> Élèves & niveaux</button>`;
     html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='rec'?'active':''}" onclick="goTeacherTab('rec')"><span class="tag">🎙️</span> Enregistrements</button>`;
     html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='temas'?'active':''}" onclick="goTeacherTab('temas')"><span class="tag">🍅</span> Suivi thème</button>`;
+    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='experimental'?'active':''}" onclick="goTeacherTab('experimental')"><span class="tag">🧪</span> Cours expérimental</button>`;
     html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='historique'?'active':''}" onclick="goTeacherTab('historique')"><span class="tag">📚</span> Historique</button>`;
   }
   if(screen==='login' || screen==='verify' || screen==='waiting'){
@@ -1103,13 +1103,12 @@ async function doSignup(){
   if(!prenom || !nom || !email || !country || !telephone || !cpf || !timezone || !pw || !pw2){
     showAuthErr('Merci de remplir tous les champs.'); return;
   }
-  if(!isValidCPF(cpf)){ showAuthErr('Le CPF renseigné n’est pas valide.'); return; }
+  if(!isValidCPF(cpf)){ showAuthErr("Le CPF renseigné n'est pas valide."); return; }
   if(!isValidEmail(email)){ showAuthErr("Cet e-mail ne semble pas valide."); return; }
   if(pw.length < 8){ showAuthErr('Le mot de passe doit contenir au moins 8 caractères.'); return; }
   if(pw !== pw2){ showAuthErr('Les deux mots de passe ne correspondent pas.'); return; }
 
-  const btn = document.getElementById('su-btn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Création…'; }
+  const btn = document.getElementById('su-btn'); if(btn){ btn.disabled = true; btn.textContent = 'Création…'; }
   try{
     const cred = await auth.createUserWithEmailAndPassword(email, pw);
     const record = {
@@ -1119,26 +1118,7 @@ async function doSignup(){
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     await db.collection('eleves').doc(cred.user.uid).set(record);
-    try {
-  await cred.user.sendEmailVerification();
-
-  alert(
-    "Firebase a accepté l'envoi du mail de vérification à : " +
-    cred.user.email
-  );
-
-} catch (e) {
-
-  console.error("ERREUR FIREBASE VERIFICATION", e);
-
-  alert(
-    "ERREUR FIREBASE\n\n" +
-    "Code : " + (e.code || "inconnu") + "\n\n" +
-    "Message : " + (e.message || "inconnu")
-  );
-
-  throw e;
-}
+    try{ await cred.user.sendEmailVerification(); }catch(e){ /* non bloquant — le compte reste valide même si l'e-mail échoue */ }
     student = {prenom, nom, email, telephone, whatsappCode, country, timezone, uid: cred.user.uid};
     screen = 'verify';
     render();
@@ -1160,12 +1140,6 @@ async function doSignin(){
       student = {prenom:'Melissa', nom:'Radde', email: cred.user.email || email, telephone:'', uid: cred.user.uid, uniteCourante:null, frequence:null, temas:{}};
       teacherTab = 'eleves';
       screen = 'teacher';
-      render();
-      return;
-    }
-    if(!cred.user.emailVerified){
-      student = {prenom:'', nom:'', email:cred.user.email || email, telephone:'', uid:cred.user.uid};
-      screen = 'verify';
       render();
       return;
     }
@@ -2267,6 +2241,82 @@ function renderReserver(){
 }
 let reserverCalDate = new Date();
 let reserverSelectedDay = null;
+let studentRescheduleId = null;
+function toggleStudentReschedule(id){
+  studentRescheduleId = (studentRescheduleId === id) ? null : id;
+  renderReserverBody();
+}
+function studentRescheduleFormHTML(s){
+  const now = Date.now();
+  const dispoLibres = dispoData.filter(x => !x.reservedBy && new Date(x.date).getTime() >= now);
+  return `<div class="rec-box" style="margin-top:10px;">
+    <p class="rec-consigne" style="font-weight:700;">🔁 Choisir un nouveau créneau</p>
+    ${dispoLibres.length ? `
+      <div class="slot-grid" style="margin-top:8px;">
+        ${dispoLibres.map(x => `
+          <div class="slot-card">
+            <div class="slot-date">🗓️ ${fmtSlotDate(x.date)}</div>
+            ${timezoneLineHTML(x.date)}
+            <button class="rec-btn" onclick="moveReservation('${s.id}','${x.id}')">Choisir ce créneau</button>
+          </div>
+        `).join('')}
+      </div>
+    ` : `<p style="font-size:12.5px; color:var(--grey); margin-top:6px;">Aucun créneau libre pour le moment.</p>`}
+    <p style="font-size:12.5px; font-weight:700; color:var(--navy); margin-top:14px;">Ou propose un autre horaire à ta professeure :</p>
+    <input type="datetime-local" id="student-propose-${s.id}" oninput="previewTZ('student-propose-${s.id}','student-propose-tz-${s.id}')" style="padding:8px; border:1px solid var(--line); border-radius:6px; margin-top:6px;">
+    <div id="student-propose-tz-${s.id}"></div>
+    <button class="rec-btn" style="margin-top:8px;" onclick="proposeCustomReschedule('${s.id}')">Envoyer ma proposition</button>
+  </div>`;
+}
+async function moveReservation(oldId, newId){
+  const oldSlot = dispoData.find(s=>s.id===oldId);
+  if(!oldSlot) return;
+  try{
+    await db.collection('disponibilites').doc(newId).update({
+      reservedBy: oldSlot.reservedBy, reservedName: oldSlot.reservedName, reservedEmail: oldSlot.reservedEmail, isPack: oldSlot.isPack || false
+    });
+    await db.collection('disponibilites').doc(oldId).update({
+      reservedBy: null, reservedName: null, reservedEmail: null, zoomJoinUrl: null, rescheduleRequest: null
+    });
+  }catch(e){ alert("Impossible de changer d'horaire pour le moment."); return; }
+  const newSlot = dispoData.find(s=>s.id===newId);
+  if(newSlot){ await ensureZoomMeeting(newId, newSlot.date, newSlot.duree, oldSlot.reservedName); }
+  studentRescheduleId = null;
+  await loadDispoEleve();
+}
+async function proposeCustomReschedule(id){
+  const val = document.getElementById('student-propose-'+id).value;
+  if(!val){ alert('Choisis une date et une heure.'); return; }
+  const proposedDate = new Date(val).toISOString();
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      rescheduleRequest: { by:'student', proposedDate, proposedDuree: 45, status:'pending' }
+    });
+  }catch(e){ alert("Impossible d'envoyer la proposition pour le moment."); return; }
+  try{ await callDriveScript({ action:'notifyReschedule', to:'teacher', teacherEmail: TEACHER_EMAIL, name: `${student.prenom} ${student.nom}`, newDate: fmtSlotDate(proposedDate) }); }catch(e){ /* non bloquant */ }
+  studentRescheduleId = null;
+  alert('Ta proposition a été envoyée à ta professeure.');
+  await loadDispoEleve();
+}
+async function confirmTeacherProposal(id){
+  const slot = dispoData.find(s=>s.id===id);
+  if(!slot || !slot.rescheduleRequest) return;
+  const newDate = slot.rescheduleRequest.proposedDate;
+  const newDuree = slot.rescheduleRequest.proposedDuree || slot.duree;
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      date: newDate, duree: newDuree, rescheduleRequest: null, anomalie: false, anomalieHandled: true, zoomJoinUrl: null
+    });
+  }catch(e){ alert("Impossible de confirmer pour le moment."); return; }
+  await ensureZoomMeeting(id, newDate, newDuree, `${student.prenom} ${student.nom}`);
+  await loadDispoEleve();
+}
+async function refuseTeacherProposal(id){
+  try{ await db.collection('disponibilites').doc(id).update({ rescheduleRequest: null }); }
+  catch(e){ alert("Impossible de refuser pour le moment."); return; }
+  await loadDispoEleve();
+}
+
 function selectReserverDayNav(delta){
   reserverCalDate = new Date(reserverCalDate.getFullYear(), reserverCalDate.getMonth()+delta, 1);
   renderReserverBody();
@@ -2291,14 +2341,31 @@ function renderReserverBody(){
   let html = '';
   if(mine.length){
     html += `<h2 class="section-title" style="margin-top:0;">Ton prochain cours</h2>`;
-    html += mine.map(s => `
+    html += mine.map(s => {
+      const canModify = (new Date(s.date).getTime() - now) > 3600000;
+      const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
+      const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
+      return `
       <div class="slot-card slot-mine">
         <div class="slot-date">📌 ${fmtSlotDate(s.date)} <span class="slot-dur">(${s.duree} min)</span></div>
         ${timezoneLineHTML(s.date)}
+        ${pendingFromTeacher ? `
+          <div class="storage-note" style="background:#FCF3CF;">
+            📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.
+            <div style="margin-top:6px;">
+              <button class="rec-btn" onclick="confirmTeacherProposal('${s.id}')">✅ Confirmer</button>
+              <button onclick="refuseTeacherProposal('${s.id}')" style="background:none; color:var(--bad); margin-left:8px;">Refuser</button>
+            </div>
+          </div>` : ''}
+        ${pendingFromMe ? `<p style="font-size:12.5px; color:var(--grey);">⏳ Ta proposition de nouveau créneau (${fmtSlotDate(s.rescheduleRequest.proposedDate)}) est en attente de validation par ta professeure.</p>` : ''}
         ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
         <button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="annulerReservation('${s.id}')">Annuler ma réservation</button>
+        ${canModify && !pendingFromMe ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Modifier l'horaire"}</button>` : ''}
+        ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">Modification possible jusqu'à 1h avant le cours seulement.</p>` : ''}
+        ${studentRescheduleId===s.id ? studentRescheduleFormHTML(s) : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
   html += `<h2 class="section-title">Calendrier</h2>
     <p style="font-size:12.5px; color:var(--grey); margin:-6px 0 10px;">🟢 créneau libre · 🔵 ton cours réservé — clique sur un jour pour filtrer</p>`;
@@ -2452,15 +2519,33 @@ function renderAdminDispo(){
     const remaining = (pack.total||0) - (pack.used||0);
     return `<option value="${s.id}|${s.prenom} ${s.nom}|${s.email||''}">${s.prenom} ${s.nom}${s.niveau ? ' · '+s.niveau : ''} — forfait ${pack.total ? `${pack.used||0}/${pack.total} (${remaining} restante${remaining>1?'s':''})` : 'non défini'}</option>`;
   }).join('');
-  const packRows = [1,2,3,4,5,6].map(i => `
+  const packRows = Array.from({length: FORFAIT_MAX}, (_,i)=>i+1).map(i => `
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-      <span style="font-size:12px; color:var(--grey); width:18px;">${i}.</span>
+      <span style="font-size:12px; color:var(--grey); width:22px;">${i}.</span>
       <input type="datetime-local" id="pack-date-${i}" oninput="previewTZ('pack-date-${i}','pack-tz-${i}')" style="padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
       <div id="pack-tz-${i}" style="font-size:11.5px; color:var(--grey);"></div>
     </div>
   `).join('');
 
+  const pendingFromStudents = dispoData.filter(s => s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending');
+  const pendingHTML = pendingFromStudents.length ? `
+    <div class="rec-box" style="border-color:#8338ec;">
+      <p class="rec-consigne" style="font-weight:700;">📅 Demandes de replanification des élèves</p>
+      ${pendingFromStudents.map(s => `
+        <div class="teacher-entry">
+          <div class="who">${s.reservedName} — cours actuel : ${fmtSlotDate(s.date)}</div>
+          <div class="meta">${s.rescheduleRequest.proposedDate ? `Propose : <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>` : "Souhaite être recontacté(e) pour changer d'horaire (aucun horaire précis proposé — demande envoyée par e-mail)."}</div>
+          <div class="teacher-entry-actions">
+            ${s.rescheduleRequest.proposedDate ? `<button onclick="acceptStudentReschedule('${s.id}')">✅ Accepter</button>` : `<button onclick="toggleRescheduleForm('${s.id}')">📅 Proposer un créneau</button>`}
+            <button onclick="rejectStudentReschedule('${s.id}')" style="background:none; color:var(--bad);">Refuser</button>
+          </div>
+        </div>
+        ${(!s.rescheduleRequest.proposedDate && rescheduleFormOpenId === s.id) ? rescheduleFormHTML(s) : ''}
+      `).join('')}
+    </div>
+  ` : '';
   body.innerHTML = `
+    ${pendingHTML}
     <div class="rec-box">
       <p class="rec-consigne" style="font-weight:700;">➕ Ajouter un créneau</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
@@ -2545,8 +2630,13 @@ function recapEditorHTML(s){
 async function saveSessionRecap(id){
   const vocab = document.getElementById('recap-vocab-'+id).value.trim();
   const recordingUrl = document.getElementById('recap-rec-'+id).value.trim();
+  const updates = { vocab, recordingUrl };
+  if(vocab && recordingUrl){
+    // Preuve manuelle que le cours a bien eu lieu — annule toute anomalie détectée par les clics.
+    updates.anomalie = false;
+  }
   try{
-    await db.collection('disponibilites').doc(id).update({ vocab, recordingUrl });
+    await db.collection('disponibilites').doc(id).update(updates);
     openRecapId = null;
   }catch(e){ alert("Impossible d'enregistrer pour le moment."); }
   await loadAdminDispo();
@@ -2564,10 +2654,11 @@ function renderPastSessions(){
       <div class="who">🗓️ ${fmtSlotDate(s.date)} <span style="font-weight:400; color:var(--grey);">— ${s.reservedName}</span></div>
       <div class="meta">${s.anomalie ? '<b style="color:var(--bad);">⚠️ Anomalie : pas rejoint par les deux</b> · ' : ''}${s.vocab ? '✅ Vocabulaire ajouté' : '⬜ Pas encore de vocabulaire'} · ${s.recordingUrl ? "🎥 Enregistrement disponible" : "⬜ Pas encore d'enregistrement"}</div>
       <div class="teacher-entry-actions">
-        ${s.anomalie ? `<button onclick="replanifierAnomalie('${s.id}')" style="background:none; color:var(--bad);">🔁 Replanifier ce cours</button>` : ''}
+        ${s.anomalie ? `<button onclick="toggleRescheduleForm('${s.id}')" style="background:none; color:var(--bad);">📅 Proposer un nouveau créneau</button>` : ''}
         <button onclick="toggleRecap('${s.id}')">${openRecapId===s.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}</button>
       </div>
       ${openRecapId === s.id ? recapEditorHTML(s) : ''}
+      ${rescheduleFormOpenId === s.id ? rescheduleFormHTML(s) : ''}
     </div>
   `).join('');
 }
@@ -2593,11 +2684,13 @@ function renderTeacherHistorique(){
   renderPastSessions();
 }
 /* Un cours est en "anomalie" si sa date+durée est passée depuis au moins 30 min,
-   qu'il était réservé, et que ni l'élève ni la professeure n'ont cliqué sur le lien Zoom. */
+   qu'il était réservé, que ni l'élève ni la professeure n'ont cliqué sur le lien Zoom,
+   ET que la professeure n'a pas déjà confirmé manuellement (vocabulaire + enregistrement). */
 async function detectAnomalies(){
   const now = Date.now();
   for(const s of dispoData){
     if(!s.reservedBy) continue;
+    if(s.vocab && s.recordingUrl) continue; // preuve manuelle que le cours a eu lieu
     const endsAt = new Date(s.date).getTime() + (s.duree||45)*60000;
     const isPast = now > endsAt + 30*60000;
     const noShow = !(s.clickedByStudent && s.clickedByTeacher); // anomalie sauf si les DEUX ont cliqué
@@ -2607,12 +2700,58 @@ async function detectAnomalies(){
     }
   }
 }
-async function replanifierAnomalie(id){
+/* ---- Replanification (avec confirmation de l'autre partie) ---- */
+let rescheduleFormOpenId = null;
+function toggleRescheduleForm(id){
+  rescheduleFormOpenId = (rescheduleFormOpenId === id) ? null : id;
+  renderPastSessions();
+}
+function rescheduleFormHTML(s){
+  return `<div class="rec-box" style="margin-top:10px;">
+    <p class="rec-consigne" style="font-weight:700;">📅 Proposer un nouveau créneau à ${s.reservedName || "l'élève"}</p>
+    <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:8px;">Nouvelle date et heure
+      <input type="datetime-local" id="reschedule-date-${s.id}" oninput="previewTZ('reschedule-date-${s.id}','reschedule-tz-${s.id}')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;">
+    </label>
+    <div id="reschedule-tz-${s.id}"></div>
+    <div class="teacher-entry-actions" style="margin-top:8px;">
+      <button onclick="submitRescheduleProposal('${s.id}')">Envoyer la proposition</button>
+      <button onclick="toggleRescheduleForm('${s.id}')" style="background:none; color:var(--grey);">Fermer</button>
+    </div>
+  </div>`;
+}
+async function submitRescheduleProposal(id){
+  const val = document.getElementById('reschedule-date-'+id).value;
+  if(!val){ alert('Choisis une date et une heure.'); return; }
+  const slot = dispoData.find(s=>s.id===id);
+  const proposedDate = new Date(val).toISOString();
   try{
-    await db.collection('disponibilites').doc(id).update({ anomalie: false, anomalieHandled: true, reservedBy: null, reservedName: null, reservedEmail: null, zoomJoinUrl: null });
-  }catch(e){ alert("Impossible de replanifier pour le moment."); return; }
-  alert("Le créneau est libéré — tu peux maintenant le réattribuer depuis l'onglet Disponibilités.");
+    await db.collection('disponibilites').doc(id).update({
+      rescheduleRequest: { by:'teacher', proposedDate, proposedDuree: slot ? slot.duree : 45, status:'pending' }
+    });
+  }catch(e){ alert("Impossible d'envoyer la proposition pour le moment."); return; }
+  if(slot && slot.reservedEmail){
+    try{ await callDriveScript({ action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName, oldDate: fmtSlotDate(slot.date), newDate: fmtSlotDate(proposedDate) }); }catch(e){ /* non bloquant */ }
+  }
+  rescheduleFormOpenId = null;
+  alert("Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par mail).");
   await loadTeacherHistorique();
+}
+async function acceptStudentReschedule(id){
+  const slot = dispoData.find(s=>s.id===id);
+  if(!slot || !slot.rescheduleRequest) return;
+  const newDate = slot.rescheduleRequest.proposedDate;
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      date: newDate, rescheduleRequest: null, anomalie: false, anomalieHandled: true, zoomJoinUrl: null
+    });
+  }catch(e){ alert("Impossible d'accepter pour le moment."); return; }
+  await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
+  await loadAdminDispo();
+}
+async function rejectStudentReschedule(id){
+  try{ await db.collection('disponibilites').doc(id).update({ rescheduleRequest: null }); }
+  catch(e){ alert("Impossible de refuser pour le moment."); return; }
+  await loadAdminDispo();
 }
 async function addDisponibilite(){
   const dateVal = document.getElementById('dispo-date').value;
@@ -2642,7 +2781,7 @@ async function reserverPack(){
   if(!eleveVal){ alert('Choisis un élève.'); return; }
   const [id, name, email] = eleveVal.split('|');
   const dates = [];
-  for(let i=1;i<=6;i++){
+  for(let i=1;i<=FORFAIT_MAX;i++){
     const v = document.getElementById('pack-date-'+i).value;
     if(v) dates.push(new Date(v).toISOString());
   }
@@ -3007,11 +3146,12 @@ function renderTeacher(){
   else if(teacherTab==='rec') loadTeacherRecordings();
   else if(teacherTab==='historique') loadTeacherHistorique();
   else if(teacherTab==='temas') loadTeacherTemas();
-  else if(teacherTab==='dispo') loadAdminDispo();
   else if(teacherTab==='experimental') loadExperimentalAdmin();
+  else if(teacherTab==='dispo') loadAdminDispo();
 }
 function setTeacherTab(tab){ teacherTab = tab; render(); }
 
+/* ---- Onglet : Élèves & niveaux ---- */
 /* ---- Onglet : Cours expérimental ---- */
 let experimentalLink = '';
 function experimentalToken(){
@@ -3075,6 +3215,7 @@ function renderExperimentalAdmin(){
   `).join('') : '<p class="teacher-empty">Aucun profil expérimental archivé.</p>';
 
   body.innerHTML = `
+    <div class="storage-note" style="background:#FCE9C6;">⚠️ Cette fonctionnalité nécessite une page séparée <code>cours-experimental.html</code> (le lien généré ci-dessous y pointe) — dis-moi si tu veux que je la crée, sinon le lien généré ne fonctionnera pas encore.</div>
     <div class="teacher-entry" style="max-width:680px;">
       <div class="who">Créer un cours expérimental</div>
       <div class="meta" style="margin-bottom:16px;">Choisis le créneau puis génère le lien unique à envoyer à l'élève.</div>
@@ -3179,7 +3320,6 @@ async function copyExperimentalLink(){
   catch(e){ ok.textContent = 'Copie le lien affiché ci-dessus.'; }
 }
 
-/* ---- Onglet : Élèves & niveaux ---- */
 let studentsData = [];
 let openBilanId = null;
 async function loadTeacherStudents(){
@@ -3389,93 +3529,45 @@ async function deleteRecording(id, driveFileId){
 
 /* ======================= RENDU PRINCIPAL ======================= */
 function render(){
-
   const currentUser = auth.currentUser;
-
-  // =====================================================
-  // SÉCURITÉ — COMPTE ÉLÈVE NON VÉRIFIÉ
-  // =====================================================
-  // Tant que l'adresse e-mail n'est pas vérifiée :
-  // - aucun menu
-  // - aucune réservation
-  // - aucun forum
-  // - aucun historique
-  // - uniquement l'écran de vérification
-
-  if (
-    currentUser &&
-    currentUser.uid !== TEACHER_UID &&
-    !currentUser.emailVerified
-  ) {
+  /* Sécurité : tant que l'e-mail d'un compte élève n'est pas vérifié, on ne
+     montre que l'écran de vérification — jamais le menu, les réservations,
+     le forum ou l'historique. */
+  if(currentUser && currentUser.uid !== TEACHER_UID && !currentUser.emailVerified){
     screen = 'verify';
-
-    // On ne génère surtout pas la sidebar
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-      sidebar.innerHTML = '';
-      sidebar.style.display = 'none';
-    }
-
+    if(sidebar){ sidebar.innerHTML = ''; sidebar.style.display = 'none'; }
     renderVerify();
-    window.scrollTo(0, 0);
+    window.scrollTo(0,0);
     return;
   }
-
-  // =====================================================
-  // UTILISATEUR AUTORISÉ
-  // =====================================================
-
-  // Réaffiche la sidebar si elle avait été cachée
   const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    sidebar.style.display = '';
-  }
+  if(sidebar){ sidebar.style.display = ''; }
 
   renderSidebar();
-
   const contentEl = document.getElementById('content');
-
   let accent = "#3a6df0";
-
-  if(screen === 'week'){
-    const w = weeks.find(x => x.id === current);
-    if(w) accent = w.color;
-  }
-  else if(screen === 'bilan'){
-    accent = BILAN_COLOR;
-  }
-  else if(screen === 'survie'){
-    accent = "#ef476f";
-  }
-  else if(screen === 'temas'){
-    accent = "#e08a1e";
-  }
-  else if(screen === 'reserver'){
-    accent = "#06a77d";
-  }
-  else if(screen === 'forum'){
-    accent = "#6f42c1";
-  }
-  else if(screen === 'historique'){
-    accent = "#8338ec";
-  }
-
+  if(screen==='week'){ const w = weeks.find(x=>x.id===current); if(w) accent = w.color; }
+  else if(screen==='bilan'){ accent = BILAN_COLOR; }
+  else if(screen==='survie'){ accent = "#ef476f"; }
+  else if(screen==='temas'){ accent = "#e08a1e"; }
+  else if(screen==='reserver'){ accent = "#06a77d"; }
+  else if(screen==='forum'){ accent = "#6f42c1"; }
+  else if(screen==='historique'){ accent = "#8338ec"; }
   contentEl.style.setProperty('--accent', accent);
-
-  if(screen === 'login') renderLogin();
-  else if(screen === 'verify') renderVerify();
-  else if(screen === 'waiting') renderWaiting();
-  else if(screen === 'dossiers') renderDossiers();
-  else if(screen === 'survie') renderSurvie();
-  else if(screen === 'temas') renderTemas();
-  else if(screen === 'reserver') renderReserver();
-  else if(screen === 'forum') renderForum();
-  else if(screen === 'historique') renderHistorique();
-  else if(screen === 'week') renderWeek(weeks.find(w => w.id === current));
-  else if(screen === 'bilan') renderBilan();
-  else if(screen === 'teacher') renderTeacher();
-
-  window.scrollTo(0, 0);
+  if(screen==='login') renderLogin();
+  else if(screen==='verify') renderVerify();
+  else if(screen==='waiting') renderWaiting();
+  else if(screen==='dossiers') renderDossiers();
+  else if(screen==='survie') renderSurvie();
+  else if(screen==='temas') renderTemas();
+  else if(screen==='reserver') renderReserver();
+  else if(screen==='forum') renderForum();
+  else if(screen==='historique') renderHistorique();
+  else if(screen==='week') renderWeek(weeks.find(w=>w.id===current));
+  else if(screen==='bilan') renderBilan();
+  else if(screen==='teacher') renderTeacher();
+  window.scrollTo(0,0);
 }
 
 /* ======================= EXERCICES ======================= */
