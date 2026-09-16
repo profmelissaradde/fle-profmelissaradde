@@ -342,7 +342,7 @@ function renderReserverBody(){
   if(!body) return;
   const now = Date.now();
   const mine = dispoData.filter(s => s.reservedBy === student.uid && new Date(s.date).getTime() >= now - 3600000);
-  let dispo = dispoData.filter(s => !s.reservedBy && new Date(s.date).getTime() >= now);
+  let dispo = dispoData.filter(s => !s.reservedBy && !s.isExperimental && new Date(s.date).getTime() >= now);
 
   const markers = {};
   dispo.forEach(s=>{ markers[toDateKey(new Date(s.date))] = {color:'#06a77d'}; });
