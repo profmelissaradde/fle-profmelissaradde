@@ -59,7 +59,7 @@ function renderWeek(w){
   const c = document.getElementById('content');
   const idx = weeks.findIndex(x=>x.id===w.id);
   c.innerHTML = `
-    <p class="eyebrow">Dossier 0 · Unité ${w.id} / 5</p>
+    <p class="eyebrow">Dossier ${CURRENT_DOSSIER_NUM} · Unité ${w.id} / 5</p>
     <h1 class="page-title">${w.title_fr}</h1>
     <div class="objectif-box">
       <p class="fr"><span class="label-fr">Objectif —</span> ${w.objectif_fr}</p>
@@ -80,7 +80,9 @@ function renderWeek(w){
   `;
   const grid = document.getElementById('day-grid');
   w.days.forEach((day,i)=>{
-    const uid = `w${w.id}d${i+1}`;
+    /* Préfixé par le numéro de dossier pour ne jamais entrer en collision avec
+       l'unité/étape de même numéro d'un autre dossier (voir findDayByUid). */
+    const uid = `D${CURRENT_DOSSIER_NUM}_w${w.id}d${i+1}`;
     const key = activityKey(w.tag, day.num);
     const done = !!(student.completed && student.completed[key]);
     if(done){ exoDone[uid] = true; recDone[uid] = true; celebrated[uid] = true; }
@@ -127,7 +129,7 @@ function renderBilan(){
     `;
   }
   c.innerHTML = `
-    <p class="eyebrow">Dossier 0 · Bilan final</p>
+    <p class="eyebrow">Dossier ${CURRENT_DOSSIER_NUM} · Bilan final</p>
     <h1 class="page-title">Bilan de fin de module</h1>
     ${body}
     <div class="week-footer">
@@ -136,4 +138,3 @@ function renderBilan(){
     </div>
   `;
 }
-
