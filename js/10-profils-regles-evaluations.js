@@ -1,222 +1,59 @@
 /* ======================= PROFILS, RÈGLES & FICHES ÉLÈVES ======================= */
-/* Extension volontairement construite avec les composants visuels déjà présents
-   dans l'application : teacher-entry, objectif-box, tab-btn, rec-box, etc. */
+/* Extension construite avec les composants visuels déjà présents dans l'application. */
 (function(){
-  let adminOpenStudentId = null;
-  let adminStudentSection = 'dossiers';
-  let adminOpenDossier = null;
+  let adminOpenStudentId=null, adminStudentSection='dossiers', adminOpenDossier=null;
+  let adminViewLevel=null, adminViewUnit=null;
 
-  /* ---------- Navigation ---------- */
-  const baseSidebar = window.renderSidebar;
-  window.renderSidebar = function(){
-    baseSidebar();
-    const sb = document.getElementById('sidebar');
-    if(!sb || !student || !student.prenom || screen === 'login') return;
-    const wrap = document.createElement('div');
-    wrap.innerHTML = `
-      <div class="nav-sep"></div>
-      ${!isTeacher ? `<button class="nav-btn ${screen==='profil'?'active':''}" style="--tag-color:#3a6df0" onclick="goProfil()"><span class="tag">👤</span> Mon profil</button>` : ''}
+  const baseSidebar=window.renderSidebar;
+  window.renderSidebar=function(){
+    baseSidebar(); const sb=document.getElementById('sidebar');
+    if(!sb||!student||!student.prenom||screen==='login')return;
+    const wrap=document.createElement('div');
+    wrap.innerHTML=`<div class="nav-sep"></div>
+      ${!isTeacher?`<button class="nav-btn ${screen==='profil'?'active':''}" style="--tag-color:#3a6df0" onclick="goProfil()"><span class="tag">👤</span> Mon profil</button>`:''}
+      ${isTeacher?`<button class="nav-btn ${screen==='admin-cours'?'active':''}" style="--tag-color:#ffb703" onclick="goAdminCours()"><span class="tag">📚</span> Vue des cours</button>`:''}
       <button class="nav-btn ${screen==='regles'?'active':''}" style="--tag-color:#b8790a" onclick="goRegles()"><span class="tag">ℹ️</span> Règles & fonctionnement</button>`;
-    while(wrap.firstChild) sb.appendChild(wrap.firstChild);
+    while(wrap.firstChild)sb.appendChild(wrap.firstChild);
   };
+  window.goProfil=()=>{if(!isTeacher){screen='profil';render();}};
+  window.goRegles=()=>{screen='regles';render();};
+  window.goAdminCours=()=>{if(isTeacher){screen='admin-cours';adminViewLevel=null;adminViewUnit=null;render();}};
 
-  window.goProfil = function(){ if(isTeacher) return; screen='profil'; render(); };
-  window.goRegles = function(){ screen='regles'; render(); };
+  function ruleBlock(t,x){return `<div class="teacher-entry"><div class="who">${t}</div><div class="meta" style="line-height:1.65;margin-top:6px;">${x}</div></div>`;}
+  function rulesHTML(){return `<p class="eyebrow">Informations</p><h1 class="page-title">Règles & fonctionnement</h1><div class="objectif-box"><p class="fr">Tu trouveras ici les règles utiles pour les cours et l'utilisation de la plateforme. En cas de situation particulière, écris-moi directement dans la messagerie.</p></div>${ruleBlock('Réservation et replanification','Les cours sont réservés depuis la plateforme selon les créneaux disponibles. Une demande de déplacement peut être faite tant que le cours est à plus d’une heure de son début.')}${ruleBlock('Annulation tardive et absence','Une annulation ou une absence à moins d’une heure du cours est considérée comme tardive. Deux tolérances sont prévues sur une période de 30 jours.')}${ruleBlock('Forfaits',`Les forfaits contiennent entre ${FORFAIT_MIN} et ${FORFAIT_MAX} séances. Le nombre de séances utilisées et restantes est visible dans « Mon profil ».`)}${ruleBlock('Suivi pédagogique','Chaque dossier possède son propre bilan. Lorsqu’un dossier est terminé et évalué, il apparaît comme « Accompli ».')}${ruleBlock('Communication','La messagerie de la plateforme est le point de contact privilégié pour les questions liées aux cours et à l’organisation.')}`;}
 
-  /* ---------- Règles ---------- */
-  function rulesHTML(){
-    return `
-      <p class="eyebrow">Informations</p>
-      <h1 class="page-title">Règles & fonctionnement</h1>
-      <div class="objectif-box">
-        <p class="fr">Tu trouveras ici les règles utiles pour les cours et l'utilisation de la plateforme. En cas de situation particulière, écris-moi directement dans la messagerie.</p>
-      </div>
-      ${ruleBlock('Réservation et replanification','Les cours sont réservés depuis la plateforme selon les créneaux disponibles. Une demande de déplacement peut être faite tant que le cours est à plus d’une heure de son début. Le créneau initial reste réservé jusqu’à l’acceptation de la nouvelle proposition.')}
-      ${ruleBlock('Annulation tardive et absence','Une annulation ou une absence à moins d’une heure du cours est considérée comme tardive. Deux tolérances sont prévues sur une période de 30 jours. Au-delà, une séance annulée tardivement par l’élève est perdue.')}
-      ${ruleBlock('Forfaits',`Les forfaits contiennent entre ${FORFAIT_MIN} et ${FORFAIT_MAX} séances. Le nombre de séances utilisées et restantes est visible dans « Mon profil ».`)}
-      ${ruleBlock('Suivi pédagogique','Chaque dossier possède son propre bilan. Lorsqu’un dossier est terminé et évalué par la professeure, il apparaît comme « Accompli » dans le profil de l’élève avec son bilan et, lorsqu’elle est renseignée, sa note.')}
-      ${ruleBlock('Communication','La messagerie de la plateforme est le point de contact privilégié pour les questions liées aux cours, aux exercices et à l’organisation.')}`;
-  }
-  function ruleBlock(title,text){
-    return `<div class="teacher-entry"><div class="who">${title}</div><div class="meta" style="line-height:1.65;margin-top:6px;">${text}</div></div>`;
-  }
+  function dossierKey(s,n){return s.niveau?bilanKey(s.niveau,n):null;}
+  function dossierBilan(s,n){const k=dossierKey(s,n);return k&&s.bilans?s.bilans[k]:null;}
+  function dossierName(n){const d=(dossiersMenu||[]).find(x=>x.num===n);return d?d.name:`Dossier ${n}`;}
+  function statusHTML(st){return st==='done'?'<span class="done-badge">✓ Accompli</span>':st==='current'?'<span class="admin-pill">En cours</span>':'<span class="admin-pill" style="color:var(--grey);">À venir</span>';}
+  function dossierRowsHTML(s,admin){if(!s.niveau)return '<p class="teacher-empty">Le niveau doit d’abord être attribué.</p>';return (dossiersMenu||[]).map(d=>{const b=dossierBilan(s,d.num),st=b?'done':d.num===CURRENT_DOSSIER_NUM?'current':'later',click=admin||!!b;return `<div class="teacher-entry" ${click?`style="cursor:pointer;" onclick="${admin?`openAdminDossier('${s.id}',${d.num})`:`toggleStudentDossier(${d.num})`}"`:''}><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div><div class="who">Dossier ${d.num} — ${esc(d.name)}</div>${b&&b.date?`<div class="meta">Bilan du ${fmtSimpleDate(b.date)}</div>`:''}</div><div style="display:flex;align-items:center;gap:8px;">${b&&b.note20!=null?`<span class="grade-badge" style="margin:0;padding:5px 10px;font-size:12px;">${b.note20}/20</span>`:''}${statusHTML(st)}</div></div>${!admin&&b&&window.__studentOpenDossier===d.num?bilanReadHTML(b):''}</div>`;}).join('');}
+  function fmtSimpleDate(v){try{return new Date(v).toLocaleDateString('fr-FR');}catch(e){return '';}}
+  function bilanReadHTML(b){const checked=(b.items||[]).map((ok,i)=>ok&&bilanItems[i]?`<li>${esc(bilanItems[i])}</li>`:'').filter(Boolean).join('');return `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">${checked?`<div class="meta"><b>Acquis validés</b><ul style="margin:7px 0 0;padding-left:20px;line-height:1.6;">${checked}</ul></div>`:''}${b.note?`<div class="meta" style="margin-top:9px;"><b>Commentaire de Melissa</b><br>${esc(b.note)}</div>`:''}</div>`;}
+  window.toggleStudentDossier=n=>{window.__studentOpenDossier=window.__studentOpenDossier===n?null:n;render();};
 
-  /* ---------- Helpers dossiers / bilans ---------- */
-  function dossierKey(s,num){ return s.niveau ? bilanKey(s.niveau,num) : null; }
-  function dossierBilan(s,num){ const k=dossierKey(s,num); return k && s.bilans ? s.bilans[k] : null; }
-  function dossierName(num){ const d=(dossiersMenu||[]).find(x=>x.num===num); return d ? d.name : `Dossier ${num}`; }
-  function dossierStatus(s,num){
-    if(dossierBilan(s,num)) return 'done';
-    if(num===CURRENT_DOSSIER_NUM) return 'current';
-    return 'later';
-  }
-  function statusHTML(status){
-    if(status==='done') return '<span class="done-badge">✓ Accompli</span>';
-    if(status==='current') return '<span class="admin-pill">En cours</span>';
-    return '<span class="admin-pill" style="color:var(--grey);">À venir</span>';
-  }
-  function dossierRowsHTML(s, admin){
-    if(!s.niveau) return '<p class="teacher-empty">Le niveau doit d’abord être attribué.</p>';
-    return (dossiersMenu||[]).map(d=>{
-      const b=dossierBilan(s,d.num), status=dossierStatus(s,d.num);
-      const clickable=admin || !!b;
-      return `<div class="teacher-entry" ${clickable?`style="cursor:pointer;" onclick="${admin?`openAdminDossier('${s.id}',${d.num})`:`toggleStudentDossier(${d.num})`}"`:''}>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div><div class="who">Dossier ${d.num} — ${esc(d.name)}</div>${b&&b.date?`<div class="meta">Bilan du ${fmtSimpleDate(b.date)}</div>`:''}</div>
-          <div style="display:flex;align-items:center;gap:8px;">${b&&b.note20!=null?`<span class="grade-badge" style="margin:0;padding:5px 10px;font-size:12px;">${b.note20}/20</span>`:''}${statusHTML(status)}</div>
-        </div>
-        ${!admin && b && window.__studentOpenDossier===d.num ? bilanReadHTML(b) : ''}
-      </div>`;
-    }).join('');
-  }
-  function fmtSimpleDate(v){
-    try{ return new Date(v).toLocaleDateString('fr-FR'); }catch(e){ return ''; }
-  }
-  function bilanReadHTML(b){
-    const checked=(b.items||[]).map((ok,i)=>ok&&bilanItems[i]?`<li>${esc(bilanItems[i])}</li>`:'').filter(Boolean).join('');
-    return `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
-      ${checked?`<div class="meta"><b>Acquis validés</b><ul style="margin:7px 0 0;padding-left:20px;line-height:1.6;">${checked}</ul></div>`:''}
-      ${b.note?`<div class="meta" style="margin-top:9px;"><b>Commentaire de Melissa</b><br>${esc(b.note)}</div>`:''}
-    </div>`;
-  }
-  window.toggleStudentDossier=function(num){ window.__studentOpenDossier=window.__studentOpenDossier===num?null:num; render(); };
+  async function renderStudentProfile(){const c=document.getElementById('content');if(!c)return;c.innerHTML='<p class="teacher-empty">Chargement…</p>';let s={...student};try{const d=await db.collection('eleves').doc(student.uid).get();if(d.exists)s={id:d.id,...d.data()};}catch(e){}const p=s.pack||{},r=Math.max(0,(p.total||0)-(p.used||0));c.innerHTML=`<p class="eyebrow">Mon espace</p><h1 class="page-title">Mon profil</h1><div class="objectif-box"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;"><div><p class="fr" style="margin:0;font-weight:700;color:var(--navy);">${esc(s.prenom)} ${esc(s.nom)}</p><p class="meta" style="margin:4px 0 0;">${esc(s.email||'')}${s.telephone?' · '+esc(s.telephone):''}</p></div>${s.niveau?`<span class="level-pill" style="margin:0;">Niveau ${esc(s.niveau)}</span>`:''}</div></div><div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${r} séance${r>1?'s':''} restante${r>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div><h2 class="section-title">Mes dossiers</h2>${dossierRowsHTML(s,false)}`;}
 
-  /* ---------- Profil élève ---------- */
-  async function renderStudentProfile(){
-    const c=document.getElementById('content'); if(!c)return;
-    c.innerHTML='<p class="teacher-empty">Chargement…</p>';
-    let s={...student};
-    try{const d=await db.collection('eleves').doc(student.uid).get();if(d.exists)s={id:d.id,...d.data()};}catch(e){}
-    const p=s.pack||{}, remaining=Math.max(0,(p.total||0)-(p.used||0));
-    c.innerHTML=`
-      <p class="eyebrow">Mon espace</p>
-      <h1 class="page-title">Mon profil</h1>
-      <div class="objectif-box">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-          <div><p class="fr" style="margin:0;font-weight:700;color:var(--navy);">${esc(s.prenom)} ${esc(s.nom)}</p><p class="meta" style="margin:4px 0 0;">${esc(s.email||'')}${s.telephone?' · '+esc(s.telephone):''}</p></div>
-          ${s.niveau?`<span class="level-pill" style="margin:0;">Niveau ${esc(s.niveau)}</span>`:''}
-        </div>
-      </div>
-      <div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${remaining} séance${remaining>1?'s':''} restante${remaining>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div>
-      <h2 class="section-title">Mes dossiers</h2>
-      <p class="meta" style="margin:-5px 0 12px;">Ton bilan apparaît ici lorsqu'un dossier est accompli.</p>
-      ${dossierRowsHTML(s,false)}`;
-  }
+  /* Vue professeure de la plateforme pédagogique : tous les niveaux, sans modifier le compte d'un élève. */
+  function renderAdminCourses(){const c=document.getElementById('content');if(!c)return;if(!adminViewLevel){c.innerHTML=`<p class="eyebrow">Aperçu pédagogique</p><h1 class="page-title">Tous les niveaux</h1><div class="objectif-box"><p class="fr">Parcours la plateforme comme un élève, sans changer ton compte admin. Choisis le niveau que tu veux consulter.</p></div><div class="dossier-grid">${niveauxMenu.map(n=>`<button class="dossier-card open" onclick="openAdminLevel('${n.code}')"><div><div class="num">${n.code}</div><div class="name">${esc(n.name)}</div></div><div class="status">Voir le parcours →</div></button>`).join('')}</div>`;return;}
+    if(adminViewUnit!==null){const w=weeks.find(x=>x.id===adminViewUnit);if(w){renderAdminCourseUnit(c,w);return;}}
+    c.innerHTML=`<div class="week-footer" style="margin-top:0;margin-bottom:18px;"><button onclick="backAdminLevels()">← Tous les niveaux</button><div></div></div><p class="eyebrow">Vue élève · Niveau ${adminViewLevel}</p><h1 class="page-title">Mes dossiers</h1><div class="objectif-box"><p class="fr">Tu consultes le niveau ${adminViewLevel} en mode professeure. Le contenu n'est pas enregistré comme progression.</p></div><div class="dossier-grid">${(dossiersMenu||[]).map(d=>`<button class="dossier-card ${d.open?'open':'locked'}" ${d.open?'onclick="openAdminCourseDossier('+d.num+')"':''}><div><div class="num">${d.num}</div><div class="name">${esc(d.name)}</div></div><div class="status">${d.open?'Ouvert':'À venir'}</div></button>`).join('')}</div>`;}
+  window.openAdminLevel=code=>{adminViewLevel=code;adminViewUnit=null;render();};
+  window.backAdminLevels=()=>{adminViewLevel=null;adminViewUnit=null;render();};
+  window.openAdminCourseDossier=num=>{if(num!==0)return;adminViewUnit=weeks[0]?weeks[0].id:null;render();};
+  window.openAdminCourseUnit=id=>{adminViewUnit=id;render();};
+  window.backAdminCourseDossiers=()=>{adminViewUnit=null;render();};
+  function renderAdminCourseUnit(c,w){const idx=weeks.findIndex(x=>x.id===w.id);c.innerHTML=`<div class="week-footer" style="margin-top:0;margin-bottom:18px;"><button onclick="backAdminCourseDossiers()">← Retour aux dossiers</button><div></div></div><p class="eyebrow">Niveau ${adminViewLevel} · Dossier 0 · Unité ${w.id} / ${weeks.length}</p><h1 class="page-title">${w.title_fr}</h1><div class="objectif-box"><p class="fr"><span class="label-fr">Objectif —</span> ${w.objectif_fr}</p><p class="pt">🇧🇷 <span class="label-pt">Objetivo —</span> ${w.objectif_pt}</p></div><div class="day-grid">${w.days.map((day,i)=>`<div class="day-card"><div class="day-top"><span class="day-num">${day.num}</span><span class="day-dur">${day.dur}</span></div><h3 class="day-title">${day.title_fr}</h3><p class="day-title-pt">🇧🇷 ${day.title_pt}</p>${mediaHTML(day)}${day.exo?`<div class="exo-box"><p class="exo-consigne"><span class="label-fr">Exercice —</span> aperçu en lecture seule</p><p class="exo-question">${day.exo.q||''}</p></div>`:''}${day.rec?`<div class="rec-box"><p class="rec-consigne"><span class="label-fr">🎙️ À enregistrer —</span> ${day.rec.fr}</p><p class="rec-consigne-pt">🇧🇷 ${day.rec.pt}</p></div>`:''}</div>`).join('')}</div><div class="oral-box"><h4>🗣️ Séance orale — ${w.oral_title_fr}</h4><p class="pt-title">🇧🇷 ${w.oral_title_pt}</p><ul class="oral-list">${w.oral.map(o=>`<li>${o.fr}<span class="pt">🇧🇷 ${o.pt}</span></li>`).join('')}</ul></div><div class="week-footer"><button ${idx===0?'disabled':''} onclick="openAdminCourseUnit(${weeks[Math.max(0,idx-1)].id})">← Unité précédente</button><button ${idx===weeks.length-1?'disabled':''} onclick="openAdminCourseUnit(${weeks[Math.min(weeks.length-1,idx+1)].id})">Unité suivante →</button></div>`;}
 
-  /* ---------- Rendu global ---------- */
-  const baseRender=window.render;
-  window.render=function(){
-    if(screen==='profil'&&!isTeacher){renderSidebar();renderStudentProfile();window.scrollTo(0,0);return;}
-    if(screen==='regles'){renderSidebar();const c=document.getElementById('content');if(c)c.innerHTML=rulesHTML();window.scrollTo(0,0);return;}
-    return baseRender();
-  };
+  const baseRender=window.render;window.render=function(){if(screen==='profil'&&!isTeacher){renderSidebar();renderStudentProfile();window.scrollTo(0,0);return;}if(screen==='regles'){renderSidebar();const c=document.getElementById('content');if(c)c.innerHTML=rulesHTML();window.scrollTo(0,0);return;}if(screen==='admin-cours'&&isTeacher){renderSidebar();renderAdminCourses();window.scrollTo(0,0);return;}return baseRender();};
 
-  /* ---------- Liste élèves admin ---------- */
-  window.renderTeacherStudentsList=function(){
-    const body=document.getElementById('teacher-body');if(!body)return;
-    if(adminOpenStudentId){const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s){renderAdminStudent(s);return;}adminOpenStudentId=null;}
-    if(!studentsData.length){body.innerHTML='<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>';return;}
-    body.innerHTML=`<div class="teacher-toolbar"><input id="student-filter" type="text" placeholder="Rechercher un élève…"></div><div id="student-list" style="margin-top:14px;"></div>`;
-    const input=document.getElementById('student-filter');input.oninput=()=>renderAdminList(input.value);renderAdminList('');
-  };
-  function renderAdminList(q){
-    const list=document.getElementById('student-list');if(!list)return;const n=norm(q||'');
-    const arr=studentsData.filter(s=>!n||norm(`${s.prenom} ${s.nom} ${s.email||''}`).includes(n));
-    list.innerHTML=arr.length?arr.map(s=>{
-      const completed=(dossiersMenu||[]).filter(d=>!!dossierBilan(s,d.num)).length;
-      return `<div class="teacher-entry" style="cursor:pointer;" onclick="openAdminStudent('${s.id}')">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div>
-          <div style="display:flex;gap:7px;align-items:center;">${s.niveau?`<span class="level-pill" style="margin:0;padding:5px 10px;font-size:12px;">${esc(s.niveau)}</span>`:'<span class="admin-pill" style="color:var(--bad);">Niveau à attribuer</span>'}<span class="admin-pill">${completed} dossier${completed>1?'s':''} accompli${completed>1?'s':''}</span></div>
-        </div>
-      </div>`;
-    }).join(''):'<p class="teacher-empty">Aucun élève ne correspond à cette recherche.</p>';
-  }
-
-  window.openAdminStudent=function(id){adminOpenStudentId=id;adminStudentSection='dossiers';adminOpenDossier=null;renderTeacherStudentsList();};
-  window.closeAdminStudent=function(){adminOpenStudentId=null;adminOpenDossier=null;renderTeacherStudentsList();};
-  window.setAdminStudentSection=function(section){adminStudentSection=section;adminOpenDossier=null;const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s)renderAdminStudent(s);};
-
-  function renderAdminStudent(s){
-    const body=document.getElementById('teacher-body');if(!body)return;
-    const p=s.pack||{};
-    body.innerHTML=`
-      <button class="tab-btn" onclick="closeAdminStudent()">← Tous les élèves</button>
-      <div class="objectif-box" style="margin-top:14px;margin-bottom:16px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-          <div><p class="fr" style="margin:0;font-weight:700;color:var(--navy);">${esc(s.prenom)} ${esc(s.nom)}</p><p class="meta" style="margin:4px 0 0;">${esc(s.email||'')}${s.telephone?' · '+esc(s.telephone):''}</p></div>
-          <button class="tab-btn" onclick="previewStudent('${s.id}')">Voir comme l'élève</button>
-        </div>
-      </div>
-      <div class="teacher-tabs" style="flex-wrap:wrap;">${[['dossiers','Dossiers & bilans'],['profil','Profil'],['forfait','Forfait']].map(x=>`<button class="tab-btn ${adminStudentSection===x[0]?'active':''}" onclick="setAdminStudentSection('${x[0]}')">${x[1]}</button>`).join('')}</div>
-      <div id="admin-student-section">${adminSectionHTML(s,p)}</div>`;
-  }
-
-  function adminSectionHTML(s,p){
-    if(adminStudentSection==='profil'){
-      return `<div class="teacher-entry"><div class="who">Informations pédagogiques</div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
-          <label class="field" style="margin:0;"><span style="display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px;">Niveau</span><select id="niv-${s.id}" style="padding:9px;border:1px solid var(--line);border-radius:8px;">${['',...niveauxMenu.map(n=>n.code)].map(x=>`<option value="${x}" ${(s.niveau||'')===x?'selected':''}>${x||'— À attribuer —'}</option>`).join('')}</select></label>
-          <label class="field" style="margin:0;"><span style="display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px;">Rythme</span><select id="freq-${s.id}" style="padding:9px;border:1px solid var(--line);border-radius:8px;">${['',1,2,3,4,5].map(x=>`<option value="${x}" ${String(s.frequence||'')===String(x)?'selected':''}>${x?x+' séance'+(x>1?'s':'')+'/semaine':'— À définir —'}</option>`).join('')}</select></label>
-        </div><button class="rec-btn" style="margin-top:12px;" onclick="saveAdminProfile('${s.id}')">Enregistrer</button></div>`;
-    }
-    if(adminStudentSection==='forfait'){
-      return `<div class="teacher-entry"><div class="who">Forfait de cours</div><div class="meta" style="margin-top:5px;">${p.total?`${p.used||0}/${p.total} séances utilisées · ${Math.max(0,p.total-(p.used||0))} restantes`:'Aucun forfait défini'}</div><div class="field" style="margin-top:12px;max-width:220px;"><label>Nombre de séances (${FORFAIT_MIN}-${FORFAIT_MAX})</label><input type="number" id="admin-pack-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${p.total||''}"></div><button class="rec-btn" onclick="saveAdminPack('${s.id}')">Enregistrer</button></div>`;
-    }
-    if(adminOpenDossier!==null) return dossierEditorHTML(s,adminOpenDossier);
-    return `<p class="meta" style="margin:0 0 12px;">Ouvre un dossier pour compléter son bilan. L'enregistrement du bilan marque le dossier comme accompli.</p>${dossierRowsHTML(s,true)}`;
-  }
-
-  /* ---------- Bilan par dossier ---------- */
-  window.openAdminDossier=function(id,num){adminOpenStudentId=id;adminOpenDossier=num;adminStudentSection='dossiers';const s=studentsData.find(x=>x.id===id);if(s)renderAdminStudent(s);};
-  window.closeAdminDossier=function(){adminOpenDossier=null;const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s)renderAdminStudent(s);};
-
-  function dossierEditorHTML(s,num){
-    if(!s.niveau) return `<div class="rec-box"><p class="rec-consigne">Attribue d'abord un niveau à ${esc(s.prenom)} dans l'onglet Profil.</p><button class="tab-btn" onclick="closeAdminDossier()">Retour aux dossiers</button></div>`;
-    const key=bilanKey(s.niveau,num), b=(s.bilans&&s.bilans[key])||{}, items=b.items||[];
-    return `<button class="tab-btn" onclick="closeAdminDossier()">← Dossiers & bilans</button>
-      <div class="rec-box" style="margin-top:12px;">
-        <p class="rec-consigne" style="font-weight:700;">Dossier ${num} — ${esc(dossierName(num))}</p>
-        <p class="meta" style="margin:3px 0 12px;">Niveau ${esc(s.niveau)} · Le bilan enregistré marquera ce dossier comme accompli.</p>
-        ${bilanItems.map((t,i)=>`<label style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin-bottom:7px;"><input type="checkbox" id="db-${s.id}-${num}-${i}" ${items[i]?'checked':''}> <span>${esc(t)}</span></label>`).join('')}
-        <div class="field" style="margin-top:13px;max-width:130px;"><label>Note / 20</label><input id="db-note20-${s.id}-${num}" type="number" min="0" max="20" step="0.5" value="${b.note20!=null?b.note20:''}" placeholder="ex. 15"></div>
-        <div class="field"><label>Commentaire pour l'élève</label><textarea id="db-comment-${s.id}-${num}" style="width:100%;min-height:80px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:'Inter',sans-serif;">${esc(b.note||'')}</textarea></div>
-        <button class="rec-btn" onclick="saveDossierBilan('${s.id}',${num})">${b.date?'Mettre à jour le bilan':'Valider le dossier comme accompli'}</button>
-      </div>`;
-  }
-
-  window.saveDossierBilan=async function(id,num){
-    const s=studentsData.find(x=>x.id===id);if(!s||!s.niveau)return;
-    const key=bilanKey(s.niveau,num);
-    const items=bilanItems.map((_,i)=>document.getElementById(`db-${id}-${num}-${i}`).checked);
-    const raw=document.getElementById(`db-note20-${id}-${num}`).value;
-    const note20=raw===''?null:Number(raw);
-    if(note20!==null&&(note20<0||note20>20)){alert('La note doit être comprise entre 0 et 20.');return;}
-    const note=document.getElementById(`db-comment-${id}-${num}`).value.trim();
-    await db.collection('eleves').doc(id).update({[`bilans.${key}`]:{items,note,note20,date:new Date().toISOString()}});
-    await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='dossiers';adminOpenDossier=null;renderTeacherStudentsList();
-  };
-
-  window.saveAdminProfile=async function(id){
-    const niv=document.getElementById('niv-'+id).value,f=document.getElementById('freq-'+id).value;
-    await db.collection('eleves').doc(id).update({niveau:niv||null,frequence:f?parseInt(f,10):null});
-    await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='profil';renderTeacherStudentsList();
-  };
-  window.saveAdminPack=async function(id){
-    const v=parseInt(document.getElementById('admin-pack-'+id).value,10);
-    if(!v||v<FORFAIT_MIN||v>FORFAIT_MAX){alert(`Le forfait doit contenir entre ${FORFAIT_MIN} et ${FORFAIT_MAX} séances.`);return;}
-    const s=studentsData.find(x=>x.id===id),updates={'pack.total':v};if(!(s.pack&&typeof s.pack.used==='number'))updates['pack.used']=0;
-    await db.collection('eleves').doc(id).update(updates);await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='forfait';renderTeacherStudentsList();
-  };
-
-  /* ---------- Aperçu élève ---------- */
-  window.previewStudent=function(id){
-    const s=studentsData.find(x=>x.id===id);if(!s)return;const body=document.getElementById('teacher-body'),p=s.pack||{},remaining=Math.max(0,(p.total||0)-(p.used||0));
-    body.innerHTML=`<button class="tab-btn" onclick="openAdminStudent('${s.id}')">← Retour à la fiche</button>
-      <div class="objectif-box" style="margin-top:14px;"><p class="fr" style="margin:0;"><b>Aperçu élève</b> — cette vue est en lecture seule.</p></div>
-      <p class="eyebrow">Mon espace</p><h2 class="page-title" style="font-family:'Fraunces',serif;color:var(--navy);">Mon profil</h2>
-      <div class="teacher-entry"><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div>
-      <div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${remaining} séance${remaining>1?'s':''} restante${remaining>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div>
-      <h2 class="section-title">Mes dossiers</h2>${dossierRowsHTML(s,false)}`;
-  };
+  window.renderTeacherStudentsList=function(){const body=document.getElementById('teacher-body');if(!body)return;if(adminOpenStudentId){const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s){renderAdminStudent(s);return;}adminOpenStudentId=null;}if(!studentsData.length){body.innerHTML='<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>';return;}body.innerHTML=`<div class="teacher-toolbar"><input id="student-filter" type="text" placeholder="Rechercher un élève…"></div><div id="student-list" style="margin-top:14px;"></div>`;const input=document.getElementById('student-filter');input.oninput=()=>renderAdminList(input.value);renderAdminList('');};
+  function renderAdminList(q){const list=document.getElementById('student-list');if(!list)return;const n=norm(q||'');const arr=studentsData.filter(s=>!n||norm(`${s.prenom} ${s.nom} ${s.email||''}`).includes(n));list.innerHTML=arr.length?arr.map(s=>{const completed=(dossiersMenu||[]).filter(d=>!!dossierBilan(s,d.num)).length;return `<div class="teacher-entry" style="cursor:pointer;" onclick="openAdminStudent('${s.id}')"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;"><div><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div><div style="display:flex;gap:7px;align-items:center;">${s.niveau?`<span class="level-pill" style="margin:0;padding:5px 10px;font-size:12px;">${esc(s.niveau)}</span>`:'<span class="admin-pill" style="color:var(--bad);">Niveau à attribuer</span>'}<span class="admin-pill">${completed} dossier${completed>1?'s':''} accompli${completed>1?'s':''}</span></div></div></div>`;}).join(''):'<p class="teacher-empty">Aucun élève ne correspond à cette recherche.</p>';}
+  window.openAdminStudent=id=>{adminOpenStudentId=id;adminStudentSection='dossiers';adminOpenDossier=null;renderTeacherStudentsList();};window.closeAdminStudent=()=>{adminOpenStudentId=null;adminOpenDossier=null;renderTeacherStudentsList();};window.setAdminStudentSection=section=>{adminStudentSection=section;adminOpenDossier=null;const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s)renderAdminStudent(s);};
+  function renderAdminStudent(s){const body=document.getElementById('teacher-body'),p=s.pack||{};body.innerHTML=`<button class="tab-btn" onclick="closeAdminStudent()">← Tous les élèves</button><div class="objectif-box" style="margin-top:14px;margin-bottom:16px;"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;"><div><p class="fr" style="margin:0;font-weight:700;color:var(--navy);">${esc(s.prenom)} ${esc(s.nom)}</p><p class="meta" style="margin:4px 0 0;">${esc(s.email||'')}${s.telephone?' · '+esc(s.telephone):''}</p></div><button class="tab-btn" onclick="previewStudent('${s.id}')">Voir comme l'élève</button></div></div><div class="teacher-tabs" style="flex-wrap:wrap;">${[['dossiers','Dossiers & bilans'],['profil','Profil'],['forfait','Forfait']].map(x=>`<button class="tab-btn ${adminStudentSection===x[0]?'active':''}" onclick="setAdminStudentSection('${x[0]}')">${x[1]}</button>`).join('')}</div><div>${adminSectionHTML(s,p)}</div>`;}
+  function adminSectionHTML(s,p){if(adminStudentSection==='profil')return `<div class="teacher-entry"><div class="who">Informations pédagogiques</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;"><label class="field" style="margin:0;"><span style="display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px;">Niveau</span><select id="niv-${s.id}" style="padding:9px;border:1px solid var(--line);border-radius:8px;">${['',...niveauxMenu.map(n=>n.code)].map(x=>`<option value="${x}" ${(s.niveau||'')===x?'selected':''}>${x||'— À attribuer —'}</option>`).join('')}</select></label><label class="field" style="margin:0;"><span style="display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px;">Rythme</span><select id="freq-${s.id}" style="padding:9px;border:1px solid var(--line);border-radius:8px;">${['',1,2,3,4,5].map(x=>`<option value="${x}" ${String(s.frequence||'')===String(x)?'selected':''}>${x?x+' séance'+(x>1?'s':'')+'/semaine':'— À définir —'}</option>`).join('')}</select></label></div><button class="rec-btn" style="margin-top:12px;" onclick="saveAdminProfile('${s.id}')">Enregistrer</button></div>`;if(adminStudentSection==='forfait')return `<div class="teacher-entry"><div class="who">Forfait de cours</div><div class="meta" style="margin-top:5px;">${p.total?`${p.used||0}/${p.total} séances utilisées · ${Math.max(0,p.total-(p.used||0))} restantes`:'Aucun forfait défini'}</div><div class="field" style="margin-top:12px;max-width:220px;"><label>Nombre de séances (${FORFAIT_MIN}-${FORFAIT_MAX})</label><input type="number" id="admin-pack-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${p.total||''}"></div><button class="rec-btn" onclick="saveAdminPack('${s.id}')">Enregistrer</button></div>`;if(adminOpenDossier!==null)return dossierEditorHTML(s,adminOpenDossier);return `<p class="meta" style="margin:0 0 12px;">Ouvre un dossier pour compléter son bilan.</p>${dossierRowsHTML(s,true)}`;}
+  window.openAdminDossier=(id,n)=>{adminOpenStudentId=id;adminOpenDossier=n;adminStudentSection='dossiers';const s=studentsData.find(x=>x.id===id);if(s)renderAdminStudent(s);};window.closeAdminDossier=()=>{adminOpenDossier=null;const s=studentsData.find(x=>x.id===adminOpenStudentId);if(s)renderAdminStudent(s);};
+  function dossierEditorHTML(s,n){if(!s.niveau)return `<div class="rec-box"><p class="rec-consigne">Attribue d'abord un niveau à ${esc(s.prenom)} dans l'onglet Profil.</p><button class="tab-btn" onclick="closeAdminDossier()">Retour aux dossiers</button></div>`;const k=bilanKey(s.niveau,n),b=(s.bilans&&s.bilans[k])||{},items=b.items||[];return `<button class="tab-btn" onclick="closeAdminDossier()">← Dossiers & bilans</button><div class="rec-box" style="margin-top:12px;"><p class="rec-consigne" style="font-weight:700;">Dossier ${n} — ${esc(dossierName(n))}</p>${bilanItems.map((t,i)=>`<label style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;margin-bottom:7px;"><input type="checkbox" id="db-${s.id}-${n}-${i}" ${items[i]?'checked':''}> <span>${esc(t)}</span></label>`).join('')}<div class="field" style="margin-top:13px;max-width:130px;"><label>Note / 20</label><input id="db-note20-${s.id}-${n}" type="number" min="0" max="20" step="0.5" value="${b.note20!=null?b.note20:''}"></div><div class="field"><label>Commentaire pour l'élève</label><textarea id="db-comment-${s.id}-${n}" style="width:100%;min-height:80px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:'Inter',sans-serif;">${esc(b.note||'')}</textarea></div><button class="rec-btn" onclick="saveDossierBilan('${s.id}',${n})">${b.date?'Mettre à jour le bilan':'Valider le dossier comme accompli'}</button></div>`;}
+  window.saveDossierBilan=async(id,n)=>{const s=studentsData.find(x=>x.id===id);if(!s||!s.niveau)return;const k=bilanKey(s.niveau,n),items=bilanItems.map((_,i)=>document.getElementById(`db-${id}-${n}-${i}`).checked),raw=document.getElementById(`db-note20-${id}-${n}`).value,note20=raw===''?null:Number(raw);if(note20!==null&&(note20<0||note20>20)){alert('La note doit être comprise entre 0 et 20.');return;}const note=document.getElementById(`db-comment-${id}-${n}`).value.trim();await db.collection('eleves').doc(id).update({[`bilans.${k}`]:{items,note,note20,date:new Date().toISOString()}});await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='dossiers';adminOpenDossier=null;renderTeacherStudentsList();};
+  window.saveAdminProfile=async id=>{const niv=document.getElementById('niv-'+id).value,f=document.getElementById('freq-'+id).value;await db.collection('eleves').doc(id).update({niveau:niv||null,frequence:f?parseInt(f,10):null});await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='profil';renderTeacherStudentsList();};window.saveAdminPack=async id=>{const v=parseInt(document.getElementById('admin-pack-'+id).value,10);if(!v||v<FORFAIT_MIN||v>FORFAIT_MAX){alert(`Le forfait doit contenir entre ${FORFAIT_MIN} et ${FORFAIT_MAX} séances.`);return;}const s=studentsData.find(x=>x.id===id),u={'pack.total':v};if(!(s.pack&&typeof s.pack.used==='number'))u['pack.used']=0;await db.collection('eleves').doc(id).update(u);await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='forfait';renderTeacherStudentsList();};
+  window.previewStudent=id=>{const s=studentsData.find(x=>x.id===id);if(!s)return;const body=document.getElementById('teacher-body'),p=s.pack||{},r=Math.max(0,(p.total||0)-(p.used||0));body.innerHTML=`<button class="tab-btn" onclick="openAdminStudent('${s.id}')">← Retour à la fiche</button><div class="objectif-box" style="margin-top:14px;"><p class="fr" style="margin:0;"><b>Aperçu élève</b> — cette vue est en lecture seule.</p></div><p class="eyebrow">Mon espace</p><h2 class="page-title" style="font-family:'Fraunces',serif;color:var(--navy);">Mon profil</h2><div class="teacher-entry"><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div><div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${r} restante${r>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div><h2 class="section-title">Mes dossiers</h2>${dossierRowsHTML(s,false)}`;};
 })();
