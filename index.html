@@ -3325,6 +3325,7 @@ function experimentalToken(){
   return Array.from(a, x=>x.toString(16).padStart(2,'0')).join('');
 }
 let experimentalStudents = [];
+let experimentalSlots = [];
 
 async function loadExperimentalAdmin(){
   const body = document.getElementById('teacher-body');
@@ -3339,6 +3340,14 @@ async function loadExperimentalAdmin(){
     console.error(e);
     experimentalStudents = [];
   }
+  try{
+    const slotsSnap = await db.collection('disponibilites').where('isExperimental','==',true).get();
+    experimentalSlots = slotsSnap.docs.map(d=>({id:d.id, ...d.data()}))
+      .sort((a,b)=> new Date(a.date) - new Date(b.date));
+  }catch(e){
+    console.error(e);
+    experimentalSlots = [];
+  }
   renderExperimentalAdmin();
 }
 
@@ -3346,6 +3355,64 @@ function experimentalStatus(s){
   if(s.status === 'archived') return 'archived';
   if(s.status === 'active') return 'active';
   return 'experimental';
+}
+
+function experimentalSlotStatus(slot){
+  if(slot.experimentalCancelled || slot.confirmationStatus === 'cancelled') return 'cancelled';
+  if(slot.reservedBy) return 'reserved';
+  return 'free';
+}
+
+function esc(v){
+  return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function experimentalSlotLink(slot){
+  const page = new URL('cours-experimental.html', window.location.href);
+  page.searchParams.set('token', slot.experimentalToken || '');
+  page.searchParams.set('slot', slot.id);
+  return page.href;
+}
+
+function renderExperimentalSlotsHTML(){
+  if(!experimentalSlots.length) return '<p class="teacher-empty">Aucun cours expérimental créé pour le moment.</p>';
+  const now = Date.now();
+  const badgeStyle = { free:'background:var(--ok-bg);color:var(--ok);', reserved:'background:#eaf0ff;color:var(--brand-blue);', cancelled:'background:var(--bad-bg);color:var(--bad);' };
+  const badgeLabel = { free:'Libre', reserved:'Réservé', cancelled:'Annulé' };
+  return experimentalSlots.map(slot=>{
+    const status = experimentalSlotStatus(slot);
+    const isPast = new Date(slot.date).getTime() < now;
+    const pill = `<span class="admin-pill" style="${badgeStyle[status]}">${badgeLabel[status]}${isPast ? ' · passé' : ''}</span>`;
+    let studentLine = '';
+    if(status !== 'free'){
+      studentLine = `<div class="meta">👤 ${esc(slot.reservedName || '—')}${slot.reservedEmail ? ' · '+esc(slot.reservedEmail) : ''}</div>`;
+    }
+    let linkLine = '';
+    if(status === 'free' && slot.experimentalToken){
+      const link = experimentalSlotLink(slot);
+      linkLine = `
+        <div class="meta" style="word-break:break-all;margin-top:6px;">${esc(link)}</div>
+        <div class="teacher-entry-actions">
+          <button class="rec-btn" onclick="copyExperimentalSlotLink('${slot.id}')">Copier le lien</button>
+          <span id="slot-copy-ok-${slot.id}" style="font-size:12.5px;color:var(--ok);"></span>
+        </div>`;
+    }
+    return `
+      <div class="teacher-entry" style="${isPast ? 'opacity:.6;' : ''}">
+        <div class="who">${fmtSlotDate(slot.date)} ${pill}</div>
+        ${timezoneLineHTML(slot.date)}
+        ${studentLine}
+        ${linkLine}
+      </div>`;
+  }).join('');
+}
+
+async function copyExperimentalSlotLink(slotId){
+  const slot = experimentalSlots.find(s=>s.id===slotId);
+  if(!slot) return;
+  const ok = document.getElementById('slot-copy-ok-'+slotId);
+  try{ await navigator.clipboard.writeText(experimentalSlotLink(slot)); if(ok) ok.textContent = 'Lien copié.'; }
+  catch(e){ if(ok) ok.textContent = 'Copie le lien affiché ci-dessus.'; }
 }
 
 function renderExperimentalAdmin(){
@@ -3380,11 +3447,11 @@ function renderExperimentalAdmin(){
   `).join('') : '<p class="teacher-empty">Aucun profil expérimental archivé.</p>';
 
   body.innerHTML = `
-    <div class="storage-note" style="background:#FCE9C6;">⚠️ Cette fonctionnalité nécessite une page séparée <code>cours-experimental.html</code> (le lien généré ci-dessous y pointe) — dis-moi si tu veux que je la crée, sinon le lien généré ne fonctionnera pas encore.</div>
     <div class="teacher-entry" style="max-width:680px;">
       <div class="who">Créer un cours expérimental</div>
       <div class="meta" style="margin-bottom:16px;">Choisis le créneau puis génère le lien unique à envoyer à l'élève.</div>
-      <div class="field" style="max-width:420px;"><label>Date et heure</label><input id="experimental-date" type="datetime-local"></div>
+      <div class="field" style="max-width:420px;"><label>Date et heure</label><input id="experimental-date" type="datetime-local" oninput="previewTZ('experimental-date','experimental-date-tz')"></div>
+      <div id="experimental-date-tz" style="margin:-8px 0 12px;"></div>
       <div class="meta" style="margin:-4px 0 16px;">Durée du cours expérimental : 45 minutes.</div>
       <button class="primary-btn" style="width:auto;padding:11px 18px;" onclick="createExperimentalCourse()">Créer le cours expérimental</button>
       <div id="experimental-error" class="login-err" style="margin-top:10px;"></div>
@@ -3395,6 +3462,10 @@ function renderExperimentalAdmin(){
         <span id="experimental-copy-ok" style="font-size:12.5px;color:var(--ok);margin-left:10px;"></span>
       </div>
     </div>
+
+    <h2 class="section-title">Créneaux déjà créés</h2>
+    <div class="storage-note">Tous les créneaux marqués « cours expérimental », libres ou déjà réservés, avec leur horaire (Paris et São Paulo) et le lien à renvoyer si besoin.</div>
+    <div id="experimental-slots-list">${renderExperimentalSlotsHTML()}</div>
 
     <h2 class="section-title">Élèves au stade expérimental</h2>
     <div class="storage-note">Ces profils ne sont pas affichés dans ta liste principale d'élèves. « Archiver » les retire de la plateforme tout en conservant leur identité et la trace du cours expérimental.</div>
@@ -3476,6 +3547,12 @@ async function createExperimentalCourse(){
     experimentalLink = page.href;
     document.getElementById('experimental-link').textContent = experimentalLink;
     result.style.display = 'block';
+    experimentalSlots.push({ id: ref.id, date: iso, duree: 45, isExperimental: true,
+      courseType: 'experimental', courseTitle: 'Cours expérimental', experimentalToken: token,
+      reservedBy: null, reservedName: null, reservedEmail: null, reminderSent: false, confirmed: false });
+    experimentalSlots.sort((a,b)=> new Date(a.date) - new Date(b.date));
+    const listEl = document.getElementById('experimental-slots-list');
+    if(listEl) listEl.innerHTML = renderExperimentalSlotsHTML();
   }catch(e){ console.error(e); err.textContent = 'Impossible de créer le cours expérimental.'; err.style.display = 'block'; }
 }
 async function copyExperimentalLink(){
