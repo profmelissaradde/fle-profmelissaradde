@@ -59,6 +59,7 @@ async function annulerReservation(id){
     }
   }catch(e){ alert("Impossible d'annuler pour le moment."); return; }
   try{ await notifyTeacherOfCancellation(`${student.prenom} ${student.nom}`, fmtSlotDate(slot.date)); }catch(e){ /* non bloquant */ }
+  await postSystemMessage(student.uid, `${student.prenom} ${student.nom}`, `❌ J'ai annulé mon cours du ${fmtSlotDate(slot.date)}.`, false);
   await loadDispoEleve();
 }
 
@@ -176,6 +177,7 @@ async function submitAdminRescheduleRequest(id){
 
   adminRescheduleFormOpenId = null;
   alert("Demande envoyée à l'élève. Le cours actuel reste réservé jusqu'à sa réponse.");
+  await postSystemMessage(slot.reservedBy, slot.reservedName, `📅 Je te propose de déplacer ton cours du ${fmtSlotDate(slot.date)} au ${fmtSlotDate(proposedDate)}. Va dans « Réserver un cours » pour confirmer ou refuser.`, true);
   await loadAdminDispo();
 }
 
@@ -592,11 +594,14 @@ async function acceptStudentReschedule(id){
     });
   }catch(e){ alert("Impossible d'accepter pour le moment."); return; }
   await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
+  await postSystemMessage(slot.reservedBy, slot.reservedName, `✅ J'ai confirmé ton cours au ${fmtSlotDate(newDate)}.`, true);
   await loadAdminDispo();
 }
 async function rejectStudentReschedule(id){
+  const slot = dispoData.find(s=>s.id===id);
   try{ await db.collection('disponibilites').doc(id).update({ rescheduleRequest: null }); }
   catch(e){ alert("Impossible de refuser pour le moment."); return; }
+  if(slot) await postSystemMessage(slot.reservedBy, slot.reservedName, `❌ Je ne peux pas déplacer ton cours à l'horaire proposé. Contacte-moi pour qu'on en discute.`, true);
   await loadAdminDispo();
 }
 async function addDisponibilite(){
@@ -720,6 +725,7 @@ async function deleteDisponibilite(id){
       if(r.refundDue) alert(`⚠️ ${slot.reservedName} a droit à un remboursement (2 annulations tardives dépassées de ton côté sur 30 jours). Pense à le faire manuellement.`);
     }catch(e){ /* non bloquant */ }
     await notifyCancellation(slot.reservedEmail, slot.reservedName, fmtSlotDate(slot.date));
+    await postSystemMessage(slot.reservedBy, slot.reservedName, `❌ Ton cours du ${fmtSlotDate(slot.date)} a été annulé.`, true);
   }
   try{ await db.collection('disponibilites').doc(id).delete(); }
   catch(e){ alert('Impossible de supprimer pour le moment.'); return; }
@@ -734,22 +740,45 @@ async function adminCancelReservation(id){
   }catch(e){ alert("Impossible d'annuler pour le moment."); return; }
   if(slot && slot.reservedEmail){
     await notifyCancellation(slot.reservedEmail, slot.reservedName, fmtSlotDate(slot.date));
+    await postSystemMessage(slot.reservedBy, slot.reservedName, `❌ Ton cours du ${fmtSlotDate(slot.date)} a été annulé.`, true);
   }
   await loadAdminDispo();
 }
 
 /* ---- Messagerie privée élève ↔ professeure + présence en ligne ---- */
 
-/* Présence : la prof "bat le pouls" toutes les 20s pendant que son onglet est ouvert ;
-   un élève est considéré "en ligne" si ce battement date de moins d'1 minute. */
+function formatElapsed(ms){
+  const s = Math.floor(ms/1000);
+  if(s < 60) return "à l'instant";
+  const m = Math.floor(s/60);
+  if(m < 60) return `${m} min`;
+  const h = Math.floor(m/60);
+  if(h < 24) return `${h} h`;
+  const d = Math.floor(h/24);
+  return `${d} j`;
+}
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---- Présence : chacun (prof et élèves) "bat le pouls" toutes les 20s pendant que
+   son onglet est ouvert. On est considéré "en ligne" si ce battement date de <1 min. ---- */
 let presenceHeartbeatInterval = null;
-function startTeacherPresenceHeartbeat(){
-  if(presenceHeartbeatInterval) return;
-  const beat = () => { db.collection('presence').doc('teacher').set({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, {merge:true}).catch(()=>{}); };
+function startPresenceHeartbeatFor(docId){
+  if(presenceHeartbeatInterval || !docId) return;
+  const beat = () => { db.collection('presence').doc(docId).set({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, {merge:true}).catch(()=>{}); };
   beat();
   presenceHeartbeatInterval = setInterval(beat, 20000);
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') beat(); });
 }
+function startTeacherPresenceHeartbeat(){ startPresenceHeartbeatFor('teacher'); }
+function startStudentPresenceHeartbeat(){ if(student && student.uid) startPresenceHeartbeatFor(student.uid); }
+
 let presenceUnsub = null;
 function listenPresence(){
   if(presenceUnsub) presenceUnsub();
@@ -758,9 +787,143 @@ function listenPresence(){
     if(!el) return;
     const data = snap.data();
     const lastSeenMs = (data && data.lastSeen && data.lastSeen.toMillis) ? data.lastSeen.toMillis() : 0;
+    if(!lastSeenMs){ el.innerHTML = "⚫ Melissa n'est pas encore en ligne"; return; }
     const online = (Date.now() - lastSeenMs) < 60000;
-    el.innerHTML = online ? '🟢 Melissa est en ligne' : "⚫ Melissa n'est pas en ligne actuellement";
-  }, err=>{ /* silencieux si le document n'existe pas encore */ });
+    el.innerHTML = online ? '🟢 Melissa est en ligne' : `⚫ Hors ligne depuis ${formatElapsed(Date.now()-lastSeenMs)}`;
+  }, ()=>{ /* silencieux si le document n'existe pas encore */ });
+}
+
+/* Côté prof : présence de chaque élève avec qui une conversation existe. */
+let teacherPresenceMap = {};
+let teacherPresenceUnsubs = {};
+function ensureStudentPresenceListener(uid){
+  if(!uid || teacherPresenceUnsubs[uid]) return;
+  teacherPresenceUnsubs[uid] = db.collection('presence').doc(uid).onSnapshot(snap=>{
+    const data = snap.data();
+    teacherPresenceMap[uid] = (data && data.lastSeen && data.lastSeen.toMillis) ? data.lastSeen.toMillis() : 0;
+    if(screen==='teacher' && teacherTab==='messages') renderTeacherMessages();
+  }, ()=>{});
+}
+function presenceLabel(uid){
+  const lastSeenMs = teacherPresenceMap[uid];
+  if(!lastSeenMs) return '⚫ Jamais connecté(e)';
+  const online = (Date.now() - lastSeenMs) < 60000;
+  return online ? '🟢 En ligne' : `⚫ Hors ligne depuis ${formatElapsed(Date.now()-lastSeenMs)}`;
+}
+
+/* ---- Message auto envoyé dans la conversation lors d'une annulation / replanification ---- */
+async function postSystemMessage(studentUid, studentName, text, senderIsTeacher){
+  if(!studentUid) return;
+  try{
+    await db.collection('messages').add({
+      studentUid, studentName: studentName || 'Élève',
+      senderUid: senderIsTeacher ? TEACHER_UID : studentUid,
+      senderIsTeacher, isSystemMessage: true,
+      text, readByTeacher: senderIsTeacher, readByStudent: !senderIsTeacher,
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){ /* non bloquant */ }
+}
+
+/* ---- Rendu d'une bulle de message, partagé entre les deux vues ---- */
+let editingMessageId = null;
+function messageBubbleHTML(m, mine, kind){
+  if(m.isSystemMessage){
+    return `<div style="text-align:center; margin:10px 0;"><span style="display:inline-block; background:#eef1f5; color:var(--grey); font-size:12px; padding:6px 12px; border-radius:100px;">${esc(m.text)}</span></div>`;
+  }
+  if(editingMessageId === m.id){
+    return `
+      <div style="margin-bottom:8px; text-align:${mine?'right':'left'};" data-msg-id="${m.id}">
+        <div style="display:inline-flex; gap:6px; align-items:center; max-width:90%;">
+          <input type="text" id="edit-input-${m.id}" value="${esc(m.text)}" style="padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; min-width:160px;" onkeydown="if(event.key==='Enter') saveEditMessage('${m.id}','${kind}')">
+          <button onclick="saveEditMessage('${m.id}','${kind}')" style="background:none; border:0; cursor:pointer;">✓</button>
+          <button onclick="cancelEditMessage('${kind}')" style="background:none; border:0; cursor:pointer;">✕</button>
+        </div>
+      </div>`;
+  }
+  let attachmentHtml = '';
+  if(m.attachmentUrl){
+    if(m.attachmentType && m.attachmentType.startsWith('image/')){
+      attachmentHtml = `<a href="${esc(m.attachmentUrl)}" target="_blank" rel="noopener"><img src="${esc(m.attachmentUrl)}" style="max-width:220px; max-height:220px; border-radius:8px; display:block; margin-top:6px;"></a>`;
+    } else {
+      attachmentHtml = `<a href="${esc(m.attachmentUrl)}" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:12.5px; color:var(--navy); text-decoration:none;">📎 ${esc(m.attachmentName||'Fichier')}</a>`;
+    }
+  }
+  const editedTag = m.edited ? ` <span style="opacity:.7;">(modifié)</span>` : '';
+  const editBtn = mine ? `<button onclick="startEditMessage('${m.id}','${kind}')" style="background:none; border:0; cursor:pointer; opacity:.6; padding:0; margin-left:6px;" title="Modifier">✏️</button>` : '';
+  return `
+    <div style="margin-bottom:8px; text-align:${mine?'right':'left'};" data-msg-id="${m.id}">
+      <span style="display:inline-block; background:${mine?'var(--brand-blue)':'#eee'}; color:${mine?'#fff':'#20232b'}; padding:8px 12px; border-radius:12px; max-width:78%; font-size:13.5px; text-align:left;">
+        ${m.text ? esc(m.text) : ''}${attachmentHtml}
+      </span>
+      <div style="font-size:10.5px; color:var(--grey); margin-top:2px;">${m.ts?fmtDate(m.ts):''}${editedTag}${editBtn}</div>
+    </div>
+  `;
+}
+function startEditMessage(id, kind){ editingMessageId = id; refreshMessagesView(kind); }
+function cancelEditMessage(kind){ editingMessageId = null; refreshMessagesView(kind); }
+async function saveEditMessage(id, kind){
+  const input = document.getElementById('edit-input-'+id);
+  if(!input) return;
+  const text = input.value.trim();
+  if(!text){ alert('Le message ne peut pas être vide.'); return; }
+  try{
+    await db.collection('messages').doc(id).update({ text, edited:true, editedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }catch(e){ alert("Impossible de modifier ce message pour le moment."); }
+  editingMessageId = null;
+  refreshMessagesView(kind);
+}
+function refreshMessagesView(kind){
+  if(kind==='teacher') renderTeacherMessages(); else renderMessagesBody();
+}
+
+/* ---- Supprimer une conversation ---- */
+async function deleteConversationForMe(studentUid, kind){
+  if(!confirm("Supprimer cette conversation de ta vue ? Elle restera visible pour l'autre personne.")) return;
+  const field = kind==='teacher' ? 'hiddenForTeacher' : 'hiddenForStudent';
+  try{
+    const snap = await db.collection('messages').where('studentUid','==',studentUid).get();
+    const batch = db.batch();
+    snap.docs.forEach(d=> batch.update(d.ref, {[field]: true}));
+    await batch.commit();
+  }catch(e){ alert('Impossible de supprimer pour le moment.'); return; }
+  if(kind==='teacher'){ closeTeacherThread(); } else { renderMessagesBody(); }
+}
+async function deleteConversationForEveryone(studentUid, kind){
+  if(!confirm('Supprimer définitivement toute la conversation, pour les deux côtés ? Cette action est irréversible.')) return;
+  try{
+    const snap = await db.collection('messages').where('studentUid','==',studentUid).get();
+    const batch = db.batch();
+    snap.docs.forEach(d=> batch.delete(d.ref));
+    await batch.commit();
+  }catch(e){ alert('Impossible de supprimer pour le moment.'); return; }
+  if(kind==='teacher'){ closeTeacherThread(); } else { renderMessagesBody(); }
+}
+
+/* ---- Pièces jointes ---- */
+async function handleAttachmentChange(kind, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  if(file.size > 8*1024*1024){ alert('Fichier trop volumineux (8 Mo maximum).'); inputEl.value=''; return; }
+  const textEl = document.getElementById('thread-input');
+  const caption = textEl ? textEl.value.trim() : '';
+  const statusEl = document.getElementById(kind+'-attach-status');
+  if(statusEl) statusEl.textContent = 'Envoi du fichier…';
+  try{
+    const base64 = await fileToBase64(file);
+    const result = await callDriveScript({ action:'upload', fileName:file.name, mimeType:file.type||'application/octet-stream', base64 });
+    if(!result || !result.ok) throw new Error('upload failed');
+    const payload = { text: caption, attachmentUrl: result.viewUrl, attachmentName: file.name, attachmentType: file.type||'', ts: firebase.firestore.FieldValue.serverTimestamp() };
+    if(kind==='teacher'){
+      if(!teacherOpenThreadUid) throw new Error('no thread open');
+      await db.collection('messages').add({ studentUid: teacherOpenThreadUid, studentName: teacherOpenThreadName, senderUid: auth.currentUser.uid, senderIsTeacher:true, readByTeacher:true, readByStudent:false, ...payload });
+    } else {
+      await db.collection('messages').add({ studentUid: student.uid, studentName: `${student.prenom} ${student.nom}`, senderUid: student.uid, senderIsTeacher:false, readByTeacher:false, readByStudent:true, ...payload });
+    }
+    if(textEl) textEl.value = '';
+  }catch(e){ alert("Impossible d'envoyer le fichier pour le moment."); }
+  inputEl.value = '';
+  if(statusEl) statusEl.textContent = '';
 }
 
 /* ---- Côté élève ---- */
@@ -771,7 +934,7 @@ function startStudentMessagesListener(){
   if(studentMsgUnsub || isTeacher || !student.uid) return;
   studentMsgUnsub = db.collection('messages').where('studentUid','==',student.uid)
     .onSnapshot(snap=>{
-      const msgs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      const msgs = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(m=>!m.hiddenForStudent);
       msgs.sort((a,b)=> (a.ts?.toMillis?.()||0) - (b.ts?.toMillis?.()||0));
       studentThreadMessages = msgs;
       studentUnreadCount = msgs.filter(m=>m.senderIsTeacher && !m.readByStudent).length;
@@ -788,13 +951,21 @@ function renderMessages(){
   const c = document.getElementById('content');
   c.innerHTML = `
     <p class="eyebrow">Contact</p>
-    <h1 class="page-title">✉️ Message à ta professeure</h1>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+      <h1 class="page-title">✉️ Message à ta professeure</h1>
+      <div>
+        <button onclick="deleteConversationForMe('${student.uid}','student')" style="background:none; color:var(--grey); font-size:12px;">🗑 Supprimer pour moi</button>
+        <button onclick="deleteConversationForEveryone('${student.uid}','student')" style="background:none; color:var(--bad); font-size:12px;">🗑 Supprimer pour tout le monde</button>
+      </div>
+    </div>
     <div id="presence-badge" style="margin-bottom:12px; font-size:13px; color:var(--grey);">Vérification…</div>
     <div id="thread-messages" style="max-height:440px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;"></div>
-    <div style="display:flex; gap:8px; margin-top:10px;">
+    <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
       <input id="thread-input" type="text" placeholder="Écris ton message…" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px;" onkeydown="if(event.key==='Enter') sendStudentMessage()">
+      <label style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff;" title="Joindre une photo ou un fichier">📎<input type="file" style="display:none" onchange="handleAttachmentChange('student', this)"></label>
       <button class="rec-btn" onclick="sendStudentMessage()">Envoyer</button>
     </div>
+    <div id="student-attach-status" style="font-size:11.5px; color:var(--grey); margin-top:4px;"></div>
   `;
   listenPresence();
   startStudentMessagesListener();
@@ -803,12 +974,7 @@ function renderMessages(){
 function renderMessagesBody(){
   const el = document.getElementById('thread-messages');
   if(!el) return;
-  el.innerHTML = studentThreadMessages.length ? studentThreadMessages.map(m=>`
-    <div style="margin-bottom:8px; text-align:${m.senderIsTeacher?'left':'right'};">
-      <span style="display:inline-block; background:${m.senderIsTeacher?'#eee':'var(--brand-blue)'}; color:${m.senderIsTeacher?'#20232b':'#fff'}; padding:8px 12px; border-radius:12px; max-width:75%; font-size:13.5px;">${esc(m.text)}</span>
-      <div style="font-size:10.5px; color:var(--grey); margin-top:2px;">${m.ts ? fmtDate(m.ts) : ''}</div>
-    </div>
-  `).join('') : '<p class="teacher-empty">Écris ton premier message ci-dessous.</p>';
+  el.innerHTML = studentThreadMessages.length ? studentThreadMessages.map(m=>messageBubbleHTML(m, !m.senderIsTeacher, 'student')).join('') : '<p class="teacher-empty">Écris ton premier message ci-dessous.</p>';
   el.scrollTop = el.scrollHeight;
 }
 async function sendStudentMessage(){
@@ -839,15 +1005,17 @@ function startTeacherMessagesListener(){
     const toMarkRead = [];
     snap.docs.forEach(d=>{
       const m = d.data();
+      if(m.hiddenForTeacher) return;
       if(!byStudent[m.studentUid]) byStudent[m.studentUid] = { studentUid:m.studentUid, studentName:m.studentName||'Élève', lastText:'', lastTs:null, unread:0, msgs:[] };
       const t = byStudent[m.studentUid];
-      t.lastText = m.text; t.lastTs = m.ts; t.msgs.push({id:d.id, ...m});
+      t.lastText = m.text || (m.attachmentUrl ? '📎 Pièce jointe' : ''); t.lastTs = m.ts; t.msgs.push({id:d.id, ...m});
       if(!m.senderIsTeacher && !m.readByTeacher){
         t.unread++;
         if(teacherOpenThreadUid===m.studentUid && screen==='teacher' && teacherTab==='messages') toMarkRead.push(d.id);
       }
     });
     teacherMsgThreads = Object.values(byStudent).sort((a,b)=> (b.lastTs?.toMillis?.()||0) - (a.lastTs?.toMillis?.()||0));
+    teacherMsgThreads.forEach(t=> ensureStudentPresenceListener(t.studentUid));
     toMarkRead.forEach(id=> db.collection('messages').doc(id).update({readByTeacher:true}).catch(()=>{}) );
     renderSidebar();
     if(screen==='teacher' && teacherTab==='messages') renderTeacherMessages();
@@ -869,20 +1037,24 @@ function renderTeacherMessages(){
     const thread = teacherMsgThreads.find(t=>t.studentUid===teacherOpenThreadUid);
     const msgs = thread ? thread.msgs : [];
     body.innerHTML = `
-      <button onclick="closeTeacherThread()" style="background:none; color:var(--navy); margin-bottom:10px;">← Retour aux conversations</button>
-      <h3 style="margin:0 0 10px;">${esc(teacherOpenThreadName)}</h3>
-      <div id="thread-messages" style="max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;">
-        ${msgs.length ? msgs.map(m=>`
-          <div style="margin-bottom:8px; text-align:${m.senderIsTeacher?'right':'left'};">
-            <span style="display:inline-block; background:${m.senderIsTeacher?'var(--brand-blue)':'#eee'}; color:${m.senderIsTeacher?'#fff':'#20232b'}; padding:8px 12px; border-radius:12px; max-width:75%; font-size:13.5px;">${esc(m.text)}</span>
-            <div style="font-size:10.5px; color:var(--grey); margin-top:2px;">${m.ts ? fmtDate(m.ts) : ''}</div>
-          </div>
-        `).join('') : '<p class="teacher-empty">Aucun message pour le moment.</p>'}
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+        <button onclick="closeTeacherThread()" style="background:none; color:var(--navy);">← Retour aux conversations</button>
+        <div>
+          <button onclick="deleteConversationForMe('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--grey); font-size:12px;">🗑 Supprimer pour moi</button>
+          <button onclick="deleteConversationForEveryone('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--bad); font-size:12px;">🗑 Supprimer pour tout le monde</button>
+        </div>
       </div>
-      <div style="display:flex; gap:8px; margin-top:10px;">
+      <h3 style="margin:0 0 4px;">${esc(teacherOpenThreadName)}</h3>
+      <div style="font-size:12.5px; color:var(--grey); margin-bottom:10px;">${presenceLabel(teacherOpenThreadUid)}</div>
+      <div id="thread-messages" style="max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;">
+        ${msgs.length ? msgs.map(m=>messageBubbleHTML(m, m.senderIsTeacher, 'teacher')).join('') : '<p class="teacher-empty">Aucun message pour le moment.</p>'}
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
         <input id="thread-input" type="text" placeholder="Écrire un message…" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px;" onkeydown="if(event.key==='Enter') sendTeacherMessage()">
+        <label style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff;" title="Joindre une photo ou un fichier">📎<input type="file" style="display:none" onchange="handleAttachmentChange('teacher', this)"></label>
         <button class="rec-btn" onclick="sendTeacherMessage()">Envoyer</button>
       </div>
+      <div id="teacher-attach-status" style="font-size:11.5px; color:var(--grey); margin-top:4px;"></div>
     `;
     const el = document.getElementById('thread-messages');
     if(el) el.scrollTop = el.scrollHeight;
@@ -896,6 +1068,7 @@ function renderTeacherMessages(){
     <div class="teacher-entry" style="cursor:pointer;" onclick="openTeacherThread('${t.studentUid}')">
       <div class="who">${esc(t.studentName)} ${t.unread ? `<span class="admin-pill" style="background:var(--bad); color:#fff;">${t.unread}</span>` : ''}</div>
       <div class="meta">${esc((t.lastText||'').slice(0,90))}</div>
+      <div class="meta" style="font-size:11.5px;">${presenceLabel(t.studentUid)}</div>
     </div>
   `).join('');
 }
@@ -1038,4 +1211,3 @@ function renderDossiers(){
     grid.appendChild(el);
   });
 }
-
