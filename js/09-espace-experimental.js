@@ -132,3 +132,148 @@
     return baseRender();
   };
 })();
+
+/* ======================= MESSAGERIE PROF — TOUS LES ÉLÈVES ======================= */
+/*
+  La liste Messages de la professeure ne dépend plus seulement des conversations
+  déjà existantes. Tous les profils Firestore sont proposés : élèves actifs,
+  élèves expérimentaux et profils sans niveau. La professeure peut donc démarrer
+  elle-même une nouvelle conversation avec n'importe lequel d'entre eux.
+*/
+(function(){
+  let teacherMessageDirectory = [];
+
+  function directoryStudent(uid){
+    return teacherMessageDirectory.find(s => s.id === uid) || null;
+  }
+
+  function allTeacherMessageContacts(){
+    const threadByUid = {};
+    (teacherMsgThreads || []).forEach(t => { threadByUid[t.studentUid] = t; });
+
+    const contacts = teacherMessageDirectory.map(s => {
+      const existing = threadByUid[s.id];
+      if(existing) return {...existing, profile:s};
+      return {
+        studentUid:s.id,
+        studentName:`${s.prenom || ''} ${s.nom || ''}`.trim() || s.email || 'Élève',
+        lastText:'', lastTs:null, unread:0, msgs:[], profile:s
+      };
+    });
+
+    (teacherMsgThreads || []).forEach(t => {
+      if(!contacts.some(c => c.studentUid === t.studentUid)) contacts.push(t);
+    });
+
+    return contacts.sort((a,b) => {
+      const at = a.lastTs?.toMillis?.() || 0;
+      const bt = b.lastTs?.toMillis?.() || 0;
+      if(at !== bt) return bt - at;
+      return (a.studentName || '').localeCompare(b.studentName || '', 'fr');
+    });
+  }
+
+  async function loadTeacherMessageDirectory(){
+    try{
+      const snap = await db.collection('eleves').orderBy('nom').get();
+      teacherMessageDirectory = snap.docs
+        .map(d => ({id:d.id, ...d.data()}))
+        .filter(s => s.status !== 'archived');
+      teacherMessageDirectory.forEach(s => ensureStudentPresenceListener(s.id));
+    }catch(e){
+      console.error('Chargement annuaire messagerie :', e);
+      teacherMessageDirectory = [];
+    }
+  }
+
+  window.loadTeacherMessages = async function(){
+    startTeacherMessagesListener();
+    await loadTeacherMessageDirectory();
+    renderTeacherMessages();
+  };
+
+  window.openTeacherThread = function(uid){
+    teacherOpenThreadUid = uid;
+    const t = (teacherMsgThreads || []).find(x => x.studentUid === uid);
+    const s = directoryStudent(uid);
+    teacherOpenThreadName = t ? t.studentName : (s ? (`${s.prenom || ''} ${s.nom || ''}`.trim() || s.email || 'Élève') : 'Élève');
+    renderTeacherMessages();
+  };
+
+  window.renderTeacherMessages = function(){
+    const body = document.getElementById('teacher-body');
+    if(!body) return;
+
+    if(teacherOpenThreadUid){
+      const thread = (teacherMsgThreads || []).find(t => t.studentUid === teacherOpenThreadUid);
+      const msgs = thread ? thread.msgs : [];
+      const profile = directoryStudent(teacherOpenThreadUid);
+      const typeLabel = profile && (profile.experimentalLesson === true || profile.registrationSource === 'cours-experimental' || profile.status === 'experimental')
+        ? '<span class="admin-pill" style="margin-left:6px;background:#fff4d6;color:#8a5a00;">🧪 Expérimental</span>'
+        : '';
+      body.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+          <button onclick="closeTeacherThread()" style="background:none; color:var(--navy);">← Retour aux conversations</button>
+          <div>
+            <button onclick="deleteConversationForMe('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--grey); font-size:12px;">🗑 Supprimer pour moi</button>
+            <button onclick="deleteConversationForEveryone('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--bad); font-size:12px;">🗑 Supprimer pour tout le monde</button>
+          </div>
+        </div>
+        <h3 style="margin:0 0 4px;">${esc(teacherOpenThreadName)} ${typeLabel}</h3>
+        ${profile && profile.email ? `<div style="font-size:12px;color:var(--grey);margin-bottom:3px;">${esc(profile.email)}</div>` : ''}
+        <div style="font-size:12.5px; color:var(--grey); margin-bottom:10px;">${presenceLabel(teacherOpenThreadUid)}</div>
+        <div id="thread-messages" style="max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;">
+          ${msgs.length ? msgs.map(m=>messageBubbleHTML(m, m.senderIsTeacher, 'teacher')).join('') : '<p class="teacher-empty">Aucun message pour le moment — tu peux démarrer la conversation.</p>'}
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+          <input id="thread-input" type="text" placeholder="Écrire un message…" style="flex:1; padding:10px; border:1px solid var(--line); border-radius:8px;" onkeydown="if(event.key==='Enter') sendTeacherMessage()">
+          <label style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff;" title="Joindre une photo ou un fichier">📎<input type="file" style="display:none" onchange="handleAttachmentChange('teacher', this)"></label>
+          <button class="rec-btn" onclick="sendTeacherMessage()">Envoyer</button>
+        </div>
+        <div id="teacher-attach-status" style="font-size:11.5px; color:var(--grey); margin-top:4px;"></div>
+      `;
+      const el = document.getElementById('thread-messages');
+      if(el) el.scrollTop = el.scrollHeight;
+      return;
+    }
+
+    const contacts = allTeacherMessageContacts();
+    if(!contacts.length){
+      body.innerHTML = '<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>';
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="teacher-toolbar" style="margin-bottom:14px;">
+        <input id="teacher-message-filter" type="text" placeholder="Rechercher un élève…" oninput="renderTeacherMessages()">
+      </div>
+      <div id="teacher-message-contacts"></div>
+    `;
+
+    const filterEl = document.getElementById('teacher-message-filter');
+    const previousFilter = window.__teacherMessageFilter || '';
+    if(filterEl){
+      filterEl.value = previousFilter;
+      filterEl.oninput = function(){ window.__teacherMessageFilter = this.value; renderTeacherMessages(); };
+    }
+    const q = norm(previousFilter);
+    const filtered = contacts.filter(c => {
+      if(!q) return true;
+      const p = c.profile || {};
+      return norm(`${c.studentName || ''} ${p.email || ''} ${p.telephone || ''}`).includes(q);
+    });
+
+    const list = document.getElementById('teacher-message-contacts');
+    if(!list) return;
+    list.innerHTML = filtered.length ? filtered.map(t => {
+      const p = t.profile || {};
+      const experimental = p.experimentalLesson === true || p.registrationSource === 'cours-experimental' || p.status === 'experimental';
+      return `
+        <div class="teacher-entry" style="cursor:pointer;" onclick="openTeacherThread('${t.studentUid}')">
+          <div class="who">${esc(t.studentName)} ${experimental ? '<span class="admin-pill" style="background:#fff4d6;color:#8a5a00;">🧪 Expérimental</span>' : ''} ${t.unread ? `<span class="admin-pill" style="background:var(--bad); color:#fff;">${t.unread}</span>` : ''}</div>
+          <div class="meta">${p.email ? esc(p.email) : ''}${t.lastText ? `${p.email ? ' · ' : ''}${esc((t.lastText||'').slice(0,90))}` : ' · Nouvelle conversation'}</div>
+          <div class="meta" style="font-size:11.5px;">${presenceLabel(t.studentUid)}</div>
+        </div>`;
+    }).join('') : '<p class="teacher-empty">Aucun élève ne correspond à cette recherche.</p>';
+  };
+})();
