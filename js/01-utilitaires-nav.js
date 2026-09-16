@@ -386,6 +386,12 @@ function renderSidebar(){
     });
     html += `<button class="nav-btn ${screen==='bilan'?'active':''}" style="--tag-color:${BILAN_COLOR}" onclick="goBilan()"><span class="tag">✓</span> Bilan final</button></nav>`;
   }
+  if(isTeacher && screen!=='login'){
+    html += `<div class="nav-sep"></div><p class="nav-section-label">Vue élève (aperçu complet)</p>
+      <div class="niveau-switch" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
+        ${niveauxMenu.map(n=>`<button class="tab-btn ${niveau===n.code?'active':''}" style="padding:4px 10px; font-size:12px;" onclick="setAdminNiveau('${n.code}')">${n.code}</button>`).join('')}
+      </div>`;
+  }
   if(student.prenom && niveau && screen!=='login'){
     html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:#e08a1e" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine</button>`;
     html += `<button class="nav-btn ${screen==='survie'?'active':''}" style="--tag-color:#ef476f" onclick="goSurvie()"><span class="tag">🆘</span> Phrases de survie</button>`;
@@ -419,6 +425,17 @@ function goWaiting(){ screen='waiting'; render(); }
 function goDossiers(){ screen='dossiers'; render(); }
 function goSurvie(){ screen='survie'; render(); }
 function goTemas(){ screen='temas'; render(); }
+/* Change le niveau affiché pour le compte admin (aperçu élève) — jamais écrit dans
+   Firestore, aucun forfait ni attribution requis. Si on est sur un écran élève qui
+   dépend du niveau, on reste dessus ; sinon on ouvre directement les dossiers. */
+function setAdminNiveau(code){
+  if(!isTeacher) return;
+  niveau = code;
+  if(screen!=='temas' && screen!=='dossiers' && screen!=='survie' && screen!=='week' && screen!=='bilan'){
+    screen = 'dossiers';
+  }
+  render();
+}
 function goReserver(){ screen='reserver'; render(); }
 function goForum(){ screen='forum'; render(); }
 function goMessages(){ screen='messages'; render(); }
@@ -488,4 +505,3 @@ async function saveProgress(tag){
   try{ await db.collection('eleves').doc(student.uid).update({uniteCourante: tag}); }
   catch(e){ /* non bloquant */ }
 }
-
