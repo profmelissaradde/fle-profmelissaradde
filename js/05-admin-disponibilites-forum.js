@@ -254,6 +254,9 @@ function renderAdminDispo(){
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Durée (minutes)
           <input type="number" id="dispo-duree" value="45" min="15" step="5" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
         </label>
+        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Répéter chaque semaine
+          <input type="number" id="dispo-repeat" value="1" min="1" max="26" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:90px;">
+        </label>
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Réserver directement pour (optionnel)
           <select id="dispo-eleve" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:180px;">
             <option value="">— Laisser libre —</option>
@@ -262,13 +265,14 @@ function renderAdminDispo(){
         </label>
         <button class="rec-btn" onclick="addDisponibilite()">Ajouter</button>
       </div>
+      <p style="font-size:12px; color:var(--grey); margin:8px 0 0;">💡 Mets 8 dans « Répéter chaque semaine » pour créer d'un coup ce même jour et cette même heure pendant 8 semaines, au lieu de les ajouter une par une.</p>
     </div>
     <div class="rec-box" style="margin-top:16px;">
       <p class="rec-consigne" style="font-weight:700;">📦 Réserver un forfait (plusieurs dates, un seul élève)</p>
       <p style="font-size:12.5px; color:var(--grey); margin:4px 0 10px;">Ces séances sont réservées directement pour l'élève — il ne les choisit pas lui-même dans la liste des créneaux libres. Laisse vides les dates que tu n'utilises pas.</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Élève
-          <select id="pack-eleve" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:260px;">
+          <select id="pack-eleve" onchange="prefillPackCount()" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:260px;">
             <option value="">— Choisir un élève —</option>
             ${packStudentOptions}
           </select>
@@ -277,6 +281,22 @@ function renderAdminDispo(){
           <input type="number" id="pack-duree" value="45" min="15" step="5" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
         </label>
       </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; background:var(--cream); border:1px solid var(--line); border-radius:8px; padding:10px 12px;">
+        <label style="font-size:12px; font-weight:700; color:var(--navy);">⚡ Remplissage rapide — 1er cours
+          <input type="datetime-local" id="pack-quick-start" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+        </label>
+        <label style="font-size:12px; font-weight:700; color:var(--navy);">Tous les
+          <select id="pack-quick-interval" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+            <option value="7">7 jours</option>
+            <option value="14">14 jours</option>
+          </select>
+        </label>
+        <label style="font-size:12px; font-weight:700; color:var(--navy);">Nombre de séances
+          <input type="number" id="pack-quick-count" value="1" min="1" max="${FORFAIT_MAX}" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:70px;">
+        </label>
+        <button class="rec-btn" onclick="fillPackDatesQuick()" type="button">Remplir les dates ci-dessous</button>
+      </div>
+      <p style="font-size:11.5px; color:var(--grey); margin:-6px 0 10px;">Ça pré-remplit les champs ci-dessous à intervalle régulier — tu peux ensuite corriger ou vider une date ponctuellement (vacances, jour férié…) avant de créer les séances.</p>
       ${packRows}
       <button class="rec-btn" style="margin-top:8px;" onclick="reserverPack()">📦 Créer les séances du forfait</button>
     </div>
@@ -457,24 +477,56 @@ async function rejectStudentReschedule(id){
 async function addDisponibilite(){
   const dateVal = document.getElementById('dispo-date').value;
   const duree = parseInt(document.getElementById('dispo-duree').value, 10) || 45;
+  const repeat = Math.max(1, parseInt(document.getElementById('dispo-repeat').value, 10) || 1);
   const eleveVal = document.getElementById('dispo-eleve').value;
   if(!dateVal){ alert('Choisis une date et une heure.'); return; }
-  const dateISO = new Date(dateVal).toISOString();
-  const slot = { date: dateISO, duree, reservedBy: null, reservedName: null, reservedEmail: null, ts: firebase.firestore.FieldValue.serverTimestamp() };
-  if(eleveVal){
-    const [id, name, email] = eleveVal.split('|');
-    slot.reservedBy = id; slot.reservedName = name; slot.reservedEmail = email;
+  const baseDate = new Date(dateVal);
+  let name = null;
+  if(eleveVal){ [, name] = eleveVal.split('|'); }
+
+  let created = 0;
+  for(let i=0; i<repeat; i++){
+    const occDate = new Date(baseDate.getTime() + i * 7 * 24 * 3600 * 1000);
+    const dateISO = occDate.toISOString();
+    const slot = { date: dateISO, duree, reservedBy: null, reservedName: null, reservedEmail: null, ts: firebase.firestore.FieldValue.serverTimestamp() };
+    if(eleveVal){
+      const [id, nm, email] = eleveVal.split('|');
+      slot.reservedBy = id; slot.reservedName = nm; slot.reservedEmail = email;
+    }
+    try{
+      const ref = await db.collection('disponibilites').add(slot);
+      if(eleveVal){ await ensureZoomMeeting(ref.id, dateISO, duree, name); }
+      created++;
+    }catch(e){ /* on continue avec les occurrences suivantes même si une échoue */ }
   }
-  let newId = null;
-  try{
-    const ref = await db.collection('disponibilites').add(slot);
-    newId = ref.id;
-  }catch(e){ alert("Impossible d'ajouter ce créneau pour le moment."); return; }
-  if(eleveVal && newId){
-    const [, name] = eleveVal.split('|');
-    await ensureZoomMeeting(newId, dateISO, duree, name);
-  }
+  if(created===0){ alert("Impossible d'ajouter ce créneau pour le moment."); return; }
+  if(repeat > 1) alert(`${created} créneau(x) créé(s) (chaque semaine à partir du ${fmtSlotDate(baseDate.toISOString())}).`);
   await loadAdminDispo();
+}
+function prefillPackCount(){
+  const eleveVal = document.getElementById('pack-eleve').value;
+  const countEl = document.getElementById('pack-quick-count');
+  if(!eleveVal || !countEl) return;
+  const [id] = eleveVal.split('|');
+  const s = studentsData.find(x=>x.id===id);
+  const pack = (s && s.pack) || {};
+  const remaining = Math.max(1, (pack.total||0) - (pack.used||0));
+  countEl.value = Math.min(remaining, FORFAIT_MAX);
+}
+function fillPackDatesQuick(){
+  const startVal = document.getElementById('pack-quick-start').value;
+  const interval = parseInt(document.getElementById('pack-quick-interval').value, 10) || 7;
+  const count = Math.max(1, Math.min(FORFAIT_MAX, parseInt(document.getElementById('pack-quick-count').value, 10) || 1));
+  if(!startVal){ alert('Choisis la date du premier cours.'); return; }
+  const start = new Date(startVal);
+  for(let i=0;i<count;i++){
+    const occ = new Date(start.getTime() + i * interval * 24 * 3600 * 1000);
+    const input = document.getElementById('pack-date-'+(i+1));
+    if(!input) break;
+    const pad = n => String(n).padStart(2,'0');
+    input.value = `${occ.getFullYear()}-${pad(occ.getMonth()+1)}-${pad(occ.getDate())}T${pad(occ.getHours())}:${pad(occ.getMinutes())}`;
+    previewTZ('pack-date-'+(i+1), 'pack-tz-'+(i+1));
+  }
 }
 async function reserverPack(){
   const eleveVal = document.getElementById('pack-eleve').value;
@@ -681,4 +733,3 @@ function renderDossiers(){
     grid.appendChild(el);
   });
 }
-
