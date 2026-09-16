@@ -211,12 +211,13 @@
       const typeLabel = profile && (profile.experimentalLesson === true || profile.registrationSource === 'cours-experimental' || profile.status === 'experimental')
         ? '<span class="admin-pill" style="margin-left:6px;background:#fff4d6;color:#8a5a00;">🧪 Expérimental</span>'
         : '';
+      const actionBase = 'appearance:none; border:1px solid var(--line); border-radius:9px; padding:7px 11px; font:inherit; font-size:12px; line-height:1.2; cursor:pointer; box-shadow:none; transition:background .15s ease,border-color .15s ease,transform .15s ease;';
       body.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
-          <button onclick="closeTeacherThread()" style="background:none; color:var(--navy);">← Retour aux conversations</button>
-          <div>
-            <button onclick="deleteConversationForMe('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--grey); font-size:12px;">🗑 Supprimer pour moi</button>
-            <button onclick="deleteConversationForEveryone('${teacherOpenThreadUid}','teacher')" style="background:none; color:var(--bad); font-size:12px;">🗑 Supprimer pour tout le monde</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <button onclick="closeTeacherThread()" style="${actionBase} background:#fff; color:var(--navy);">←&nbsp; Retour aux conversations</button>
+          <div style="display:flex; gap:7px; flex-wrap:wrap;">
+            <button onclick="deleteConversationForMe('${teacherOpenThreadUid}','teacher')" style="${actionBase} background:#f7f7f8; color:var(--grey);">🗑️&nbsp; Pour moi</button>
+            <button onclick="deleteConversationForEveryone('${teacherOpenThreadUid}','teacher')" style="${actionBase} background:#fff1f2; border-color:#fecdd3; color:var(--bad);">🗑️&nbsp; Pour tout le monde</button>
           </div>
         </div>
         <h3 style="margin:0 0 4px;">${esc(teacherOpenThreadName)} ${typeLabel}</h3>
