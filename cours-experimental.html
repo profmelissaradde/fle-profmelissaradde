@@ -17,6 +17,10 @@ h1,h2{font-family:Fraunces,serif;color:var(--navy)}h1{margin:0 0 8px}.sub{color:
 label{display:block;font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:5px}
 input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
 .phone-row{display:flex;gap:8px}.prefix{padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--cream);font-weight:700;white-space:nowrap}
+.pwd-row{display:flex;gap:8px}.pwd-row input{flex:1}
+.pwd-toggle{flex:0 0 44px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:16px;padding:0}
+.pwd-match{font-size:12.5px;margin-top:5px;min-height:16px}.pwd-match.ok{color:var(--ok)}.pwd-match.bad{color:var(--bad)}
+.tzline{font-size:12.5px;color:var(--grey);margin-top:4px}
 button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;background:var(--blue);color:#fff;font-weight:700;font-size:15px;cursor:pointer;text-align:center;text-decoration:none}
 .secondary{background:var(--navy);margin-top:10px}.err{color:var(--bad);font-size:13px;margin-top:10px}.success{color:var(--ok)}
 #formPanel,#success{display:none}@media(max-width:600px){.grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
@@ -28,7 +32,11 @@ button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;
 <p class="sub">Complète tes coordonnées pour réserver le créneau transmis par la Prof. Melissa Radde.</p>
 <div id="status">Vérification du lien…</div>
 <div id="formPanel">
-  <div class="slot"><strong>Ton cours expérimental</strong><br><span id="slotText"></span></div>
+  <div class="slot">
+    <strong>Ton cours expérimental</strong>
+    <div id="slotLocal" style="margin-top:6px"></div>
+    <div id="slotRefs" class="tzline"></div>
+  </div>
   <div class="grid">
     <div class="field"><label>Prénom</label><input id="prenom" autocomplete="given-name" required></div>
     <div class="field"><label>Nom de famille</label><input id="nom" autocomplete="family-name" required></div>
@@ -36,11 +44,11 @@ button,.button{display:block;width:100%;border:0;border-radius:8px;padding:13px;
     <div class="field full"><label>Pays de résidence</label><input id="country" type="text" autocomplete="country-name" placeholder="Ex. France, Brésil, Portugal" required></div>
     <div class="field full"><label>WhatsApp</label><div class="phone-row"><select id="waCode" style="max-width:230px"></select><input id="telephone" type="tel" autocomplete="tel-national" placeholder="Numéro WhatsApp" required></div></div>
     <div class="field full"><label>CPF</label><input id="cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" required></div>
-    <div class="field full"><label>Fuseau horaire</label><select id="timezone"></select></div>
-    <div class="field"><label>Mot de passe</label><input id="password" type="password" autocomplete="new-password" minlength="8" required></div>
-    <div class="field"><label>Confirmer le mot de passe</label><input id="password2" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="field full"><label>Ton fuseau horaire</label><select id="timezone"></select></div>
+    <div class="field"><label>Mot de passe</label><div class="pwd-row"><input id="password" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="pwd-toggle" data-target="password" aria-label="Afficher le mot de passe">👁</button></div></div>
+    <div class="field"><label>Confirmer le mot de passe</label><div class="pwd-row"><input id="password2" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="pwd-toggle" data-target="password2" aria-label="Afficher le mot de passe">👁</button></div><div id="pwdMatch" class="pwd-match"></div></div>
   </div>
-  <div class="rules">Tu peux annuler ou demander le déplacement de ton cours jusqu’à 24 heures avant l’horaire prévu. À moins de 24 heures, le créneau ne peut plus être déplacé. En cas d’absence ou d’annulation tardive, un nouveau cours expérimental gratuit ne pourra pas être réservé et le prochain cours devra être réglé.<br><br>24 heures avant le cours, tu recevras un e-mail te demandant de confirmer ta présence. Le lien Zoom sera disponible dans ton espace de cours.</div>
+  <div class="rules">L’horaire ci-dessus est affiché dans <strong>ton</strong> fuseau horaire (modifiable dans le champ « Ton fuseau horaire »), avec l’heure de Paris et de Rio à titre de repère.<br><br>Tu peux annuler ou demander le déplacement de ton cours jusqu’à 24 heures avant l’horaire prévu. À moins de 24 heures, le créneau ne peut plus être déplacé. En cas d’absence ou d’annulation tardive, un nouveau cours expérimental gratuit ne pourra pas être réservé et le prochain cours devra être réglé.<br><br>24 heures avant le cours, tu recevras un e-mail te demandant de confirmer ta présence. Le lien Zoom sera disponible dans ton espace de cours.</div>
   <button id="reserve" type="button">Créer mon compte et réserver</button><div id="err" class="err"></div>
 </div>
 <div id="success"><h2 class="success">Cours expérimental réservé</h2><p>Ton compte a été créé et ton cours apparaît maintenant dans ton espace.</p><a class="button secondary" href="./index.html">Accéder à mon espace de cours</a></div>
@@ -67,6 +75,34 @@ function detectedTimezone(){try{return Intl.DateTimeFormat().resolvedOptions().t
 function fillTimezones(){let z=[];try{z=Intl.supportedValuesOf?Intl.supportedValuesOf('timeZone'):[]}catch(e){}if(!z.length)z=['Europe/Paris','America/Sao_Paulo','America/Manaus','America/Fortaleza','America/Recife','America/Bahia'];const cur=detectedTimezone();if(!z.includes(cur))z.unshift(cur);$('timezone').innerHTML=z.map(x=>`<option value="${x}" ${x===cur?'selected':''}>${x}</option>`).join('')}
 $('cpf').addEventListener('input',e=>e.target.value=formatCPF(e.target.value));fillWhatsAppCodes();fillTimezones();
 
+document.querySelectorAll('.pwd-toggle').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const inp=$(btn.dataset.target);
+    inp.type=inp.type==='password'?'text':'password';
+    btn.textContent=inp.type==='password'?'👁':'🙈';
+  });
+});
+function checkPwdMatch(){
+  const p1=$('password').value,p2=$('password2').value,el=$('pwdMatch');
+  if(!p2){el.textContent='';el.className='pwd-match';return}
+  if(p1===p2){el.textContent='✓ Les mots de passe correspondent';el.className='pwd-match ok'}
+  else{el.textContent='✗ Les mots de passe ne correspondent pas';el.className='pwd-match bad'}
+}
+$('password').addEventListener('input',checkPwdMatch);
+$('password2').addEventListener('input',checkPwdMatch);
+
+function fmtInTz(date,tz){
+  try{return new Intl.DateTimeFormat('fr-FR',{dateStyle:'full',timeStyle:'short',timeZone:tz}).format(date)}
+  catch(e){return date.toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})}
+}
+function renderSlotTimes(){
+  if(!slot)return;
+  const date=new Date(slot.date),tz=$('timezone').value||detectedTimezone();
+  $('slotLocal').innerHTML=`<strong>${fmtInTz(date,tz)}</strong> — 45 min<br><span style="font-size:12px;color:var(--grey)">(dans le fuseau horaire : ${tz})</span>`;
+  $('slotRefs').innerHTML=`Heure de Paris : ${fmtInTz(date,'Europe/Paris')}<br>Heure de Rio de Janeiro : ${fmtInTz(date,'America/Sao_Paulo')}`;
+}
+$('timezone').addEventListener('change',renderSlotTimes);
+
 async function init(){
   if(!token||!slotId){$('status').textContent='Ce lien de cours expérimental est incomplet.';return}
   try{
@@ -75,7 +111,7 @@ async function init(){
     slot=doc.data();
     if(!slot.isExperimental||slot.experimentalToken!==token){$('status').textContent='Ce lien n’est pas valide.';return}
     if(slot.reservedBy){$('status').textContent='Ce cours expérimental a déjà été réservé.';return}
-    $('slotText').textContent=new Date(slot.date).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})+' — 45 min';
+    renderSlotTimes();
     $('status').style.display='none';$('formPanel').style.display='block';
   }catch(e){console.error(e);$('status').textContent='Impossible de vérifier le créneau pour le moment.'}
 }
