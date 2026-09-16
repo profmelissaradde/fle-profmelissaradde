@@ -108,11 +108,15 @@ async function saveActivityCompletion(weekTag, dayNum){
 const recorders = {};
 
 function findDayByUid(uid){
-  const m = uid.match(/^w(\d+)d(\d+)$/);
+  /* uid format : "D<dossier>_w<unité>d<étape>", ex. "D1_w3d2" — le préfixe de
+     dossier évite toute collision entre deux dossiers ayant la même unité/étape. */
+  const m = uid.match(/^D(\d+)_w(\d+)d(\d+)$/);
   if(!m) return null;
-  const w = weeks.find(x=>x.id===parseInt(m[1]));
+  const dossierNum = parseInt(m[1]);
+  const src = dossiersContent[dossierNum] || weeks;
+  const w = src.find(x=>x.id===parseInt(m[2]));
   if(!w) return null;
-  const day = w.days[parseInt(m[2])-1];
+  const day = w.days[parseInt(m[3])-1];
   return {week:w, day};
 }
 
@@ -150,7 +154,7 @@ async function toggleRec(uid){
           await db.collection('enregistrements').add({
             uid: student.uid,
             prenom: student.prenom, nom: student.nom, email: student.email, telephone: student.telephone,
-            niveau: niveau, dossier: "Dossier 0",
+            niveau: niveau, dossier: `Dossier ${CURRENT_DOSSIER_NUM}`,
             semaine: ctx.week.tag, jour: ctx.day.num, activite: ctx.day.title_fr,
             driveUrl: result.viewUrl, driveFileId: result.fileId,
             ts: firebase.firestore.FieldValue.serverTimestamp()
