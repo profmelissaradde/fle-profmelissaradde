@@ -351,6 +351,123 @@ const temasSemanas = [
         }
       }
     }
+  },
+  {
+    id: "chiens-chats-2026-09-21",
+    date_debut: "2026-09-21",
+    periode: "21 → 27 septembre 2026",
+    titre_fr: "Chiens, chats ou rien ?",
+    titre_pt: "Cães, gatos ou nada?",
+    sub_fr: "Un thème léger à faire en 15 à 30 minutes, à ton rythme.",
+    sub_pt: "Um tema leve para fazer em 15 a 30 minutos, no seu ritmo.",
+    niveaux: {
+      A1: {
+        duree: "≈ 15 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde cette vidéo sur les Français et leurs animaux de compagnie et repère les mots que tu connais déjà.",
+          consigne_pt: "Assista a este vídeo sobre os franceses e seus animais de estimação e identifique as palavras que você já conhece.",
+          media: {type:"video", id:"xZQ4xxQG1Sk", label:"Les Français aiment-ils les animaux de compagnie ? — 5 minutes de français"},
+          exo: {type:"qcm", q:"Beaucoup de Français ont…", options:["Un animal de compagnie","Une voiture de sport","Un bateau"], correct:0}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "4 min",
+          texte_fr: "J'ai un chien et un chat à la maison. Le matin, je promène mon chien dans le parc. Le soir, mon chat s'installe sur mes genoux. Je ne peux plus imaginer ma vie sans eux.",
+          texte_pt: "Tenho um cachorro e um gato em casa. De manhã, levo meu cachorro para passear no parque. À noite, meu gato se instala no meu colo. Não consigo mais imaginar minha vida sem eles.",
+          exo: {type:"qcm", q:"Où est le chat le soir ?", options:["Dans le parc","Sur les genoux","Chez le vétérinaire"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "3 min",
+          consigne_fr: "Écris 3 phrases sur un animal (le tien ou celui de quelqu'un que tu connais). Utilise « Il/Elle s'appelle... » et « Il/Elle aime... ».",
+          consigne_pt: "Escreva 3 frases sobre um animal (o seu ou o de alguém que você conhece). Use « Il/Elle s'appelle... » e « Il/Elle aime... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "3 min",
+          consigne_fr: "Enregistre-toi : dis à voix haute si tu préfères les chiens ou les chats, et pourquoi (1 raison).",
+          consigne_pt: "Grave-se: diga em voz alta se você prefere cães ou gatos, e por quê (1 razão)."
+        }
+      },
+      A2: {
+        duree: "≈ 20 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde ce reportage sur les animaux de compagnie en France et note deux informations qui te surprennent.",
+          consigne_pt: "Assista a esta reportagem sobre os animais de estimação na França e anote duas informações que te surpreendem.",
+          media: {type:"video", id:"e-fJs43BkYI", label:"Chiens, chats, nouveaux animaux de compagnie… la vie des bêtes à Bordeaux"},
+          exo: {type:"qcm", q:"En France, on compte…", options:["Plus de 30 millions d'animaux de compagnie","Environ 3 millions d'animaux de compagnie","Moins d'un million d'animaux de compagnie"], correct:0}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "5 min",
+          texte_fr: "En France, on compte plus de 30 millions d'animaux domestiques dans les foyers : chats, chiens, lapins, poissons, oiseaux. Les Français accordent une grande importance à leurs compagnons : soins vétérinaires, jouets, alimentation adaptée. Le débat entre amateurs de chats et de chiens est un grand classique : les uns soulignent l'indépendance du chat, les autres la loyauté du chien.",
+          texte_pt: "Na França, há mais de 30 milhões de animais domésticos nos lares: gatos, cães, coelhos, peixes, pássaros. Os franceses dão grande importância aos seus companheiros: cuidados veterinários, brinquedos, alimentação adequada. O debate entre amantes de gatos e de cães é um grande clássico: uns destacam a independência do gato, outros a lealdade do cão.",
+          exo: {type:"qcm", q:"Selon le texte, les amateurs de chiens soulignent surtout…", options:["Leur indépendance","Leur loyauté","Leur silence"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "5 min",
+          consigne_fr: "Écris un petit texte (5-6 phrases) : es-tu plutôt « personne à chats » ou « personne à chiens » ? Utilise « Je suis plutôt... parce que... ».",
+          consigne_pt: "Escreva um pequeno texto (5-6 frases): você é mais « pessoa de gatos » ou « pessoa de cães »? Use « Je suis plutôt... parce que... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "5 min",
+          consigne_fr: "Enregistre-toi : explique en 4-5 phrases les qualités que tu apprécies le plus chez un animal de compagnie.",
+          consigne_pt: "Grave-se: explique em 4-5 frases as qualidades que você mais aprecia em um animal de estimação."
+        }
+      },
+      B1: {
+        duree: "≈ 25 min",
+        co: {
+          titre_fr: "Compréhension orale — Musique", titre_pt: "Compreensão oral — Música", dur: "6 min",
+          consigne_fr: "Écoute cette chanson de Georges Brassens, qui raconte l'histoire d'une bergère et d'un petit chat qu'elle adopte. Repère le vocabulaire de l'adoption et de la tendresse.",
+          consigne_pt: "Ouça esta canção de Georges Brassens, que conta a história de uma pastora e de um gatinho que ela adota. Identifique o vocabulário da adoção e da ternura.",
+          media: {type:"video", id:"zuxMhzKeozo", label:"Georges Brassens — Brave Margot"},
+          exo: {type:"qcm", q:"Dans cette chanson, Margot…", options:["Perd son chat dans la forêt","Adopte un petit chat qui a perdu sa mère","Vend son chat au marché"], correct:1}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "6 min",
+          texte_fr: "Avoir un animal de compagnie, c'est aussi une responsabilité : il faut le nourrir, le promener, s'en occuper chaque jour. En France, beaucoup considèrent leur chien ou leur chat comme un membre de la famille à part entière. Mais perdre un animal peut être un vrai deuil, difficile à comprendre pour ceux qui n'en ont jamais eu.",
+          texte_pt: "Ter um animal de estimação também é uma responsabilidade: é preciso alimentá-lo, passeá-lo, cuidar dele todos os dias. Na França, muitos consideram seu cão ou gato um membro da família por completo. Mas perder um animal pode ser um luto de verdade, difícil de entender para quem nunca teve um.",
+          link: {url:"https://fr.wikipedia.org/wiki/Animal_de_compagnie", label:"En savoir plus — Wikipédia"},
+          exo: {type:"qcm", q:"Selon le texte, perdre un animal…", options:["N'a aucune importance","Peut être un vrai deuil","Est toujours facile à vivre"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Écris un court paragraphe (6-8 phrases) sur la relation entre les humains et les animaux de compagnie : penses-tu qu'on puisse avoir un lien vraiment profond avec un animal ?",
+          consigne_pt: "Escreva um parágrafo curto (6-8 frases) sobre a relação entre os humanos e os animais de estimação: você acha que é possível ter um vínculo realmente profundo com um animal?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (1 min) : pensez-vous qu'il est raisonnable de dépenser beaucoup d'argent pour un animal (vétérinaire, accessoires, nourriture spéciale) ?",
+          consigne_pt: "Grave-se (1 min): você acha razoável gastar muito dinheiro com um animal (veterinário, acessórios, comida especial)?"
+        }
+      },
+      B2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "7 min",
+          consigne_fr: "Regarde ce reportage sur le business des animaux de compagnie en France. Note les secteurs économiques mentionnés.",
+          consigne_pt: "Assista a esta reportagem sobre o business dos animais de estimação na França. Anote os setores econômicos mencionados.",
+          media: {type:"video", id:"_bhqyz6-NfE", label:"Animaux de compagnie, à qui profite le business ?"},
+          exo: {type:"qcm", q:"Le reportage montre que les animaux de compagnie…", options:["Ne génèrent aucune activité économique","Sont devenus un vrai marché économique (nourriture, soins, accessoires)","Sont interdits dans la plupart des foyers français"], correct:1}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "8 min",
+          texte_fr: "« Plus je connais les hommes, plus j'aime mon chien », dit une expression populaire française, attribuée selon les sources à Frédéric II de Prusse ou à Blaise Pascal. Au-delà de la boutade, la question des droits des animaux soulève aujourd'hui de vrais débats juridiques et éthiques en France : maltraitance, exploitation commerciale, statut légal de l'animal — longtemps considéré comme un simple bien meuble avant d'être reconnu, depuis une loi de 2015, comme un être vivant doué de sensibilité.",
+          texte_pt: "« Quanto mais conheço os homens, mais amo o meu cão », diz uma expressão popular francesa, atribuída conforme as fontes a Frederico II da Prússia ou a Blaise Pascal. Além da piada, a questão dos direitos dos animais levanta hoje verdadeiros debates jurídicos e éticos na França: maus-tratos, exploração comercial, estatuto legal do animal — durante muito tempo considerado um simples bem móvel antes de ser reconhecido, desde uma lei de 2015, como um ser vivo dotado de sensibilidade.",
+          link: {url:"https://fr.wikipedia.org/wiki/Droits_des_animaux", label:"Le débat sur les droits des animaux — Wikipédia"},
+          exo: {type:"qcm", q:"Depuis 2015, en droit français, l'animal est reconnu comme…", options:["Un simple bien meuble","Un être vivant doué de sensibilité","Une personne juridique à part entière"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (8-10 phrases) : jusqu'où doit aller, selon vous, la protection légale des animaux de compagnie ?",
+          consigne_pt: "Redija um texto argumentativo (8-10 frases): até onde deve ir, na sua opinião, a proteção legal dos animais de estimação?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "8 min",
+          consigne_fr: "Enregistre-toi (1-2 min) : défends ou nuance cette citation — « Plus je connais les hommes, plus j'aime mon chien. »",
+          consigne_pt: "Grave-se (1-2 min): defenda ou nuance esta citação — « Quanto mais conheço os homens, mais amo o meu cão »."
+        }
+      }
+    }
   }
 ];
 
@@ -359,6 +476,26 @@ function getTema(id){
 }
 function temaMostRecentId(){
   return temasSemanas[temasSemanas.length - 1].id;
+}
+
+/* Un thème avec "date_debut" (format "AAAA-MM-JJ") ne doit apparaître côté élève qu'à
+   partir de cette date (permet de préparer un thème à l'avance sans qu'il soit visible
+   trop tôt). Sans "date_debut", le thème est visible immédiatement — comportement
+   historique conservé pour tous les thèmes déjà publiés. Côté professeure, aucun
+   filtre n'est appliqué : elle voit et peut préparer tous les thèmes, y compris ceux
+   pas encore publiés aux élèves. */
+function temaEstVisibleEleve(t){
+  if(!t.date_debut) return true;
+  const aujourdhui = new Date().toISOString().slice(0,10);
+  return aujourdhui >= t.date_debut;
+}
+function temasSemanasVisiveisEleve(){
+  const visiveis = temasSemanas.filter(temaEstVisibleEleve);
+  return visiveis.length ? visiveis : [temasSemanas[0]]; // filet de sécurité, ne devrait jamais arriver
+}
+function temaMostRecentVisibleId(){
+  const visiveis = temasSemanasVisiveisEleve();
+  return visiveis[visiveis.length - 1].id;
 }
 
 let temaSelectedId = null;      // thème actuellement affiché côté élève
@@ -603,14 +740,17 @@ function goTemaWeek(id){
 
 function renderTemas(){
   const c = document.getElementById('content');
-  if(!temaSelectedId){ temaSelectedId = temaMostRecentId(); }
+  if(!temaSelectedId){ temaSelectedId = temaMostRecentVisibleId(); }
+  // Si l'id sélectionné correspond à un thème pas encore publié (ex: ancien lien, ou
+  // date système qui a reculé), on retombe sur le dernier thème visible.
+  if(!temaEstVisibleEleve(getTema(temaSelectedId))){ temaSelectedId = temaMostRecentVisibleId(); }
   const tema = getTema(temaSelectedId);
   const effNiveau = temaNiveauEffectif();
   const data = tema.niveaux[effNiveau];
   student.temas = student.temas || {};
 
-  // Sélecteur de semaines — plus récent en premier
-  const weeksHTML = [...temasSemanas].reverse().map(t=>{
+  // Sélecteur de semaines — plus récent en premier (seulement les thèmes déjà publiés)
+  const weeksHTML = [...temasSemanasVisiveisEleve()].reverse().map(t=>{
     const done = temaAllDone(t.id);
     const active = t.id === temaSelectedId;
     return `<button class="tema-week-tab ${active?'active':''}" onclick="goTemaWeek('${t.id}')">
