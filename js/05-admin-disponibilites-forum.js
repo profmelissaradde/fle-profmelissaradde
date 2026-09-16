@@ -3954,11 +3954,11 @@ function renderDossiers(){
 
     <div class="objectif-box">
       <p class="fr">
-        Le niveau ${niveau} comptera <b>9 dossiers</b> au total. Pour l'instant, le <b>Dossier 0</b> est disponible — les suivants arriveront au fur et à mesure. Chaque dossier est découpé en <b>5 unités</b> ; tu avances à ton rythme, que tu aies 1, 2, 3, 4 ou 5 séances par semaine avec ta professeure. Avec 4 séances/semaine par exemple, tu peux terminer tout le dossier en un peu plus d'une semaine — ce n'est jamais bloqué sur 5 semaines.
+        Le niveau ${niveau} comptera <b>9 dossiers</b> au total. Pour l'instant, les <b>Dossiers 0 et 1</b> sont disponibles — les suivants arriveront au fur et à mesure. Chaque dossier est découpé en <b>5 unités</b> ; tu avances à ton rythme, que tu aies 1, 2, 3, 4 ou 5 séances par semaine avec ta professeure. Avec 4 séances/semaine par exemple, tu peux terminer tout un dossier en un peu plus d'une semaine — ce n'est jamais bloqué sur 5 semaines.
       </p>
 
       <p class="pt">
-        🇧🇷 O nível ${niveau} terá 9 módulos ao todo. Por enquanto, o Módulo 0 está disponível — os próximos chegarão aos poucos. Cada módulo tem <b>5 unidades</b>; você avança no seu próprio ritmo, tenha 1, 2, 3, 4 ou 5 aulas por semana. Com 4 aulas/semana, por exemplo, dá para terminar o módulo em pouco mais de uma semana — nunca é travado em 5 semanas.
+        🇧🇷 O nível ${niveau} terá 9 módulos ao todo. Por enquanto, os <b>Módulos 0 e 1</b> estão disponíveis — os próximos chegarão aos poucos. Cada módulo tem <b>5 unidades</b>; você avança no seu próprio ritmo, tenha 1, 2, 3, 4 ou 5 aulas por semana. Com 4 aulas/semana, por exemplo, dá para terminar um módulo em pouco mais de uma semana — nunca é travado em 5 semanas.
       </p>
     </div>
 
@@ -3998,20 +3998,17 @@ function renderDossiers(){
         ? '● Disponible'
         : '🔒 Bientôt disponible';
 
-    if(
-      isOpen &&
-      student.uniteCourante
-    ){
-      const w =
-        weeks.find(
-          x =>
-            x.tag ===
-            student.uniteCourante
-        );
-
-      if(w){
-        statusText =
-          `↻ Reprendre — Unité ${w.id}/5`;
+    if(isOpen){
+      /* Chaque dossier garde sa propre progression : on pointe "weeks" vers le
+         contenu du dossier d.num avant de chercher l'unité en cours pour CE
+         dossier précis (student.uniteCourante est maintenant { [num]: tag }). */
+      setActiveDossier(d.num);
+      const tagCourant = student.uniteCourante && student.uniteCourante[d.num];
+      if(tagCourant){
+        const w = weeks.find(x => x.tag === tagCourant);
+        if(w){
+          statusText = `↻ Reprendre — Unité ${w.id}/5`;
+        }
       }
     }
 
@@ -4033,16 +4030,10 @@ function renderDossiers(){
 
     if(isOpen){
       el.onclick = ()=>{
-        const w =
-          weeks.find(
-            x =>
-              x.tag ===
-              student.uniteCourante
-          );
-
-        goWeek(
-          w ? w.id : 1
-        );
+        setActiveDossier(d.num);
+        const tagCourant = student.uniteCourante && student.uniteCourante[d.num];
+        const w = tagCourant ? weeks.find(x => x.tag === tagCourant) : null;
+        goWeek(w ? w.id : 1);
       };
     }
 
