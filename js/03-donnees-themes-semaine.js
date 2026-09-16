@@ -235,6 +235,122 @@ const temasSemanas = [
         }
       }
     }
+  },
+  {
+    id: "patrimoine-2026-09-14",
+    periode: "14 → 20 septembre 2026",
+    titre_fr: "Que laisserons-nous aux générations futures ?",
+    titre_pt: "O que deixaremos para as gerações futuras?",
+    sub_fr: "Un thème pour réfléchir à ce que nous transmettrons, à faire en 15 à 30 minutes, à ton rythme.",
+    sub_pt: "Um tema para refletir sobre o que vamos transmitir, para fazer em 15 a 30 minutos, no seu ritmo.",
+    niveaux: {
+      A1: {
+        duree: "≈ 15 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde la vidéo sur les Journées du Patrimoine et repère les mots que tu connais déjà.",
+          consigne_pt: "Assista ao vídeo sobre as Journées du Patrimoine e identifique as palavras que você já conhece.",
+          media: {type:"video", id:"RaodWTbaKeU", label:"Les Journées européennes du patrimoine — présentation"},
+          exo: {type:"qcm", q:"Les Journées du Patrimoine, c'est en quel mois ?", options:["En septembre","En décembre","En mars"], correct:0}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "4 min",
+          texte_fr: "Le patrimoine, c'est ce qui vient du passé. Un monument, une chanson, une recette : tout ça, c'est le patrimoine. Ma grand-mère m'a transmis sa recette de tarte aux pommes. Je vais la transmettre à mes enfants aussi.",
+          texte_pt: "O patrimônio é o que vem do passado. Um monumento, uma canção, uma receita: tudo isso é patrimônio. Minha avó me transmitiu a receita de torta de maçã dela. Vou transmiti-la aos meus filhos também.",
+          exo: {type:"qcm", q:"Qu'est-ce que la grand-mère a transmis ?", options:["Une maison","Une recette","Une langue"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "3 min",
+          consigne_fr: "Écris 3 phrases : qu'est-ce que ta famille t'a transmis (une recette, une tradition, un objet) ? Utilise « On m'a transmis... ».",
+          consigne_pt: "Escreva 3 frases: o que sua família transmitiu para você (uma receita, uma tradição, um objeto)? Use « On m'a transmis... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "3 min",
+          consigne_fr: "Enregistre-toi : dis à voix haute une chose que tu voudrais transmettre à tes enfants ou à de jeunes proches.",
+          consigne_pt: "Grave-se: diga em voz alta uma coisa que você gostaria de transmitir aos seus filhos ou a jovens próximos."
+        }
+      },
+      A2: {
+        duree: "≈ 20 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde cette courte vidéo sur les Journées du Patrimoine et note deux lieux qu'on peut visiter.",
+          consigne_pt: "Assista a este vídeo curto sobre as Journées du Patrimoine e anote dois lugares que se pode visitar.",
+          media: {type:"video", id:"p3U0oHPhyOI", label:"Les pépites des Journées du Patrimoine 2025"},
+          exo: {type:"qcm", q:"Pendant les Journées du Patrimoine, les monuments sont…", options:["Payants","Fermés au public","Gratuits"], correct:2}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "5 min",
+          texte_fr: "Chaque génération reçoit un héritage du passé : des monuments, des œuvres d'art, mais aussi une langue, des valeurs, des traditions. Aujourd'hui, avec les crises climatiques, une question se pose : que laisserons-nous vraiment aux générations futures ?",
+          texte_pt: "Cada geração recebe uma herança do passado: monumentos, obras de arte, mas também uma língua, valores, tradições. Hoje, com as crises climáticas, uma pergunta se coloca: o que deixaremos realmente para as gerações futuras?",
+          exo: {type:"qcm", q:"L'héritage immatériel, c'est par exemple…", options:["Une langue ou une tradition","Un monument en pierre","Une pièce de monnaie"], correct:0}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "5 min",
+          consigne_fr: "Écris un petit texte (5-6 phrases) sur une tradition de ta famille que tu voudrais transmettre. Utilise le futur simple : « Je transmettrai... ».",
+          consigne_pt: "Escreva um pequeno texto (5-6 frases) sobre uma tradição da sua família que você gostaria de transmitir. Use o futuro simples: « Je transmettrai... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "5 min",
+          consigne_fr: "Enregistre-toi : explique en 4-5 phrases ce que représente pour toi le mot « patrimoine ».",
+          consigne_pt: "Grave-se: explique em 4-5 frases o que representa para você a palavra « patrimoine »."
+        }
+      },
+      B1: {
+        duree: "≈ 25 min",
+        co: {
+          titre_fr: "Compréhension orale — Musique", titre_pt: "Compreensão oral — Música", dur: "6 min",
+          consigne_fr: "Écoute cette chanson de Jacques Brel sur les personnes âgées et la mémoire. Repère le vocabulaire lié au temps qui passe.",
+          consigne_pt: "Ouça esta canção de Jacques Brel sobre os idosos e a memória. Identifique o vocabulário ligado à passagem do tempo.",
+          media: {type:"video", id:"E18IBHnY5-Y", label:"Jacques Brel — Les Vieux (Clip officiel)"},
+          exo: {type:"qcm", q:"Cette chanson parle surtout…", options:["Des enfants et de leurs projets d'avenir","Des personnes âgées et de ce qui s'efface avec le temps","D'un voyage à l'étranger"], correct:1}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "6 min",
+          texte_fr: "Chaque année, en septembre, la France célèbre les Journées du Patrimoine : pendant deux jours, des milliers de monuments habituellement fermés au public ouvrent gratuitement leurs portes. Mais le patrimoine, ce n'est pas seulement des pierres anciennes : c'est aussi la gastronomie, la langue, les savoir-faire artisanaux, la musique traditionnelle. Le patrimoine immatériel est souvent plus fragile que le patrimoine matériel : quand les derniers porteurs d'un savoir disparaissent sans l'avoir transmis, ce savoir meurt avec eux.",
+          texte_pt: "Todo ano, em setembro, a França celebra as Journées du Patrimoine: durante dois dias, milhares de monumentos normalmente fechados ao público abrem suas portas gratuitamente. Mas o patrimônio não é apenas pedras antigas: é também a gastronomia, a língua, os saberes artesanais, a música tradicional. O patrimônio imaterial é muitas vezes mais frágil que o patrimônio material: quando os últimos portadores de um saber desaparecem sem tê-lo transmitido, esse saber morre com eles.",
+          link: {url:"https://fr.wikipedia.org/wiki/Journ%C3%A9es_europ%C3%A9ennes_du_patrimoine", label:"En savoir plus — Wikipédia"},
+          exo: {type:"qcm", q:"Pourquoi le patrimoine immatériel est-il plus fragile ?", options:["Parce qu'il coûte plus cher à entretenir","Parce qu'il peut disparaître si personne ne le transmet","Parce qu'il n'intéresse personne"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Écris un court paragraphe (6-8 phrases) sur un savoir-faire, une histoire ou une valeur transmis dans ta famille : qui te l'a transmis, et le transmettras-tu à ton tour ?",
+          consigne_pt: "Escreva um parágrafo curto (6-8 frases) sobre um saber-fazer, uma história ou um valor transmitido na sua família: quem transmitiu para você, e você transmitirá também?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (1 min) : que pensez-vous du mouvement des jeunes pour le climat, qui réclame des comptes à la génération précédente sur l'héritage qu'elle leur laisse ?",
+          consigne_pt: "Grave-se (1 min): o que você acha do movimento dos jovens pelo clima, que cobra satisfações da geração anterior sobre a herança que ela está deixando?"
+        }
+      },
+      B2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "7 min",
+          consigne_fr: "Regarde cette vidéo sur les éléments français inscrits au patrimoine immatériel de l'UNESCO. Note trois éléments qui te surprennent.",
+          consigne_pt: "Assista a este vídeo sobre os elementos franceses inscritos no patrimônio imaterial da UNESCO. Anote três elementos que te surpreendem.",
+          media: {type:"video", id:"RJgnl0TxzyM", label:"La France à l'UNESCO — les 22 chefs-d'œuvre de notre patrimoine immatériel"},
+          exo: {type:"qcm", q:"Le patrimoine immatériel de l'UNESCO reconnaît…", options:["Seulement des monuments classés","Des pratiques, savoir-faire et traditions vivantes","Uniquement des langues officielles"], correct:1}
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "8 min",
+          texte_fr: "En 2023, l'art du vitrail a été inscrit par l'UNESCO au patrimoine culturel immatériel de l'humanité, aux côtés des vignobles en terrasses de Bourgogne, reconnus en 2015 comme paysage culturel vivant. Ces deux exemples montrent que le patrimoine n'est pas figé : c'est un savoir-faire transmis de génération en génération, qui continue d'évoluer. La question n'est donc pas seulement de préserver le passé, mais de savoir ce que nous choisissons de transmettre — et à qui.",
+          texte_pt: "Em 2023, a arte do vitral foi inscrita pela UNESCO no patrimônio cultural imaterial da humanidade, ao lado dos vinhedos em terraços da Borgonha, reconhecidos em 2015 como paisagem cultural viva. Esses dois exemplos mostram que o patrimônio não é estático: é um saber-fazer transmitido de geração em geração, que continua evoluindo. A questão não é apenas preservar o passado, mas saber o que escolhemos transmitir — e para quem.",
+          link: {url:"https://ich.unesco.org/fr/etat/france", label:"Le patrimoine immatériel français — UNESCO"},
+          exo: {type:"qcm", q:"Selon le texte, le patrimoine est…", options:["Un objet figé du passé","Un savoir-faire vivant, transmis et qui évolue","Une liste fermée établie une fois pour toutes"], correct:1}
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (8-10 phrases) : peut-on vraiment parler d'un « devoir de transmission » envers les générations futures, ou chaque génération est-elle libre de vivre sans se soucier de ce qu'elle laissera ?",
+          consigne_pt: "Redija um texto argumentativo (8-10 frases): podemos realmente falar de um « dever de transmissão » em relação às gerações futuras, ou cada geração é livre para viver sem se preocupar com o que vai deixar?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "8 min",
+          consigne_fr: "Enregistre-toi (1-2 min) : défends ou nuance cette citation attribuée à Saint-Exupéry — « Nous n'héritons pas de la terre de nos parents, nous l'empruntons à nos enfants. »",
+          consigne_pt: "Grave-se (1-2 min): defenda ou nuance esta citação atribuída a Saint-Exupéry — « Não herdamos a terra de nossos pais, nós a tomamos emprestada de nossos filhos »."
+        }
+      }
+    }
   }
 ];
 
@@ -679,4 +795,3 @@ function renderTeacherTemas(){
       </div>`;
     }).join('');
 }
-
