@@ -311,7 +311,13 @@ function bilanEditorHTML(s){
       <button onclick="toggleBilanEditor('${s.id}')" style="background:none; color:var(--grey); border:none; font-weight:700; cursor:pointer;">Fermer</button>
     </div>`;
   }
-  const key = bilanKey(s.niveau, CURRENT_DOSSIER_NUM);
+  /* Cet éditeur rapide (accessible directement depuis la liste des élèves) reste
+     volontairement figé sur le Dossier 0 : CURRENT_DOSSIER_NUM est un pointeur
+     partagé avec la navigation élève/aperçu-cours et ne doit pas influencer cet
+     écran. Pour noter le Dossier 1 (ou un autre), utiliser l'onglet complet de
+     la fiche élève (« Dossiers & bilans », dans 10-profils-regles-evaluations.js),
+     qui prend le numéro de dossier en paramètre explicite. */
+  const key = bilanKey(s.niveau, 0);
   const b = (s.bilans && s.bilans[key]) || {};
   const items = b.items || [];
   const rows = bilanItems.map((t,i)=>`
@@ -358,7 +364,10 @@ function completionStats(completedMap){
   });
   return {total, thisWeek};
 }
-const TOTAL_ACTIVITIES = weeks.reduce((sum,w)=> sum + w.days.length, 0);
+/* Total toutes activités confondues, tous dossiers déjà construits (dossiersContent) —
+   recalculé sur l'objet complet plutôt que sur le seul pointeur "weeks" (qui ne
+   pointe que vers le dossier actuellement affiché ailleurs dans l'app). */
+const TOTAL_ACTIVITIES = Object.values(dossiersContent).reduce((sum,ws)=> sum + ws.reduce((s2,w)=>s2+w.days.length,0), 0);
 function reminderMailto(s){
   const subject = "Petit rappel — cours de français";
   const body = `Bonjour ${s.prenom},\n\nJe vois que tu n'as pas encore beaucoup avancé sur tes activités cette semaine. N'hésite pas à t'y remettre un peu avant notre prochaine séance !\n\nÀ bientôt,\nMelissa`;
@@ -375,9 +384,13 @@ function renderTeacherStudentsList(){
     const freqOpts = ['', 1, 2, 3, 4, 5].map(f=>
       `<option value="${f}" ${(String(s.frequence||'')===String(f)) ? 'selected' : ''}>${f ? f+' séance'+(f>1?'s':'')+'/semaine' : '— Rythme non défini —'}</option>`
     ).join('');
+    /* Progression Dossier 0 uniquement dans ce résumé rapide (voir la note plus haut
+       sur bilanKey(s.niveau, 0)). Gère aussi les anciennes fiches où uniteCourante
+       était encore une simple chaîne au lieu de { [numéroDossier]: tag }. */
     let progressText = 'Pas encore commencé';
-    if(s.uniteCourante){
-      const w = weeks.find(x=>x.tag===s.uniteCourante);
+    const uc0 = typeof s.uniteCourante === 'string' ? s.uniteCourante : (s.uniteCourante && s.uniteCourante[0]);
+    if(uc0){
+      const w = weeksD0.find(x=>x.tag===uc0);
       if(w) progressText = `Unité ${w.id}/5 — ${w.title_fr}`;
     }
     const stats = completionStats(s.completed);
@@ -389,7 +402,7 @@ function renderTeacherStudentsList(){
     return `<div class="teacher-entry">
       <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
       <div class="meta">${s.email} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
-      <div class="meta">📍 Progression : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, CURRENT_DOSSIER_NUM)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, CURRENT_DOSSIER_NUM)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, CURRENT_DOSSIER_NUM)].note20}/20</b>` : ''}` : ''}</div>
+      <div class="meta">📍 Progression (Dossier 0) : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, 0)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, 0)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, 0)].note20}/20</b>` : ''}` : ''}</div>
       <div class="meta">✅ ${stats.total}/${TOTAL_ACTIVITIES} activités faites au total · <b style="color:${behind ? 'var(--bad)' : 'var(--ok)'}">${stats.thisWeek} cette semaine</b>${behind ? ' ⚠️ moins de la moitié' : ''}</div>
       <div class="meta">📦 Forfait : ${packTotal ? `<b style="color:${packRemaining<=0?'var(--bad)':'var(--navy)'}">${packUsed}/${packTotal} séances utilisées</b> (${packRemaining} restante${packRemaining>1?'s':''})` : 'aucun forfait défini'}</div>
       <div class="teacher-entry-actions">
@@ -483,4 +496,3 @@ async function deleteRecording(id, driveFileId){
   try{ await db.collection('enregistrements').doc(id).delete(); }catch(e){ /* ignore */ }
   await loadTeacherRecordings();
 }
-
