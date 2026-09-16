@@ -24,7 +24,7 @@
 
     student = {
       prenom: record.prenom || '', nom: record.nom || '', email: record.email || '', telephone: record.telephone || '', uid,
-      uniteCourante: null, frequence: null, bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {},
+      uniteCourante: {}, frequence: null, bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {},
       experimentalLesson: true, registrationSource: record.registrationSource || 'cours-experimental', status: record.status || 'experimental'
     };
     niveau = null; current = null; screen = 'experimental';
