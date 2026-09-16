@@ -91,7 +91,7 @@ async function doSignup(){
     const cred = await auth.createUserWithEmailAndPassword(email, pw);
     const record = {
       prenom, nom, email, telephone, whatsappCode, country, cpf, timezone,
-      niveau: null, frequence: null, uniteCourante: null,
+      niveau: null, frequence: null, uniteCourante: {},
       status: 'active', registrationSource: 'plateforme', experimentalLesson: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -119,7 +119,7 @@ async function doSignin(){
          d'attribution de niveau côté Firestore pour accéder au Thème de la semaine, aux
          dossiers, etc. Voir setAdminNiveau() dans 01-utilitaires-nav.js. */
       niveau = niveau || 'A1'; current = null;
-      student = {prenom:'Melissa', nom:'Radde', email: cred.user.email || email, telephone:'', uid: cred.user.uid, uniteCourante:null, frequence:null, temas:{}};
+      student = {prenom:'Melissa', nom:'Radde', email: cred.user.email || email, telephone:'', uid: cred.user.uid, uniteCourante:{}, frequence:null, temas:{}};
       teacherTab = 'eleves';
       screen = 'teacher';
       startTeacherPresenceHeartbeat();
