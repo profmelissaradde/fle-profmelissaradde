@@ -179,6 +179,124 @@ async function submitAdminRescheduleRequest(id){
   await loadAdminDispo();
 }
 
+/* ---- Récurrence par jours de la semaine (créneaux + forfaits) ---- */
+const WEEKDAYS_FR = [
+  {value:1, label:'Lun'}, {value:2, label:'Mar'}, {value:3, label:'Mer'},
+  {value:4, label:'Jeu'}, {value:5, label:'Ven'}, {value:6, label:'Sam'}, {value:0, label:'Dim'}
+];
+function weekdayPickerHTML(prefix){
+  return `<div style="display:flex; gap:8px; flex-wrap:wrap;">` +
+    WEEKDAYS_FR.map(d => `
+      <div style="display:flex; align-items:center; gap:4px; font-size:12.5px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:5px 8px;">
+        <label style="display:flex; align-items:center; gap:4px;">
+          <input type="checkbox" id="${prefix}-day-${d.value}" onchange="toggleDayTime('${prefix}',${d.value})">
+          ${d.label}
+        </label>
+        <input type="time" id="${prefix}-time-${d.value}" placeholder="de" style="display:none; width:80px; padding:3px 4px; border:1px solid var(--line); border-radius:4px;" onchange="refreshRecurrencePreview('${prefix}')">
+        <span id="${prefix}-sep-${d.value}" style="display:none; color:var(--grey);">à</span>
+        <input type="time" id="${prefix}-timeend-${d.value}" placeholder="à (optionnel)" title="Heure de fin, seulement si tu veux plusieurs créneaux à la suite (demi-journée)" style="display:none; width:80px; padding:3px 4px; border:1px solid var(--line); border-radius:4px;" onchange="refreshRecurrencePreview('${prefix}')">
+      </div>
+    `).join('') + `</div>`;
+}
+function toggleDayTime(prefix, value){
+  const chk = document.getElementById(`${prefix}-day-${value}`);
+  const time = document.getElementById(`${prefix}-time-${value}`);
+  const sep = document.getElementById(`${prefix}-sep-${value}`);
+  const timeEnd = document.getElementById(`${prefix}-timeend-${value}`);
+  if(!chk || !time) return;
+  const show = chk.checked ? 'inline-block' : 'none';
+  time.style.display = show;
+  if(sep) sep.style.display = chk.checked ? 'inline' : 'none';
+  if(timeEnd) timeEnd.style.display = show;
+  if(!chk.checked){ time.value = ''; if(timeEnd) timeEnd.value = ''; }
+  refreshRecurrencePreview(prefix);
+}
+function readSelectedDayTimes(prefix){
+  const out = [];
+  WEEKDAYS_FR.forEach(d=>{
+    const chk = document.getElementById(`${prefix}-day-${d.value}`);
+    const time = document.getElementById(`${prefix}-time-${d.value}`);
+    const timeEnd = document.getElementById(`${prefix}-timeend-${d.value}`);
+    if(chk && chk.checked && time && time.value) out.push({weekday: d.value, time: time.value, timeEnd: (timeEnd && timeEnd.value) || null});
+  });
+  return out;
+}
+/* Éclate une plage horaire (ex. 9h-13h) en plusieurs créneaux consécutifs de la durée choisie ; sans heure de fin, un seul créneau à l'heure donnée. */
+function expandDayTimes(dayTimes, dureeMinutes){
+  const expanded = [];
+  dayTimes.forEach(dt=>{
+    if(dt.timeEnd){
+      const [sh,sm] = dt.time.split(':').map(Number);
+      const [eh,em] = dt.timeEnd.split(':').map(Number);
+      let startMin = sh*60+sm;
+      const endMin = eh*60+em;
+      while(startMin + dureeMinutes <= endMin){
+        const hh = String(Math.floor(startMin/60)).padStart(2,'0');
+        const mm = String(startMin%60).padStart(2,'0');
+        expanded.push({weekday: dt.weekday, time: `${hh}:${mm}`});
+        startMin += dureeMinutes;
+      }
+    } else {
+      expanded.push({weekday: dt.weekday, time: dt.time});
+    }
+  });
+  return expanded;
+}
+function nextOccurrence(startDateStr, weekday, timeStr){
+  const [h,m] = timeStr.split(':').map(Number);
+  const d = new Date(startDateStr+'T00:00:00');
+  const diff = (weekday - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+/* Un ou plusieurs jours/heures (avec éventuelles plages horaires), répétés pendant N semaines. */
+function generateWeeklyDates(startDateStr, dayTimes, weeks, dureeMinutes){
+  const expanded = expandDayTimes(dayTimes, dureeMinutes || 45);
+  const dates = [];
+  expanded.forEach(dt=>{
+    const base = nextOccurrence(startDateStr, dt.weekday, dt.time);
+    for(let w=0; w<weeks; w++){
+      dates.push(new Date(base.getTime() + w*7*24*3600*1000));
+    }
+  });
+  dates.sort((a,b)=>a-b);
+  return dates;
+}
+/* Plusieurs jours/heures (avec éventuelles plages horaires) combinés jusqu'à atteindre un nombre de séances. */
+function generateCountDates(startDateStr, dayTimes, count, dureeMinutes){
+  const expanded = expandDayTimes(dayTimes, dureeMinutes || 45);
+  if(expanded.length===0) return [];
+  const next = expanded.map(dt => nextOccurrence(startDateStr, dt.weekday, dt.time));
+  const out = [];
+  while(out.length < count){
+    let minIdx = 0;
+    for(let i=1;i<next.length;i++){ if(next[i] < next[minIdx]) minIdx = i; }
+    out.push(new Date(next[minIdx]));
+    next[minIdx] = new Date(next[minIdx].getTime() + 7*24*3600*1000);
+  }
+  return out;
+}
+function refreshRecurrencePreview(prefix){
+  const previewEl = document.getElementById(prefix+'-preview');
+  if(!previewEl) return;
+  const dayTimes = readSelectedDayTimes(prefix);
+  let dates = [];
+  if(prefix==='dispo'){
+    const startVal = document.getElementById('dispo-start')?.value;
+    const weeks = Math.max(1, parseInt(document.getElementById('dispo-weeks')?.value,10) || 1);
+    const duree = parseInt(document.getElementById('dispo-duree')?.value,10) || 45;
+    if(startVal && dayTimes.length) dates = generateWeeklyDates(startVal, dayTimes, weeks, duree);
+  } else if(prefix==='pack'){
+    const startVal = document.getElementById('pack-quick-start')?.value;
+    const count = Math.max(1, Math.min(FORFAIT_MAX, parseInt(document.getElementById('pack-quick-count')?.value,10) || 1));
+    const duree = parseInt(document.getElementById('pack-duree')?.value,10) || 45;
+    if(startVal && dayTimes.length) dates = generateCountDates(startVal, dayTimes, count, duree);
+  }
+  if(!dates.length){ previewEl.innerHTML = ''; return; }
+  previewEl.innerHTML = `<div style="font-size:11.5px; color:var(--grey); margin-top:6px; max-height:120px; overflow-y:auto;">📋 ${dates.length} date(s) : ${dates.map(d=>fmtSlotDate(d.toISOString())).join(' · ')}</div>`;
+}
+
 function renderAdminDispo(){
   const body = document.getElementById('teacher-body');
   if(!body) return;
@@ -247,15 +365,14 @@ function renderAdminDispo(){
     <div class="rec-box">
       <p class="rec-consigne" style="font-weight:700;">➕ Ajouter un créneau</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Date et heure
-          <input type="datetime-local" id="dispo-date" oninput="previewTZ('dispo-date','dispo-tz-preview')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;">
+        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">À partir du
+          <input type="date" id="dispo-start" onchange="refreshRecurrencePreview('dispo')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;">
         </label>
-        <div id="dispo-tz-preview" style="align-self:center;"></div>
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Durée (minutes)
-          <input type="number" id="dispo-duree" value="45" min="15" step="5" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
+          <input type="number" id="dispo-duree" value="45" min="15" step="5" onchange="refreshRecurrencePreview('dispo')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
         </label>
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Répéter chaque semaine
-          <input type="number" id="dispo-repeat" value="1" min="1" max="26" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:90px;">
+        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Nombre de semaines
+          <input type="number" id="dispo-weeks" value="1" min="1" max="26" onchange="refreshRecurrencePreview('dispo')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:90px;">
         </label>
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Réserver directement pour (optionnel)
           <select id="dispo-eleve" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:180px;">
@@ -263,9 +380,12 @@ function renderAdminDispo(){
             ${studentOptions}
           </select>
         </label>
-        <button class="rec-btn" onclick="addDisponibilite()">Ajouter</button>
       </div>
-      <p style="font-size:12px; color:var(--grey); margin:8px 0 0;">💡 Mets 8 dans « Répéter chaque semaine » pour créer d'un coup ce même jour et cette même heure pendant 8 semaines, au lieu de les ajouter une par une.</p>
+      <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:12px;">Jours de la semaine — une heure précise, ou une plage « de / à » pour une demi-journée de créneaux à la suite</label>
+      <div style="margin-top:6px;">${weekdayPickerHTML('dispo')}</div>
+      <div id="dispo-preview"></div>
+      <button class="rec-btn" style="margin-top:12px;" onclick="addDisponibilite()">Créer le(s) créneau(x)</button>
+      <p style="font-size:12px; color:var(--grey); margin:8px 0 0;">💡 Une heure de « à » optionnelle : par ex. Lundi de 9h à 13h avec des cours de 45 min → 5 créneaux à la suite ce jour-là. Ajoute « Nombre de semaines » pour répéter tout ça sur plusieurs semaines. En général jusqu'à 4 jours par semaine, exceptionnellement 6.</p>
     </div>
     <div class="rec-box" style="margin-top:16px;">
       <p class="rec-consigne" style="font-weight:700;">📦 Réserver un forfait (plusieurs dates, un seul élève)</p>
@@ -278,25 +398,22 @@ function renderAdminDispo(){
           </select>
         </label>
         <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Durée par séance (minutes)
-          <input type="number" id="pack-duree" value="45" min="15" step="5" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
+          <input type="number" id="pack-duree" value="45" min="15" step="5" onchange="refreshRecurrencePreview('pack')" style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;">
         </label>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; background:var(--cream); border:1px solid var(--line); border-radius:8px; padding:10px 12px;">
-        <label style="font-size:12px; font-weight:700; color:var(--navy);">⚡ Remplissage rapide — 1er cours
-          <input type="datetime-local" id="pack-quick-start" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
-        </label>
-        <label style="font-size:12px; font-weight:700; color:var(--navy);">Tous les
-          <select id="pack-quick-interval" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
-            <option value="7">7 jours</option>
-            <option value="14">14 jours</option>
-          </select>
+        <label style="font-size:12px; font-weight:700; color:var(--navy);">⚡ Remplissage rapide — à partir du
+          <input type="date" id="pack-quick-start" onchange="refreshRecurrencePreview('pack')" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
         </label>
         <label style="font-size:12px; font-weight:700; color:var(--navy);">Nombre de séances
-          <input type="number" id="pack-quick-count" value="1" min="1" max="${FORFAIT_MAX}" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:70px;">
+          <input type="number" id="pack-quick-count" value="1" min="1" max="${FORFAIT_MAX}" onchange="refreshRecurrencePreview('pack')" style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:70px;">
         </label>
-        <button class="rec-btn" onclick="fillPackDatesQuick()" type="button">Remplir les dates ci-dessous</button>
       </div>
-      <p style="font-size:11.5px; color:var(--grey); margin:-6px 0 10px;">Ça pré-remplit les champs ci-dessous à intervalle régulier — tu peux ensuite corriger ou vider une date ponctuellement (vacances, jour férié…) avant de créer les séances.</p>
+      <label style="font-size:12px; font-weight:700; color:var(--navy);">Jours de la semaine — une heure précise, ou une plage « de / à » pour une demi-journée</label>
+      <div style="margin-top:6px;">${weekdayPickerHTML('pack')}</div>
+      <div id="pack-preview"></div>
+      <p style="font-size:11.5px; color:var(--grey); margin:8px 0 10px;">Ça pré-remplit les champs ci-dessous, dans l'ordre chronologique en combinant les jours cochés — tu peux ensuite corriger ou vider une date ponctuellement (vacances, jour férié…) avant de créer les séances.</p>
+      <button class="rec-btn" onclick="fillPackDatesQuick()" type="button">Remplir les dates ci-dessous</button>
       ${packRows}
       <button class="rec-btn" style="margin-top:8px;" onclick="reserverPack()">📦 Créer les séances du forfait</button>
     </div>
@@ -475,18 +592,19 @@ async function rejectStudentReschedule(id){
   await loadAdminDispo();
 }
 async function addDisponibilite(){
-  const dateVal = document.getElementById('dispo-date').value;
+  const startVal = document.getElementById('dispo-start').value;
+  const weeks = Math.max(1, parseInt(document.getElementById('dispo-weeks').value, 10) || 1);
   const duree = parseInt(document.getElementById('dispo-duree').value, 10) || 45;
-  const repeat = Math.max(1, parseInt(document.getElementById('dispo-repeat').value, 10) || 1);
   const eleveVal = document.getElementById('dispo-eleve').value;
-  if(!dateVal){ alert('Choisis une date et une heure.'); return; }
-  const baseDate = new Date(dateVal);
+  if(!startVal){ alert('Choisis une date de départ.'); return; }
+  const dayTimes = readSelectedDayTimes('dispo');
+  if(dayTimes.length===0){ alert('Coche au moins un jour de la semaine et renseigne son heure.'); return; }
+  const dates = generateWeeklyDates(startVal, dayTimes, weeks, duree);
   let name = null;
   if(eleveVal){ [, name] = eleveVal.split('|'); }
 
   let created = 0;
-  for(let i=0; i<repeat; i++){
-    const occDate = new Date(baseDate.getTime() + i * 7 * 24 * 3600 * 1000);
+  for(const occDate of dates){
     const dateISO = occDate.toISOString();
     const slot = { date: dateISO, duree, reservedBy: null, reservedName: null, reservedEmail: null, ts: firebase.firestore.FieldValue.serverTimestamp() };
     if(eleveVal){
@@ -499,8 +617,8 @@ async function addDisponibilite(){
       created++;
     }catch(e){ /* on continue avec les occurrences suivantes même si une échoue */ }
   }
-  if(created===0){ alert("Impossible d'ajouter ce créneau pour le moment."); return; }
-  if(repeat > 1) alert(`${created} créneau(x) créé(s) (chaque semaine à partir du ${fmtSlotDate(baseDate.toISOString())}).`);
+  if(created===0){ alert("Impossible d'ajouter ce(s) créneau(x) pour le moment."); return; }
+  if(created > 1) alert(`${created} créneaux créés.`);
   await loadAdminDispo();
 }
 function prefillPackCount(){
@@ -512,21 +630,23 @@ function prefillPackCount(){
   const pack = (s && s.pack) || {};
   const remaining = Math.max(1, (pack.total||0) - (pack.used||0));
   countEl.value = Math.min(remaining, FORFAIT_MAX);
+  refreshRecurrencePreview('pack');
 }
 function fillPackDatesQuick(){
   const startVal = document.getElementById('pack-quick-start').value;
-  const interval = parseInt(document.getElementById('pack-quick-interval').value, 10) || 7;
   const count = Math.max(1, Math.min(FORFAIT_MAX, parseInt(document.getElementById('pack-quick-count').value, 10) || 1));
-  if(!startVal){ alert('Choisis la date du premier cours.'); return; }
-  const start = new Date(startVal);
-  for(let i=0;i<count;i++){
-    const occ = new Date(start.getTime() + i * interval * 24 * 3600 * 1000);
+  if(!startVal){ alert('Choisis la date de départ.'); return; }
+  const dayTimes = readSelectedDayTimes('pack');
+  if(dayTimes.length===0){ alert('Coche au moins un jour de la semaine et renseigne son heure.'); return; }
+  const duree = parseInt(document.getElementById('pack-duree').value, 10) || 45;
+  const dates = generateCountDates(startVal, dayTimes, count, duree);
+  dates.forEach((occ,i)=>{
     const input = document.getElementById('pack-date-'+(i+1));
-    if(!input) break;
+    if(!input) return;
     const pad = n => String(n).padStart(2,'0');
     input.value = `${occ.getFullYear()}-${pad(occ.getMonth()+1)}-${pad(occ.getDate())}T${pad(occ.getHours())}:${pad(occ.getMinutes())}`;
     previewTZ('pack-date-'+(i+1), 'pack-tz-'+(i+1));
-  }
+  });
 }
 async function reserverPack(){
   const eleveVal = document.getElementById('pack-eleve').value;
