@@ -57,7 +57,12 @@ window.addEventListener('load', () => {
       try{
         const cred = await auth.signInWithEmailAndPassword(email, pw);
         if(cred.user.uid === TEACHER_UID){
-          isTeacher = true; niveau = null; current = null;
+          isTeacher = true;
+          /* Le compte admin garde toujours son niveau "vue élève" (par défaut A1,
+             modifiable dans la barre latérale via les pastilles de niveau) — pas besoin
+             de forfait ni d'attribution de niveau côté Firestore pour accéder au Thème
+             de la semaine, aux dossiers, etc. Voir setAdminNiveau() dans 01-utilitaires-nav.js. */
+          niveau = niveau || 'A1'; current = null;
           student = {prenom:'Melissa', nom:'Radde', email:cred.user.email || email, telephone:'', uid:cred.user.uid, uniteCourante:null, frequence:null, temas:{}};
           teacherTab = 'eleves'; screen = 'teacher';
           startTeacherPresenceHeartbeat(); startTeacherMessagesListener(); render(); return;
