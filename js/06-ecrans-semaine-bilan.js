@@ -1,8 +1,8 @@
 /* ======================= MÉDIA / EXERCICE / ENREGISTREMENT ======================= */
-function mediaHTML(day){
+function mediaHTML(obj){
   let html = '';
-  if(day.media){
-    day.media.forEach(m=>{
+  if(obj.media){
+    obj.media.forEach(m=>{
       if(m.type==='audio'){
         html += `<div class="media-block"><p class="section-label">🎧 Écouter — Ouvir</p><audio controls src="${m.url}"></audio></div>`;
       } else if(m.type==='video'){
@@ -10,31 +10,40 @@ function mediaHTML(day){
       }
     });
   }
-  if(day.link){
-    html += `<a class="source-link" href="${day.link.url}" target="_blank" rel="noopener">🔗 ${day.link.label}</a>`;
+  if(obj.link){
+    html += `<a class="source-link" href="${obj.link.url}" target="_blank" rel="noopener">🔗 ${obj.link.label}</a>`;
   }
   return html;
 }
+/* Un seul exercice (ancien format day.exo, toujours supporté). */
 function exoHTML(day, uid){
   if(!day.exo) return '';
-  if(day.exo.type==='qcm'){
-    const opts = day.exo.options.map((o,i)=>`<button class="exo-opt" onclick="answerQCM('${uid}',${i},${day.exo.correct})">${o}</button>`).join('');
+  return exoItemHTML(day.exo, uid);
+}
+/* Un exercice isolé (utilisé pour l'ancien format ET pour chaque exercice gradué
+   d'un bloc CO/CE au nouveau format — voir skillBlockHTML). */
+function exoItemHTML(exo, uid){
+  const niveauBadge = exo.niveau ? `<span class="niveau-badge niveau-${exo.niveau}">${exo.niveau}</span>` : '';
+  if(exo.type==='qcm'){
+    const opts = exo.options.map((o,i)=>`<button class="exo-opt" onclick="answerQCM('${uid}',${i},${exo.correct})">${o}</button>`).join('');
     return `<div class="exo-box">
+      ${niveauBadge}
       <p class="exo-consigne"><span class="label-fr">Consigne —</span> Choisis la bonne réponse.</p>
       <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
-      <p class="exo-question">${day.exo.q}</p>
+      <p class="exo-question">${exo.q}</p>
       <div class="exo-options" id="opts-${uid}">${opts}</div>
       <p class="exo-feedback" id="fb-${uid}"></p>
     </div>`;
   }
-  if(day.exo.type==='texte'){
+  if(exo.type==='texte'){
     return `<div class="exo-box">
+      ${niveauBadge}
       <p class="exo-consigne"><span class="label-fr">Consigne —</span> Complète la phrase.</p>
       <p class="exo-consigne-pt">🇧🇷 Complete a frase.</p>
-      <p class="exo-question">${day.exo.q}</p>
+      <p class="exo-question">${exo.q}</p>
       <div class="exo-text-row">
         <input type="text" id="in-${uid}" placeholder="Ta réponse / Sua resposta">
-        <button onclick='checkTexte("${uid}", ${JSON.stringify(day.exo.accept)})'>Vérifier</button>
+        <button onclick='checkTexte("${uid}", ${JSON.stringify(exo.accept)})'>Vérifier</button>
       </div>
       <p class="exo-feedback" id="fb-${uid}"></p>
     </div>`;
@@ -42,9 +51,13 @@ function exoHTML(day, uid){
   return '';
 }
 function recHTML(day, uid){
-  return `<div class="rec-box">
-    <p class="rec-consigne"><span class="label-fr">🎙️ À enregistrer —</span> ${day.rec.fr}</p>
-    <p class="rec-consigne-pt">🇧🇷 ${day.rec.pt}</p>
+  const eo = day.eo || day.rec; // "eo" (nouveau format) ou "rec" (ancien format) — même forme {fr, pt}
+  if(!eo) return '';
+  return `<div class="rec-box skill-eo">
+    <p class="skill-label">🗣️ Expression orale</p>
+    <p class="skill-label-pt">🇧🇷 Expressão oral</p>
+    <p class="rec-consigne"><span class="label-fr">🎙️ À enregistrer —</span> ${eo.fr}</p>
+    <p class="rec-consigne-pt">🇧🇷 ${eo.pt}</p>
     <div class="rec-controls">
       <button class="rec-btn" id="btn-${uid}" onclick="toggleRec('${uid}')">● Enregistrer</button>
       <span class="rec-time" id="time-${uid}">00:00</span>
@@ -52,6 +65,55 @@ function recHTML(day, uid){
     <div id="player-${uid}"></div>
     <p class="rec-status" id="status-${uid}">Ton enregistrement sera envoyé automatiquement à ta professeure.</p>
   </div>`;
+}
+/* ---- Nouveau format riche : leçon (accroche + explication), puis CO / CE / EE ---- */
+function leconHTML(day){
+  if(!day.lecon) return '';
+  return `<div class="lecon-box">
+    <p class="lecon-accroche">💬 ${day.lecon.accroche_fr}</p>
+    <p class="lecon-accroche-pt">🇧🇷 ${day.lecon.accroche_pt}</p>
+    <div class="lecon-contenu">
+      <p class="fr">${day.lecon.contenu_fr}</p>
+      <p class="pt">🇧🇷 ${day.lecon.contenu_pt}</p>
+    </div>
+  </div>`;
+}
+function skillBlockHTML(skillKey, iconLabelFr, iconLabelPt, skill, dayUid){
+  if(!skill) return '';
+  let inner = mediaHTML(skill);
+  if(skill.consigne_fr){
+    inner += `<p class="exo-consigne">${skill.consigne_fr}</p><p class="exo-consigne-pt">🇧🇷 ${skill.consigne_pt||''}</p>`;
+  }
+  if(skill.texte_fr){
+    inner += `<div class="ce-texte"><p class="fr">${skill.texte_fr}</p><p class="pt">🇧🇷 ${skill.texte_pt||''}</p></div>`;
+  }
+  if(Array.isArray(skill.exos)){
+    inner += skill.exos.map((exo,i)=>exoItemHTML(exo, `${dayUid}_${skillKey}${i+1}`)).join('');
+  }
+  return `<div class="skill-block skill-${skillKey}">
+    <p class="skill-label">${iconLabelFr}</p>
+    <p class="skill-label-pt">🇧🇷 ${iconLabelPt}</p>
+    ${inner}
+  </div>`;
+}
+function eeHTML(ee, dayUid){
+  if(!ee) return '';
+  return `<div class="skill-block skill-ee ee-box">
+    <p class="skill-label">✍️ Expression écrite</p>
+    <p class="skill-label-pt">🇧🇷 Expressão escrita</p>
+    <p class="exo-consigne">${ee.consigne_fr}</p>
+    <p class="exo-consigne-pt">🇧🇷 ${ee.consigne_pt}</p>
+    <textarea id="ee-${dayUid}" rows="4" placeholder="Écris ta réponse ici... / Escreva sua resposta aqui..."></textarea>
+    <button onclick="markEEDone('${dayUid}')">J'ai fini d'écrire</button>
+    <p class="exo-feedback ok" id="ee-fb-${dayUid}" style="display:none;">✅ Note bien de relire ta réponse avec ta professeure pendant la séance orale.</p>
+  </div>`;
+}
+/* L'expression écrite n'est pas corrigée automatiquement (c'est un texte libre) —
+   ce bouton confirme juste que l'élève a terminé, pour qu'il pense à la faire relire
+   par sa professeure ; le texte reste dans la page, il n'est pas envoyé à Firestore. */
+function markEEDone(uid){
+  const fb = document.getElementById(`ee-fb-${uid}`);
+  if(fb) fb.style.display = 'block';
 }
 
 /* ======================= ÉCRAN : SEMAINE ======================= */
@@ -92,8 +154,11 @@ function renderWeek(w){
       <div class="day-top"><span class="day-num">${day.num}</span><span class="day-dur">${day.dur}</span>${done ? '<span class="done-badge">✅ Fait</span>' : ''}</div>
       <h3 class="day-title">${day.title_fr}</h3>
       <p class="day-title-pt">🇧🇷 ${day.title_pt}</p>
-      ${mediaHTML(day)}
-      ${exoHTML(day, uid)}
+      ${leconHTML(day)}
+      ${day.co ? skillBlockHTML('co', '🎧 Compréhension orale', 'Compreensão oral', day.co, uid) : ''}
+      ${day.ce ? skillBlockHTML('ce', '📖 Compréhension écrite', 'Compreensão escrita', day.ce, uid) : ''}
+      ${day.ee ? eeHTML(day.ee, uid) : ''}
+      ${(!day.co && !day.ce) ? mediaHTML(day) + exoHTML(day, uid) : ''}
       ${recHTML(day, uid)}
     `;
     grid.appendChild(el);
