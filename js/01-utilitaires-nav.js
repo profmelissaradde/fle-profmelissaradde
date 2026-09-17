@@ -315,48 +315,167 @@ const weeksD1 = [
     objectif_fr:"Saluer et prendre congé selon le moment de la journée et le type de relation (formelle/informelle), choisir entre tu et vous, distinguer les sons [y] et [u], et reconnaître l'intonation montante (question) et descendante (affirmation).",
     objectif_pt:"Cumprimentar e se despedir de acordo com o momento do dia e o tipo de relação (formal/informal), escolher entre tu e vous, distinguir os sons [y] e [u], e reconhecer a entonação ascendente (pergunta) e descendente (afirmação).",
     days:[
-      {num:"Étape 1", dur:"15 min",
-        title_fr:"Saluer selon le moment de la journée",
-        title_pt:"Cumprimentar de acordo com o momento do dia",
-        link:{url:"https://www.podcastfrancaisfacile.com/dialogue/conversation-dialogue-salutations-en-francais-se-saluer-dire-bonjour-au-revoir.html", label:"Saluer en français — 15 dialogues (podcastfrancaisfacile)"},
-        exo:{type:"qcm", q:"Lucas arrive à l'université le matin et rencontre son professeur. Il dit :", options:["Bonjour monsieur, comment allez-vous ?","Salut ! Vous allez bien ?","Au revoir, à demain !"], correct:0},
-        rec:{fr:"Imagine que tu croises quelqu'un le matin, puis l'après-midi, puis le soir : dis une salutation adaptée à chaque moment.", pt:"Imagine que você encontra alguém de manhã, depois à tarde, depois à noite: diga uma saudação adequada para cada momento."}},
-      {num:"Étape 2", dur:"15 min",
-        title_fr:"Bonjour ou bonne journée ? Saluer et prendre congé",
-        title_pt:"Bonjour ou bonne journée? Cumprimentar e se despedir",
-        link:{url:"https://www.podcastfrancaisfacile.com/dialogue/conversation-dialogue-salutations-en-francais-se-saluer-dire-bonjour-au-revoir.html", label:"Saluer et prendre congé — dialogues (podcastfrancaisfacile)"},
-        exo:{type:"qcm", q:"« Bonjour » et « bonne journée » : ces deux formules sont…", options:["Interchangeables, on peut utiliser l'une ou l'autre à tout moment","Différentes : « bonjour » sert à saluer, « bonne journée » sert à prendre congé","Utilisées seulement le soir"], correct:1},
-        rec:{fr:"Dis 2 formules pour saluer (arriver) et 2 formules pour prendre congé (partir).", pt:"Diga 2 fórmulas para cumprimentar (chegar) e 2 fórmulas para se despedir (partir)."}},
-      {num:"Étape 3", dur:"15 min",
-        title_fr:"Point culture — Tu ou vous ? Relation formelle ou informelle",
-        title_pt:"Ponto cultural — Tu ou vous? Relação formal ou informal",
-        link:{url:"https://www.podcastfrancaisfacile.com/communication/vouvoiement-tutoiement.html", label:"Le tutoiement et le vouvoiement (podcastfrancaisfacile)"},
-        exo:{type:"qcm", q:"« Tu » correspond à une relation…, « vous » correspond à une relation…", options:["informelle / formelle","formelle / informelle","les deux sont formelles"], correct:0},
-        rec:{fr:"Donne un exemple de situation où on utilise « tu », et un exemple où on utilise « vous ».", pt:"Dê um exemplo de situação em que se usa «tu», e um exemplo em que se usa «vous»."}},
-      {num:"Étape 4", dur:"15 min",
-        title_fr:"Phonétique — Distinguer [y] (tu) et [u] (vous)",
-        title_pt:"Fonética — Distinguir [y] (tu) e [u] (vous)",
-        link:{url:"https://www.podcastfrancaisfacile.com/phonetique-prononciation/tableau-des-sons-du-francais.html", label:"Le son [y] et le son [u] — exercices"},
-        exo:{type:"qcm", q:"Dans la phrase « Vous allez au musée du Louvre », combien de fois entend-on le son [u] ?", options:["2 fois","1 fois","3 fois"], correct:0},
-        rec:{fr:"Répète ces deux phrases en marquant bien la différence : « Vous allez au musée du Louvre » et « Tu salues Lou et Luce ».", pt:"Repita essas duas frases marcando bem a diferença entre [y] e [u]."}},
-      {num:"Étape 5", dur:"15 min",
-        title_fr:"Phonétique — L'intonation montante et descendante",
-        title_pt:"Fonética — A entonação ascendente e descendente",
-        link:{url:"https://www.podcastfrancaisfacile.com/phonetique-prononciation/tableau-des-sons-du-francais.html", label:"Intonation de la question et de l'affirmation"},
-        exo:{type:"qcm", q:"Pour poser une question à l'oral (sans « est-ce que »), la voix…", options:["Monte à la fin de la phrase","Descend à la fin de la phrase","Reste toujours plate"], correct:0},
-        rec:{fr:"Dis la même phrase deux fois : une fois comme une question (voix qui monte), une fois comme une affirmation (voix qui descend). Par exemple : « Tu vas bien ? » / « Tu vas bien. »", pt:"Diga a mesma frase duas vezes: uma vez como pergunta (voz que sobe), uma vez como afirmação (voz que desce)."}},
-      {num:"Étape 6", dur:"15 min",
-        title_fr:"Saluer sans les mots : la poignée de main, la bise",
-        title_pt:"Cumprimentar sem palavras: o aperto de mão, o beijo no rosto",
-        link:{url:"https://fr.wikipedia.org/wiki/Bise_(salutation)", label:"La bise en France — Wikipédia"},
-        exo:{type:"qcm", q:"En France, deux collègues qui se rencontrent pour la première fois dans un cadre professionnel vont plutôt…", options:["Se serrer la main","Se faire la bise","Se taper dans la main"], correct:0},
-        rec:{fr:"Compare : comment se saluent les gens dans ton pays, selon qu'ils se connaissent bien ou non ? Est-ce différent de la France ?", pt:"Compare: como as pessoas se cumprimentam no seu país, dependendo de se conhecerem bem ou não? É diferente da França?"}},
-      {num:"Étape 7", dur:"15 min",
-        title_fr:"Mise en pratique : saluer et prendre congé",
-        title_pt:"Colocando em prática: cumprimentar e se despedir",
-        link:{url:"https://www.podcastfrancaisfacile.com/dialogue/conversation-dialogue-salutations-en-francais-se-saluer-dire-bonjour-au-revoir.html", label:"Saluer et prendre congé — dialogues (podcastfrancaisfacile)"},
-        exo:{type:"qcm", q:"Il est 20h, tu quittes un ami proche. Tu dis plutôt :", options:["Bonsoir monsieur, comment allez-vous ?","Salut, bonne soirée !","Bonjour, ça va ?"], correct:1},
-        rec:{fr:"Imagine 3 courtes situations (le matin entre amis, l'après-midi avec un professeur, le soir avec un collègue) et joue chaque salutation à voix haute.", pt:"Imagine 3 situações curtas (de manhã entre amigos, à tarde com um professor, à noite com um colega) e represente cada saudação em voz alta."}}
+      {num:"Jour 1", dur:"25 min",
+        title_fr:"On se croise dans le couloir",
+        title_pt:"Nos cruzamos no corredor",
+        lecon:{
+          accroche_fr:"Imagine : tu arrives dans une ville que tu ne connais pas, tu ne parles presque pas la langue, et la première personne que tu croises te dit quelque chose... Tu ne sais pas quoi répondre. Ce tout petit moment peut faire toute la différence entre se sentir perdu et se sentir déjà un peu chez soi.",
+          accroche_pt:"Imagine: você chega numa cidade que não conhece, quase não fala a língua, e a primeira pessoa que cruza te diz algo... Você não sabe o que responder. Esse pequeno momento pode fazer toda a diferença entre se sentir perdido e já se sentir um pouco em casa.",
+          contenu_fr:"En français, la salutation change selon le moment de la journée. Le matin et l'après-midi, on dit « Bonjour ». Le soir, on dit « Bonsoir ». Pour partir, on utilise d'autres mots : « Au revoir », « Bonne journée » (le matin ou l'après-midi), « Bonne soirée » (le soir). Attention, piège classique : « Bonjour » sert seulement à arriver, jamais à partir !",
+          contenu_pt:"Em francês, a saudação muda de acordo com o momento do dia. De manhã e à tarde, diz-se «Bonjour». À noite, diz-se «Bonsoir». Para se despedir, usam-se outras palavras: «Au revoir», «Bonne journée» (de manhã ou à tarde), «Bonne soirée» (à noite). Atenção, armadilha clássica: «Bonjour» serve só para chegar, nunca para partir!"
+        },
+        co:{
+          consigne_fr:"Écoute ces dialogues et repère à quel moment de la journée ils se passent, et si la personne arrive ou si elle part.",
+          consigne_pt:"Ouça esses diálogos e identifique em que momento do dia eles acontecem, e se a pessoa está chegando ou partindo.",
+          link:{url:"https://www.podcastfrancaisfacile.com/dialogue/conversation-dialogue-salutations-en-francais-se-saluer-dire-bonjour-au-revoir.html", label:"Saluer en français — 15 dialogues (podcastfrancaisfacile)"},
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Quelqu'un dit « Bonsoir ! ». À quel moment de la journée sommes-nous probablement ?", options:["Le matin","Le soir","Midi pile"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Un professeur dit à un étudiant : « Bonne journée, à demain ! ». Que fait le professeur ?", options:["Il arrive","Il part (il prend congé)","Il pose une question"], correct:1},
+            {niveau:"difficile", type:"texte", q:"Il est 21h, tu quittes un ami. Tu dis : « ___ ! »", accept:["bonne soirée","bonsoir"]}
+          ]
+        },
+        ce:{
+          texte_fr:"Lucas arrive à l'université le matin : il dit « Bonjour » à deux messieurs à l'accueil. Dans un couloir, il salue une jeune fille. L'après-midi, à la cafétéria, il retrouve des amis et dit « Salut ! ». Le soir, dans l'escalier, il croise une dame et lui dit « Bonsoir ». Avec les professeurs, Lucas reste poli et formel ; avec ses amis, il est beaucoup plus détendu.",
+          texte_pt:"Lucas chega à universidade de manhã: ele diz «Bonjour» a dois senhores na recepção. Num corredor, cumprimenta uma moça. À tarde, na cantina, encontra amigos e diz «Salut!». À noite, na escada, cruza com uma senhora e diz «Bonsoir». Com os professores, Lucas permanece educado e formal; com os amigos, ele é bem mais descontraído.",
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Où Lucas retrouve-t-il ses amis ?", options:["À la cafétéria","Dans l'escalier","À l'accueil"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"D'après le texte, avec qui Lucas est-il probablement le plus formel ?", options:["Ses amis","Les messieurs à l'accueil","La jeune fille du couloir"], correct:1}
+          ]
+        },
+        ee:{
+          consigne_fr:"Écris un tout petit dialogue (3 à 4 lignes) entre deux personnes qui se croisent le matin dans un couloir. Utilise au moins une formule pour saluer et une pour prendre congé.",
+          consigne_pt:"Escreva um diálogo bem curto (3 a 4 linhas) entre duas pessoas que se cruzam de manhã num corredor. Use pelo menos uma fórmula para cumprimentar e uma para se despedir."
+        },
+        eo:{fr:"Enregistre-toi : dis à voix haute 3 façons différentes de saluer selon le moment de la journée, puis 2 façons différentes de prendre congé.", pt:"Grave-se: diga em voz alta 3 formas diferentes de cumprimentar de acordo com o momento do dia, depois 2 formas diferentes de se despedir."}
+      },
+      {num:"Jour 2", dur:"25 min",
+        title_fr:"Tu ou vous ? Ne te trompe pas de registre",
+        title_pt:"Tu ou vous? Não erre o registro",
+        lecon:{
+          accroche_fr:"En France, confondre « tu » et « vous », ce n'est pas juste une petite faute de grammaire. C'est un peu comme arriver en pyjama à un entretien d'embauche, ou en costume-cravate à une fête entre copains : le mot juste au mauvais moment peut mettre tout le monde mal à l'aise, même sans le vouloir.",
+          accroche_pt:"Na França, confundir «tu» e «vous» não é só um pequeno erro de gramática. É um pouco como chegar de pijama numa entrevista de emprego, ou de terno numa festa entre amigos: a palavra certa na hora errada pode deixar todo mundo sem graça, mesmo sem querer.",
+          contenu_fr:"« Tu » s'utilise dans une relation informelle : avec des amis, la famille, des enfants, ou des personnes de ton âge que tu connais bien. « Vous » s'utilise dans une relation formelle : avec un professeur, un inconnu, une personne âgée, ou dans un cadre professionnel. Dans le doute, commence toujours par « vous » — c'est plus prudent, et c'est souvent à la personne la plus âgée ou la plus expérimentée de proposer de se tutoyer.",
+          contenu_pt:"«Tu» é usado numa relação informal: com amigos, família, crianças, ou pessoas da sua idade que você conhece bem. «Vous» é usado numa relação formal: com um professor, um desconhecido, uma pessoa mais velha, ou num ambiente profissional. Na dúvida, comece sempre com «vous» — é mais prudente, e geralmente é a pessoa mais velha ou mais experiente que propõe passar ao tratamento por «tu»."
+        },
+        co:{
+          consigne_fr:"Écoute (ou lis à voix haute avec ta professeure) ces quatre mini-situations et décide si la relation est formelle ou informelle.",
+          consigne_pt:"Ouça (ou leia em voz alta com sua professora) essas quatro minissituações e decida se a relação é formal ou informal.",
+          link:{url:"https://www.podcastfrancaisfacile.com/communication/vouvoiement-tutoiement.html", label:"Le tutoiement et le vouvoiement (podcastfrancaisfacile)"},
+          exos:[
+            {niveau:"facile", type:"qcm", q:"« Tu t'appelles comment ? » — cette question est plutôt…", options:["Formelle","Informelle","Ni l'une ni l'autre"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Tu rencontres ta nouvelle professeure pour la première fois. Tu lui demandes son prénom, tu dis :", options:["Tu t'appelles comment ?","Vous vous appelez comment ?","Comment ça va ?"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Dans un cadre professionnel, deux collègues qui se rencontrent pour la première fois vont plutôt…", options:["Se tutoyer immédiatement","Se vouvoyer, au moins au début","Ne rien se dire"], correct:1}
+          ]
+        },
+        ce:{
+          texte_fr:"En France, on ne tutoie pas tout le monde de la même façon. Avec un enfant, on utilise toujours « tu ». Avec un adulte inconnu, on commence presque toujours par « vous ». Entre jeunes du même âge, le tutoiement arrive vite. Mais avec un supérieur hiérarchique ou une personne âgée, beaucoup de Français préfèrent rester au « vous », même après plusieurs années.",
+          texte_pt:"Na França, não se trata todo mundo do mesmo jeito. Com uma criança, sempre se usa «tu». Com um adulto desconhecido, quase sempre se começa com «vous». Entre jovens da mesma idade, o tratamento por «tu» chega rápido. Mas com um superior hierárquico ou uma pessoa mais velha, muitos franceses preferem continuar com «vous», mesmo depois de vários anos.",
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Avec un enfant, on utilise…", options:["Toujours « tu »","Toujours « vous »","Ça dépend du jour"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"D'après le texte, avec un supérieur hiérarchique, beaucoup de Français…", options:["Passent vite au tutoiement","Restent au « vous », même après longtemps","Ne parlent jamais"], correct:1}
+          ]
+        },
+        ee:{
+          consigne_fr:"Écris 2 phrases : une question que tu poserais à un ami avec « tu », et la même question posée à ta professeure avec « vous ».",
+          consigne_pt:"Escreva 2 frases: uma pergunta que você faria a um amigo com «tu», e a mesma pergunta feita à sua professora com «vous»."
+        },
+        eo:{fr:"Enregistre-toi : donne un exemple de situation où tu utiliserais « tu », et un exemple où tu utiliserais « vous », en expliquant pourquoi.", pt:"Grave-se: dê um exemplo de situação em que você usaria «tu», e um exemplo em que usaria «vous», explicando por quê."}
+      },
+      {num:"Jour 3", dur:"25 min",
+        title_fr:"Le petit son qui change tout : [y] et [u]",
+        title_pt:"O pequeno som que muda tudo: [y] e [u]",
+        lecon:{
+          accroche_fr:"« Tu » et « vous » n'ont pas seulement un sens différent — ils ne se prononcent même pas avec la même bouche ! Un tout petit changement de son peut transformer une phrase polie en phrase familière, sans même changer un seul mot.",
+          accroche_pt:"«Tu» e «vous» não têm só um sentido diferente — nem se pronunciam com a mesma boca! Uma pequena mudança de som pode transformar uma frase educada numa frase informal, sem nem mudar uma única palavra.",
+          contenu_fr:"Le son [y] (comme dans « tu », « salut ») se prononce avec les lèvres très arrondies et la langue vers l'avant — un son qui n'existe pas dans beaucoup de langues ! Le son [u] (comme dans « vous », « bonjour ») se prononce aussi avec les lèvres arrondies, mais la langue reste en arrière. Astuce : pour [y], pense à dire « i » en arrondissant les lèvres comme pour un baiser.",
+          contenu_pt:"O som [y] (como em «tu», «salut») pronuncia-se com os lábios bem arredondados e a língua para frente — um som que não existe em muitas línguas! O som [u] (como em «vous», «bonjour») também se pronuncia com os lábios arredondados, mas a língua fica atrás. Dica: para [y], pense em dizer «i» arredondando os lábios como para um beijo."
+        },
+        co:{
+          consigne_fr:"Écoute (ou fais écouter par ta professeure) ces mots et phrases, et repère le son [y] ou le son [u].",
+          consigne_pt:"Ouça (ou peça para sua professora ler) essas palavras e frases, e identifique o som [y] ou o som [u].",
+          link:{url:"https://www.podcastfrancaisfacile.com/phonetique-prononciation/tableau-des-sons-du-francais.html", label:"Le son [y] et le son [u] — exercices"},
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Le mot « tu » contient le son…", options:["[y]","[u]","[o]"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Le mot « vous » contient le son…", options:["[y]","[u]","[i]"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Dans la phrase « Vous allez au musée du Louvre », combien de fois entend-on le son [u] ?", options:["1 fois","2 fois","3 fois"], correct:1}
+          ]
+        },
+        ce:{
+          texte_fr:"« Tu salues Lou et Luce » : cette phrase contient trois fois le son [y] (tu, salues, Luce) et une fois le son [u] (Lou). À l'inverse, « Vous allez au musée du Louvre » contient le son [u] deux fois (vous, au) et le son [y] deux fois (musée se prononce avec un [y] dans « u », du). S'entraîner à l'oreille sur ces deux sons aide énormément à mieux comprendre le français parlé.",
+          texte_pt:"«Tu salues Lou et Luce»: essa frase contém três vezes o som [y] (tu, salues, Luce) e uma vez o som [u] (Lou). Já «Vous allez au musée du Louvre» contém o som [u] duas vezes (vous, au) e o som [y] duas vezes (musée tem um [y] na sílaba «u», du). Treinar o ouvido nesses dois sons ajuda enormemente a entender melhor o francês falado.",
+          exos:[
+            {niveau:"moyen", type:"qcm", q:"Dans « Tu salues Lou et Luce », combien de fois entend-on le son [y] ?", options:["1 fois","2 fois","3 fois"], correct:2}
+          ]
+        },
+        ee:{
+          consigne_fr:"Écris 2 phrases courtes : une avec au moins deux mots contenant le son [y], une avec au moins deux mots contenant le son [u].",
+          consigne_pt:"Escreva 2 frases curtas: uma com pelo menos duas palavras contendo o som [y], uma com pelo menos duas palavras contendo o som [u]."
+        },
+        eo:{fr:"Enregistre-toi en répétant bien distinctement : « Tu salues Lou et Luce » puis « Vous allez au musée du Louvre ».", pt:"Grave-se repetindo bem claramente: «Tu salues Lou et Luce» depois «Vous allez au musée du Louvre»."}
+      },
+      {num:"Jour 4", dur:"25 min",
+        title_fr:"Saluer sans un mot : la poignée de main, la bise",
+        title_pt:"Cumprimentar sem uma palavra: o aperto de mão, o beijo no rosto",
+        lecon:{
+          accroche_fr:"Un Français qui débarque dans ton pays pourrait se sentir complètement perdu rien qu'en te voyant saluer quelqu'un — trop de bises, pas assez, la mauvaise joue en premier... Le langage du corps se trompe aussi facilement que les mots, et parfois, il en dit encore plus long.",
+          accroche_pt:"Um francês que chegasse ao seu país poderia se sentir completamente perdido só de te ver cumprimentar alguém — beijos demais, de menos, o lado errado primeiro... A linguagem do corpo erra tão facilmente quanto as palavras, e às vezes, ela diz ainda mais coisas.",
+          contenu_fr:"En France, la manière de saluer sans parler dépend aussi de la relation. Entre collègues ou personnes qui se rencontrent pour la première fois dans un cadre professionnel : on se serre la main. Entre amis proches : on se fait souvent la bise (un ou deux baisers sur la joue, selon la région). Entre jeunes du même groupe : on peut se taper dans la main. Ce ne sont pas des règles strictes partout en France, mais elles aident à ne pas se sentir perdu.",
+          contenu_pt:"Na França, a maneira de cumprimentar sem falar também depende da relação. Entre colegas ou pessoas que se encontram pela primeira vez num ambiente profissional: aperta-se a mão. Entre amigos próximos: costuma-se dar a «bise» (um ou dois beijinhos no rosto, dependendo da região). Entre jovens do mesmo grupo: pode-se bater na mão. Não são regras rígidas em toda a França, mas ajudam a não se sentir perdido."
+        },
+        co:{
+          consigne_fr:"Écoute (ou fais décrire par ta professeure) ces situations et devine le type de relation entre les personnes.",
+          consigne_pt:"Ouça (ou peça para sua professora descrever) essas situações e adivinhe o tipo de relação entre as pessoas.",
+          link:{url:"https://fr.wikipedia.org/wiki/Bise_(salutation)", label:"La bise en France — Wikipédia"},
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Deux amis proches se retrouvent après longtemps. Ils vont probablement…", options:["Se serrer la main froidement","Se faire la bise","Se saluer sans se toucher"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"En France, deux collègues qui se rencontrent pour la première fois dans un cadre professionnel vont plutôt…", options:["Se serrer la main","Se faire la bise","Se taper dans la main"], correct:0}
+          ]
+        },
+        ce:{
+          texte_fr:"Sur une photo, deux jeunes hommes se serrent la main dans un couloir de lycée : c'est une relation plutôt informelle mais respectueuse. Sur une autre photo, dans un bureau, un homme et une femme se serrent la main : la relation est clairement formelle. Sur une troisième photo, à la terrasse d'un café, deux amis se font la bise. Sur la dernière, deux jeunes garçons se tapent dans la main : le geste le plus décontracté de tous.",
+          texte_pt:"Numa foto, dois rapazes apertam as mãos num corredor de escola: é uma relação meio informal mas respeitosa. Noutra foto, num escritório, um homem e uma mulher apertam as mãos: a relação é claramente formal. Numa terceira foto, na varanda de um café, dois amigos se cumprimentam com a «bise». Na última, dois garotos batem na mão: o gesto mais descontraído de todos.",
+          exos:[
+            {niveau:"moyen", type:"qcm", q:"Le geste le plus décontracté décrit dans le texte est…", options:["La poignée de main au bureau","La bise entre amis","Se taper dans la main"], correct:2}
+          ]
+        },
+        ee:{
+          consigne_fr:"Écris 3 phrases : compare comment on se salue sans parler dans ton pays et en France (points communs, différences).",
+          consigne_pt:"Escreva 3 frases: compare como as pessoas se cumprimentam sem falar no seu país e na França (semelhanças, diferenças)."
+        },
+        eo:{fr:"Enregistre-toi : compare à voix haute comment se saluent les gens dans ta culture et en France.", pt:"Grave-se: compare em voz alta como as pessoas se cumprimentam na sua cultura e na França."}
+      },
+      {num:"Jour 5", dur:"25 min",
+        title_fr:"Mise en pratique : une vraie rencontre",
+        title_pt:"Colocando em prática: um encontro de verdade",
+        lecon:{
+          accroche_fr:"Tu as maintenant tous les outils : le bon mot au bon moment, le bon registre, la bonne prononciation, et même le bon geste. Il ne reste qu'une chose à faire : t'entraîner en situation réelle, comme si tu étais vraiment là, dans ce couloir, ce matin-là.",
+          accroche_pt:"Você agora tem todas as ferramentas: a palavra certa na hora certa, o registro certo, a pronúncia certa, e até o gesto certo. Só falta uma coisa: treinar numa situação real, como se você estivesse realmente ali, naquele corredor, naquela manhã.",
+          contenu_fr:"Récapitulons : le matin et l'après-midi → « Bonjour » ; le soir → « Bonsoir » ; pour partir → « Au revoir », « Bonne journée » ou « Bonne soirée ». Avec un inconnu, un professeur ou en contexte professionnel → « vous ». Avec un ami proche ou un enfant → « tu ». Et le geste change tout autant : poignée de main en contexte formel, bise ou tape dans la main entre proches.",
+          contenu_pt:"Recapitulando: de manhã e à tarde → «Bonjour»; à noite → «Bonsoir»; para se despedir → «Au revoir», «Bonne journée» ou «Bonne soirée». Com um desconhecido, um professor ou em contexto profissional → «vous». Com um amigo próximo ou uma criança → «tu». E o gesto muda tanto quanto: aperto de mão em contexto formal, «bise» ou toque de mão entre próximos."
+        },
+        co:{
+          consigne_fr:"Écoute (ou fais jouer par ta professeure) cette situation complète et réponds aux questions.",
+          consigne_pt:"Ouça (ou peça para sua professora encenar) essa situação completa e responda às perguntas.",
+          link:{url:"https://www.podcastfrancaisfacile.com/dialogue/conversation-dialogue-salutations-en-francais-se-saluer-dire-bonjour-au-revoir.html", label:"Saluer et prendre congé — dialogues (podcastfrancaisfacile)"},
+          exos:[
+            {niveau:"facile", type:"qcm", q:"Il est 20h, tu quittes un ami proche. Tu dis plutôt :", options:["Bonsoir monsieur, comment allez-vous ?","Salut, bonne soirée !","Bonjour, ça va ?"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Tu rencontres pour la première fois la mère d'un ami, une dame d'un certain âge. Tu dis probablement :", options:["Salut, tu vas bien ?","Bonjour madame, comment allez-vous ?","Ça roule ?"], correct:1}
+          ]
+        },
+        ce:{
+          texte_fr:"Il est 8h30. Sofia arrive à son nouveau travail. Elle ne connaît personne. Dans le hall, elle croise une femme d'un certain âge : « Bonjour madame ! » dit Sofia, en lui serrant la main. Plus tard, à la pause, un collègue de son âge lui propose : « On se tutoie ? Tu peux m'appeler Marc. » Sofia sourit : « Avec plaisir ! Et toi, tu peux m'appeler Sofia. » En quelques heures, elle a déjà appris à adapter son français à chaque personne.",
+          texte_pt:"São 8h30. Sofia chega ao seu novo trabalho. Ela não conhece ninguém. No saguão, cruza com uma senhora de certa idade: «Bonjour madame!» diz Sofia, apertando sua mão. Mais tarde, na pausa, um colega da sua idade propõe: «On se tutoie? Tu peux m'appeler Marc.» Sofia sorri: «Avec plaisir! Et toi, tu peux m'appeler Sofia.» Em poucas horas, ela já aprendeu a adaptar seu francês a cada pessoa.",
+          exos:[
+            {niveau:"moyen", type:"qcm", q:"Avec la dame d'un certain âge, Sofia utilise…", options:["Le tutoiement et une bise","Le vouvoiement et une poignée de main","Aucune formule de politesse"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Qui propose de passer au tutoiement dans le texte ?", options:["Sofia, en premier","La dame d'un certain âge","Le collègue du même âge"], correct:2}
+          ]
+        },
+        ee:{
+          consigne_fr:"Écris un court dialogue (5-6 lignes) : c'est ton premier jour dans un nouvel endroit (travail, école, ville). Tu salues 2 personnes différentes (une formelle, une informelle) et tu prends congé de l'une d'elles.",
+          consigne_pt:"Escreva um diálogo curto (5-6 linhas): é seu primeiro dia num lugar novo (trabalho, escola, cidade). Você cumprimenta 2 pessoas diferentes (uma formal, uma informal) e se despede de uma delas."
+        },
+        eo:{fr:"Enregistre-toi (1-2 min) : joue toute la scène de ton premier jour — salue les deux personnes de ton dialogue écrit, à voix haute, avec le bon ton pour chacune.", pt:"Grave-se (1-2 min): represente toda a cena do seu primeiro dia — cumprimente as duas pessoas do seu diálogo escrito, em voz alta, com o tom certo para cada uma."}
+      }
     ],
     oral_title_fr:"Saluer et faire connaissance", oral_title_pt:"Cumprimentar e conhecer alguém",
     oral:[
