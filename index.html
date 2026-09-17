@@ -268,6 +268,45 @@ p.day-title-pt{font-size:13.5px; color:var(--pt); font-style:italic; margin:0 0 
 }
 .rec-btn.recording{background:var(--bad); animation:pulse 1.2s infinite;}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,71,111,.4);}70%{box-shadow:0 0 0 8px rgba(239,71,111,0);}100%{box-shadow:0 0 0 0 rgba(239,71,111,0);}}
+
+/* ---- leçon (accroche + contenu) ---- */
+.lecon-box{
+  margin:8px 0 18px; padding:16px 18px; border-radius:10px;
+  background:linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%); color:#fff;
+}
+.lecon-accroche{font-family:'Fraunces',serif; font-size:16.5px; font-weight:600; line-height:1.45; margin:0 0 4px; font-style:italic;}
+.lecon-accroche-pt{font-size:12.5px; color:var(--gold-light); font-style:italic; margin:0 0 12px; opacity:.9;}
+.lecon-contenu{border-top:1px solid rgba(255,255,255,.18); padding-top:12px;}
+.lecon-contenu .fr{font-size:14px; line-height:1.6; margin:0;}
+.lecon-contenu .pt{font-size:12.5px; line-height:1.55; color:var(--gold-light); font-style:italic; margin:8px 0 0; opacity:.9;}
+
+/* ---- blocs par compétence (CO / CE / EE / EO) ---- */
+.skill-block{margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);}
+.skill-block:first-of-type{margin-top:14px;}
+.skill-label{font-family:'Fraunces',serif; font-weight:700; font-size:14px; margin:0 0 1px; color:var(--navy);}
+.skill-label-pt{font-size:11.5px; color:var(--pt); font-style:italic; margin:0 0 10px;}
+.skill-co{border-left:4px solid var(--brand-blue); padding-left:14px; margin-left:-14px;}
+.skill-ce{border-left:4px solid var(--ok); padding-left:14px; margin-left:-14px;}
+.skill-ee{border-left:4px solid #8338ec; padding-left:14px; margin-left:-14px;}
+.ce-texte{background:var(--cream); border-radius:8px; padding:12px 14px; margin:6px 0 12px;}
+.ce-texte .fr{font-size:14px; line-height:1.6; margin:0;}
+.ce-texte .pt{font-size:12.5px; line-height:1.5; color:var(--pt); font-style:italic; margin:8px 0 0;}
+.niveau-badge{
+  display:inline-block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  padding:2px 9px; border-radius:20px; margin-bottom:8px;
+}
+.niveau-facile{background:var(--ok-bg); color:var(--ok);}
+.niveau-moyen{background:#fff3d6; color:var(--gold-dark);}
+.niveau-difficile{background:var(--bad-bg); color:var(--bad);}
+.ee-box textarea{
+  width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--line); font-size:14px;
+  font-family:'Inter',sans-serif; resize:vertical; margin-top:2px;
+}
+.ee-box button{
+  margin-top:8px; padding:8px 14px; border-radius:7px; border:none; background:#8338ec; color:#fff;
+  font-weight:600; cursor:pointer; font-size:13.5px;
+}
+.ee-box button:hover{filter:brightness(0.92);}
 .rec-time{font-size:13px; color:var(--grey); font-variant-numeric:tabular-nums;}
 .rec-audio{margin-top:10px; width:100%;}
 .speak-btn{
