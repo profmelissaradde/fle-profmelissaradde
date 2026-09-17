@@ -74,13 +74,33 @@ const exoDone = {};
 const recDone = {};
 const celebrated = {};
 function activityKey(weekTag, dayNum){ return `D${CURRENT_DOSSIER_NUM}_${weekTag}_${slug(dayNum)}`; }
+/* Un exercice gradué (CO/CE) a un uid du type "D1_w1d1_co2" — on retrouve le uid
+   du JOUR ("D1_w1d1") en enlevant le suffixe "_co2"/"_ce1"/etc. Un exercice à
+   l'ancien format (day.exo) a déjà un uid de jour tel quel, donc le regex ne
+   matche rien à enlever et on renvoie le uid inchangé. */
+function dayUidFromAny(uid){
+  const m = uid.match(/^(D\d+_w\d+d\d+)/);
+  return m ? m[1] : uid;
+}
+/* Liste des suffixes d'exercices requis pour considérer un jour "complet" :
+   un par exercice gradué dans co.exos/ce.exos (nouveau format), ou "exo" pour
+   l'ancien format à exercice unique. */
+function requiredExoSuffixes(day){
+  const list = [];
+  if(day.co && Array.isArray(day.co.exos)) day.co.exos.forEach((_,i)=>list.push(`co${i+1}`));
+  if(day.ce && Array.isArray(day.ce.exos)) day.ce.exos.forEach((_,i)=>list.push(`ce${i+1}`));
+  if(day.exo) list.push('exo');
+  return list;
+}
 function maybeCelebrate(uid){
-  const ctx = findDayByUid(uid);
+  const dayUid = dayUidFromAny(uid);
+  const ctx = findDayByUid(dayUid);
   if(!ctx) return;
-  const needsExo = !!ctx.day.exo;
-  const exoOk = !needsExo || exoDone[uid];
-  if(exoOk && recDone[uid] && !celebrated[uid]){
-    celebrated[uid] = true;
+  const suffixes = requiredExoSuffixes(ctx.day);
+  const needsExo = suffixes.length > 0;
+  const exoOk = !needsExo || suffixes.every(s => s==='exo' ? exoDone[dayUid] : exoDone[`${dayUid}_${s}`]);
+  if(exoOk && recDone[dayUid] && !celebrated[dayUid]){
+    celebrated[dayUid] = true;
     showCelebration(ctx.day);
     saveActivityCompletion(ctx.week.tag, ctx.day.num);
   }
