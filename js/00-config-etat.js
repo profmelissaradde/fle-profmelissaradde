@@ -20,7 +20,7 @@ const firebaseConfig = {
 };
 const TEACHER_UID = "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjVN3__9qJC3gsAkTUBE5oy2z9J0iu08gL1DadZceMaxONg-srJgDkccKDXobiSZleYA/exec";
-const ZOOM_LINK = "https://zoom.us/j/REMPLACE_PAR_TON_LIEN";
+const ZOOM_LINK = "https://us06web.zoom.us/j/87396376216?pwd=b2G6XPCv9KCbzACXniXDKaALu1Aa2J.1";
 const TEACHER_EMAIL = "prof.melissaradde@gmail.com";
 const ZOOM_MEETING_NAME = "Cours de français — Prof Melissa Radde";
 const ZOOM_OPEN_MINUTES_BEFORE = 15;
