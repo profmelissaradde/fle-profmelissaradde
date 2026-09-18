@@ -49,15 +49,20 @@ function zoomAccess(dateStr, duree){
 /* Les liens Zoom ne sont jamais mis dans un <a href> (copiable en un clic droit) —
    on les garde dans cette table et on ouvre via un bouton + window.open(). */
 const zoomUrlMap = {};
+function validZoomUrl(url){
+  return typeof url === 'string' &&
+    /^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\//i.test(url) &&
+    !url.includes('REMPLACE_PAR_TON_LIEN');
+}
 function openZoomLink(slotId){
-  const url = zoomUrlMap[slotId] || ZOOM_LINK;
+  const url = validZoomUrl(zoomUrlMap[slotId]) ? zoomUrlMap[slotId] : ZOOM_LINK;
   window.open(url, '_blank', 'noopener');
   const field = isTeacher ? 'clickedByTeacher' : 'clickedByStudent';
   try{ db.collection('disponibilites').doc(slotId).update({ [field]: true }); }catch(e){ /* non bloquant */ }
 }
 function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
   const acc = zoomAccess(dateStr, duree);
-  zoomUrlMap[slotId] = joinUrl || ZOOM_LINK;
+  zoomUrlMap[slotId] = validZoomUrl(joinUrl) ? joinUrl : ZOOM_LINK;
   if(acc.open){
     return `<button class="primary-btn" style="width:auto; padding:10px 18px; margin-top:8px;" onclick="openZoomLink('${slotId}')">🎥 Rejoindre : ${ZOOM_MEETING_NAME}</button>`;
   }
@@ -82,8 +87,9 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
       startTime: dateISO,
       duration: duree || 45
     });
-    if(result && result.ok && result.joinUrl){
-      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+    const joinUrl = result && (result.joinUrl || result.join_url || (result.meeting && (result.meeting.joinUrl || result.meeting.join_url)));
+    if(result && result.ok && validZoomUrl(joinUrl)){
+      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: joinUrl, zoomTopic: topic });
     } else {
       console.warn('createZoomMeeting: pas de joinUrl retourné, secours sur ZOOM_LINK.', result);
     }
