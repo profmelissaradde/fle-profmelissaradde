@@ -112,12 +112,48 @@ function renderExperimentalSlotsHTML(){
           <span id="slot-copy-ok-${slot.id}" style="font-size:12.5px;color:var(--ok);"></span>
         </div>`;
     }
+    /* Statut de replanification en cours, et actions vocabulaire / enregistrement /
+       replanification / annulation — uniquement pour un créneau réservé, comme
+       pour les cours classiques (voir renderPastSessions et recapEditorHTML). */
+    let recapAndActionsHTML = '';
+    if(status === 'reserved'){
+      const pendingFromTeacher = slot.rescheduleRequest && slot.rescheduleRequest.by==='teacher' && slot.rescheduleRequest.status==='pending';
+      const pendingFromStudent = slot.rescheduleRequest && slot.rescheduleRequest.by==='student' && slot.rescheduleRequest.status==='pending';
+      let pendingHTML = '';
+      if(pendingFromTeacher){
+        pendingHTML = `<div class="storage-note" style="background:#FCF3CF;margin-top:8px;">📅 Proposition envoyée : <b>${fmtSlotDate(slot.rescheduleRequest.proposedDate)}</b> — en attente de confirmation par l'élève.</div>`;
+      } else if(pendingFromStudent){
+        pendingHTML = `<div class="storage-note" style="background:#F4ECF7;margin-top:8px;">⏳ L'élève propose 3 disponibilités :
+          <div style="margin-top:4px;font-size:12.5px;">
+            1. ${fmtSlotDate(slot.rescheduleRequest.availability1)}<br>
+            2. ${fmtSlotDate(slot.rescheduleRequest.availability2)}<br>
+            3. ${fmtSlotDate(slot.rescheduleRequest.availability3)}
+          </div>
+          <p style="font-size:11.5px;color:var(--grey);margin-top:6px;">Envoie-lui la disponibilité que tu retiens via « Proposer un nouveau créneau » ci-dessous.</p>
+        </div>`;
+      }
+      recapAndActionsHTML = `
+        ${pendingHTML}
+        <div class="teacher-entry-actions" style="margin-top:8px;">
+          <button onclick="toggleExperimentalRecap('${slot.id}')">${openRecapId===slot.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}</button>
+          ${!isPast ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
+          <button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>
+        </div>
+        ${openRecapId===slot.id ? recapEditorHTML(slot, 'saveExperimentalRecap', 'toggleExperimentalRecap') : ''}
+        ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule') : ''}
+        <div class="meta" style="margin-top:6px;">
+          ${slot.vocab ? '✅ Vocabulaire ajouté' : '⬜ Pas encore de vocabulaire'} ·
+          ${slot.recordingUrl ? '🎥 Enregistrement disponible' : "⬜ Pas encore d'enregistrement"}
+        </div>
+      `;
+    }
     return `
-      <div class="teacher-entry" style="${isPast ? 'opacity:.6;' : ''}">
+      <div class="teacher-entry" style="${isPast && status!=='reserved' ? 'opacity:.6;' : ''}">
         <div class="who">${fmtSlotDate(slot.date)} ${pill}</div>
         ${timezoneLineHTML(slot.date)}
         ${studentLine}
         ${linkLine}
+        ${recapAndActionsHTML}
       </div>`;
   }).join('');
 }
