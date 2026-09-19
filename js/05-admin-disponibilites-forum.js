@@ -166,6 +166,48 @@ async function loadNextCourseBanner(){
   }
 }
 
+/* Bannière "payer mon forfait" — student.pack est déjà en mémoire (chargé à la
+   connexion), donc pas besoin d'appel Firestore ici. 5 liens (un par moyen de
+   paiement), comme pour un cours à l'unité (voir paymentOptionsHTML). */
+function renderPackPaymentBanner(){
+  const el = document.getElementById('pack-payment-banner');
+  if(!el || isTeacher || !student.uid) return;
+  const pack = student.pack || {};
+  const links = pack.paymentLinks || {};
+  const opts = PAYMENT_METHODS.filter(m => links[m.key]);
+  if(!opts.length || pack.paymentStatus === 'paid'){
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `
+    <div class="storage-note" style="background:#FFF7E6; margin-bottom:18px;">
+      💳 <b>Ton forfait est prêt !</b> Choisis ton mode de paiement pour l'activer :
+      <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+        ${opts.map(m=>`<a href="${links[m.key]}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">${m.label}</a>`).join('')}
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px; font-weight:700; color:var(--navy); display:block;">CPF sur la nota fiscal (facultatif)</label>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <input type="text" id="cpf-pack" value="${pack.cpfNaNota||''}" placeholder="000.000.000-00" style="flex:1; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+          <button onclick="saveCpfNaNotaPack()">Enregistrer</button>
+        </div>
+        <p id="cpf-pack-fb" style="font-size:11px; color:var(--ok); display:none; margin-top:4px;">✅ Enregistré</p>
+      </div>
+      <p style="font-size:11.5px; color:var(--grey); margin-top:8px;">Ta professeure validera ton paiement dès qu'elle le recevra.</p>
+    </div>
+  `;
+}
+async function saveCpfNaNotaPack(){
+  const el = document.getElementById('cpf-pack');
+  const val = el ? el.value.trim() : '';
+  try{ await db.collection('eleves').doc(student.uid).update({ 'pack.cpfNaNota': val }); }
+  catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  student.pack = student.pack || {};
+  student.pack.cpfNaNota = val;
+  const fb = document.getElementById('cpf-pack-fb');
+  if(fb) fb.style.display = 'block';
+}
+
 
 /* ---- Admin : gérer les disponibilités ---- */
 let adminCalDate = new Date();
@@ -203,10 +245,126 @@ async function loadAdminDispo(){
     await loadTeacherStudentsQuiet();
   }
 
+  await loadPaymentLinks();
+
   renderAdminDispo();
 }
 
 let adminRescheduleFormOpenId = null;
+let paymentLinksEditorOpen = false;
+
+function togglePaymentLinksEditor(){
+  paymentLinksEditorOpen = !paymentLinksEditorOpen;
+  renderAdminDispo();
+}
+
+/* Éditeur des 5 liens de paiement C6 Bank, modifiable depuis l'app (voir
+   loadPaymentLinks dans 04-reservation-cours.js) — ce sont des liens à usage
+   unique côté C6, donc appelés à changer régulièrement ; Melissa n'a jamais
+   besoin de toucher au code pour les mettre à jour. */
+function paymentLinksEditorHTML(){
+  return `
+    <div class="rec-box" style="margin-bottom:16px;">
+      <p class="rec-consigne" style="font-weight:700;">💳 Liens de paiement (C6 Bank)</p>
+      <p style="font-size:12px; color:var(--grey); margin:2px 0 10px;">Ce sont ces liens que tes élèves classiques voient pour payer un cours réservé. Mets-les à jour ici si un lien change ou expire.</p>
+      ${PAYMENT_METHODS.map(f=>`
+        <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:8px;">
+          ${f.label}
+          <input type="url" id="paylink-${f.key}" value="${paymentLinks[f.key]||''}" placeholder="https://api-gateway.c6bank.info/..." style="width:100%; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:7px;">
+        </label>
+      `).join('')}
+      <div class="teacher-entry-actions" style="margin-top:10px;">
+        <button onclick="savePaymentLinks()">Enregistrer les liens</button>
+        <button onclick="togglePaymentLinksEditor()" style="background:none; color:var(--grey);">Fermer</button>
+      </div>
+      <p class="exo-feedback ok" id="paylinks-fb" style="display:none; color:var(--ok); margin-top:6px;">✅ Liens enregistrés.</p>
+    </div>
+  `;
+}
+async function savePaymentLinks(){
+  const updates = {};
+  PAYMENT_METHODS.forEach(f=>{
+    const el = document.getElementById('paylink-'+f.key);
+    updates[f.key] = el ? el.value.trim() : '';
+  });
+  try{
+    await db.collection('config').doc('paiement').set(updates, {merge:true});
+  }catch(e){
+    alert("Impossible d'enregistrer les liens pour le moment.");
+    return;
+  }
+  paymentLinks = {...paymentLinks, ...updates};
+  const fb = document.getElementById('paylinks-fb');
+  if(fb){ fb.style.display = 'block'; }
+}
+
+/* Marque manuellement un cours comme payé — Melissa clique dessus une fois
+   qu'elle a reçu l'e-mail de confirmation C6 Bank (Pix reçu, débit ou crédit
+   approuvé). Rien n'est automatique : le paiement se passe hors de l'app. */
+async function markPaymentReceived(id){
+  const slot = dispoData.find(s=>s.id===id);
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      paymentStatus: 'paid',
+      paymentConfirmedAt: new Date().toISOString()
+    });
+  }catch(e){
+    alert("Impossible d'enregistrer pour le moment.");
+    return;
+  }
+  if(slot && slot.reservedEmail){
+    try{
+      await callDriveScript({
+        action: 'notifyPaymentReceived',
+        email: slot.reservedEmail,
+        prenom: (slot.reservedName || '').split(' ')[0] || slot.reservedName,
+        context: `ton cours du ${fmtSlotDate(slot.date)}`
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  await loadAdminDispo();
+}
+
+/* Envoi de la nota fiscal (téléversée par Melissa depuis son logiciel de
+   facturation) : upload sur son Drive (même mécanisme que les enregistrements),
+   puis e-mail automatique à l'élève avec le lien. */
+async function sendNotaFiscal(id, inputElId){
+  const input = document.getElementById(inputElId);
+  const file = input && input.files && input.files[0];
+  if(!file){ alert('Choisis d\'abord le fichier de la nota fiscal.'); return; }
+  const slot = dispoData.find(s=>s.id===id);
+  let base64;
+  try{ base64 = await fileToBase64(file); }
+  catch(e){ alert("Impossible de lire le fichier."); return; }
+  let uploadResult;
+  try{
+    uploadResult = await callDriveScript({
+      action: 'upload',
+      fileName: `nota-fiscal-${(slot && slot.reservedName) || 'eleve'}-${id}.pdf`,
+      mimeType: file.type || 'application/pdf',
+      base64
+    });
+  }catch(e){ alert("Impossible de téléverser la nota fiscale pour le moment."); return; }
+  if(!uploadResult || !uploadResult.ok){ alert("Le téléversement a échoué."); return; }
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      notaFiscalUrl: uploadResult.viewUrl,
+      notaFiscalSent: true,
+      notaFiscalSentAt: new Date().toISOString()
+    });
+  }catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  if(slot && slot.reservedEmail){
+    try{
+      await callDriveScript({
+        action: 'notifyNotaFiscal',
+        email: slot.reservedEmail,
+        prenom: (slot.reservedName || '').split(' ')[0] || slot.reservedName,
+        notaFiscalUrl: uploadResult.viewUrl
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  await loadAdminDispo();
+}
 
 function toggleAdminRescheduleForm(id){
   adminRescheduleFormOpenId =
@@ -849,6 +1007,11 @@ function renderAdminDispo(){
       : '';
 
   body.innerHTML = `
+    <div class="teacher-entry-actions" style="margin-bottom:10px;">
+      <button onclick="togglePaymentLinksEditor()">${paymentLinksEditorOpen ? 'Fermer' : '💳 Liens de paiement'}</button>
+    </div>
+    ${paymentLinksEditorOpen ? paymentLinksEditorHTML() : ''}
+
     ${pendingHTML}
 
     <div class="rec-box">
@@ -1115,6 +1278,13 @@ function renderAdminDispo(){
                 ? `✅ Réservé par <b>${s.reservedName}</b>`
                 : '⬜ Libre'
             }
+            ${
+              s.reservedBy && !s.isExperimental
+                ? (s.paymentStatus === 'paid'
+                    ? ' · <span style="color:var(--ok);">💳 Payé</span>'
+                    : ' · <span style="color:var(--bad);">💳 Paiement en attente</span>')
+                : ''
+            }
           </div>
 
           ${
@@ -1125,6 +1295,41 @@ function renderAdminDispo(){
                   s.duree,
                   s.zoomJoinUrl
                 )
+              : ''
+          }
+
+          <div class="teacher-entry-actions">
+            ${
+              s.reservedBy && !s.isExperimental && s.paymentStatus !== 'paid'
+                ? `
+                  <button
+                    onclick="markPaymentReceived('${s.id}')"
+                    style="background:none; color:var(--ok);"
+                  >
+                    ✅ Paiement reçu
+                  </button>
+                `
+                : ''
+            }
+          </div>
+
+          ${
+            s.reservedBy && !s.isExperimental && s.paymentStatus === 'paid' && !s.notaFiscalSent
+              ? `
+                <div class="rec-box" style="margin-top:8px;">
+                  <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal</p>
+                  ${s.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${s.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
+                  <input type="file" id="nota-file-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
+                  <div class="teacher-entry-actions">
+                    <button onclick="sendNotaFiscal('${s.id}', 'nota-file-${s.id}')">Téléverser et envoyer</button>
+                  </div>
+                </div>
+              `
+              : ''
+          }
+          ${
+            s.notaFiscalSent
+              ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal envoyée — <a href="${s.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
               : ''
           }
 
@@ -4069,6 +4274,7 @@ function renderDossiers(){
     </h1>
 
     <div id="next-course-banner"></div>
+    <div id="pack-payment-banner"></div>
 
     <div class="objectif-box">
       <p class="fr">
@@ -4087,6 +4293,7 @@ function renderDossiers(){
   `;
 
   loadNextCourseBanner();
+  renderPackPaymentBanner();
 
   const grid =
     document.getElementById(
