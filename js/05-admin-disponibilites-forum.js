@@ -1191,6 +1191,17 @@ function renderAdminDispo(){
 
       ${packRows}
 
+      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+        <p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">💳 Liens de paiement du forfait (l'élève choisira parmi ceux que tu remplis)</p>
+        ${PAYMENT_METHODS.map(m=>`
+          <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
+            ${m.label}
+            <input type="url" id="pack-paylink-${m.key}" placeholder="https://..." style="width:100%; margin-top:2px; padding:6px 8px; border:1px solid var(--line); border-radius:5px;">
+          </label>
+        `).join('')}
+        <p style="font-size:11px; color:var(--grey); margin-top:6px;">Laisse-les vides si tu préfères les remplir plus tard, dans « Élèves & niveaux » — mais l'élève ne verra rien à payer tant qu'aucun lien n'est renseigné quelque part.</p>
+      </div>
+
       <button
         class="rec-btn"
         style="margin-top:8px;"
@@ -2350,8 +2361,35 @@ async function reserverPack(){
     }
   }
 
+  /* Liens de paiement du forfait, remplis dans ce même formulaire — évite
+     d'avoir à refaire l'étape séparément dans « Élèves & niveaux » juste
+     après, et surtout évite d'oublier de le faire, comme c'était arrivé. */
+  const newPackLinks = {};
+  PAYMENT_METHODS.forEach(m=>{
+    const el = document.getElementById('pack-paylink-'+m.key);
+    const val = el ? el.value.trim() : '';
+    if(val) newPackLinks[m.key] = val;
+  });
+  if(created > 0 && Object.keys(newPackLinks).length){
+    try{
+      await db.collection('eleves').doc(id).update({
+        'pack.paymentLinks': newPackLinks,
+        'pack.paymentStatus': 'pending'
+      });
+    }catch(e){ /* non bloquant */ }
+    try{
+      await callDriveScript({
+        action: 'notifyPackPayment',
+        email,
+        prenom: (name || '').split(' ')[0] || name,
+        paymentLinks: newPackLinks
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+
   alert(
-    `${created} séance(s) créée(s) pour ${name}.`
+    `${created} séance(s) créée(s) pour ${name}.` +
+    (Object.keys(newPackLinks).length ? ' Les liens de paiement ont été envoyés.' : '')
   );
 
   await loadAdminDispo();
