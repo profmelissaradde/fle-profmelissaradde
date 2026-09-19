@@ -170,15 +170,76 @@ async function loadPaymentLinks(force){
    classique. Le paiement est externe (lien C6) et validé manuellement par
    Melissa à réception de son e-mail de confirmation — ce bouton ne fait
    qu'ouvrir le lien, il ne change rien côté Firestore. */
+/* Options de paiement affichées à l'élève juste après avoir réservé un créneau
+   classique. Le paiement est externe (lien C6) et validé manuellement par
+   Melissa à réception de son e-mail de confirmation — ces boutons ne font
+   qu'ouvrir le bon lien, ils ne changent rien côté Firestore.
+
+   Flux en étapes plutôt que 5 boutons d'un coup :
+   1. L'élève choisit PIX / Débito / Crédito.
+   2. PIX → le lien s'ouvre directement.
+      Débito / Crédito → l'élève choisit la bandeira (Mastercard/Visa ou
+      Outras Bandeiras), puis le bon lien s'ouvre. Le nombre de fois
+      (parcelamento) se choisit ensuite directement sur la page C6, selon
+      le montant — cette plateforme ne le propose pas elle-même. */
+function paymentFlowHTML(uid, links){
+  links = links || {};
+  const hasPix = !!links.pix;
+  const hasDebito = !!(links.debitoMcVisa || links.debitoOutras);
+  const hasCredito = !!(links.creditoMcVisa || links.creditoOutras);
+  if(!hasPix && !hasDebito && !hasCredito) return '';
+  return `
+    <div style="margin-top:8px;">
+      <div id="payflow-step1-${uid}" style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${hasPix ? `<button class="rec-btn" onclick="choosePayType('${uid}','pix')">PIX</button>` : ''}
+        ${hasDebito ? `<button class="rec-btn" onclick="choosePayType('${uid}','debito')">Débito</button>` : ''}
+        ${hasCredito ? `<button class="rec-btn" onclick="choosePayType('${uid}','credito')">Crédito</button>` : ''}
+      </div>
+      <div id="payflow-step2-${uid}" style="display:none; margin-top:8px;"></div>
+    </div>
+  `;
+}
+/* uid vaut soit l'id du créneau (paiement d'un cours à l'unité, liens dans le
+   global "paymentLinks"), soit le mot "pack" (paiement d'un forfait, liens
+   dans student.pack.paymentLinks) — voir paymentOptionsHTML ci-dessous et
+   renderPackPaymentBanner dans 05-admin-disponibilites-forum.js. */
+function choosePayType(uid, type){
+  const links = (uid === 'pack') ? ((student.pack && student.pack.paymentLinks) || {}) : paymentLinks;
+  const step2 = document.getElementById('payflow-step2-'+uid);
+  if(!step2) return;
+
+  if(type === 'pix'){
+    if(links.pix) window.open(links.pix, '_blank', 'noopener');
+    step2.innerHTML = links.pix
+      ? `<p style="font-size:12px; color:var(--grey);">Le lien PIX vient de s'ouvrir dans un nouvel onglet. <a href="${links.pix}" target="_blank" rel="noopener">Clique ici</a> s'il ne s'est pas ouvert.</p>`
+      : '';
+    step2.style.display = 'block';
+    return;
+  }
+
+  const isDebito = type === 'debito';
+  const mcVisa = isDebito ? links.debitoMcVisa : links.creditoMcVisa;
+  const outras = isDebito ? links.debitoOutras : links.creditoOutras;
+
+  let html = `<p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">Quelle est la marque de ta carte ?</p><div style="display:flex; gap:6px; flex-wrap:wrap;">`;
+  if(mcVisa) html += `<a href="${mcVisa}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Mastercard / Visa</a>`;
+  if(outras) html += `<a href="${outras}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Autre marque</a>`;
+  html += `</div>`;
+
+  if(type === 'credito'){
+    html += `<p style="font-size:11px; color:var(--grey); margin-top:8px;">Le nombre de fois (parcelamento) se choisit directement sur la page de paiement, selon le montant.</p>`;
+  }
+
+  step2.innerHTML = html;
+  step2.style.display = 'block';
+}
 function paymentOptionsHTML(s){
-  const opts = PAYMENT_METHODS.filter(o => paymentLinks[o.key]);
-  if(!opts.length) return '';
+  const flow = paymentFlowHTML(s.id, paymentLinks);
+  if(!flow) return '';
   return `
     <div class="storage-note" style="background:#FFF7E6; margin-top:10px;">
       💳 <b>Paiement du cours</b> — choisis ton mode de paiement :
-      <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
-        ${opts.map(o=>`<a href="${paymentLinks[o.key]}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">${o.label}</a>`).join('')}
-      </div>
+      ${flow}
       <div style="margin-top:10px;">
         <label style="font-size:12px; font-weight:700; color:var(--navy); display:block;">CPF sur la nota fiscal (facultatif)</label>
         <div style="display:flex; gap:6px; margin-top:4px;">
