@@ -49,20 +49,28 @@ function zoomAccess(dateStr, duree){
 /* Les liens Zoom ne sont jamais mis dans un <a href> (copiable en un clic droit) —
    on les garde dans cette table et on ouvre via un bouton + window.open(). */
 const zoomUrlMap = {};
-function validZoomUrl(url){
-  return typeof url === 'string' &&
-    /^https:\/\/(?:[a-z0-9-]+\.)?zoom\.us\//i.test(url) &&
-    !url.includes('REMPLACE_PAR_TON_LIEN');
-}
 function openZoomLink(slotId){
-  const url = validZoomUrl(zoomUrlMap[slotId]) ? zoomUrlMap[slotId] : ZOOM_LINK;
+  const url = zoomUrlMap[slotId] || ZOOM_LINK;
   window.open(url, '_blank', 'noopener');
   const field = isTeacher ? 'clickedByTeacher' : 'clickedByStudent';
-  try{ db.collection('disponibilites').doc(slotId).update({ [field]: true }); }catch(e){ /* non bloquant */ }
+  /* Cette écriture est ce qui permet au système de savoir que la personne a bien
+     rejoint le cours (voir detectAnomalies dans 05-admin-disponibilites-forum.js).
+     Si elle échoue silencieusement (règles de sécurité Firestore, réseau), le
+     cours peut être signalé à tort comme une anomalie alors que tout le monde a
+     bien rejoint. On retente une fois après une courte pause avant d'abandonner,
+     et on log l'échec dans la console pour qu'il reste traçable au lieu de
+     disparaître complètement. */
+  const attempt = (isRetry) => {
+    db.collection('disponibilites').doc(slotId).update({ [field]: true }).catch(e=>{
+      if(!isRetry){ setTimeout(()=>attempt(true), 2000); }
+      else{ console.warn(`openZoomLink: échec de l'enregistrement de "${field}" pour ${slotId} — le cours pourrait être signalé à tort en anomalie.`, e); }
+    });
+  };
+  attempt(false);
 }
 function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
   const acc = zoomAccess(dateStr, duree);
-  zoomUrlMap[slotId] = validZoomUrl(joinUrl) ? joinUrl : ZOOM_LINK;
+  zoomUrlMap[slotId] = joinUrl || ZOOM_LINK;
   if(acc.open){
     return `<button class="primary-btn" style="width:auto; padding:10px 18px; margin-top:8px;" onclick="openZoomLink('${slotId}')">🎥 Rejoindre : ${ZOOM_MEETING_NAME}</button>`;
   }
@@ -87,9 +95,8 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
       startTime: dateISO,
       duration: duree || 45
     });
-    const joinUrl = result && (result.joinUrl || result.join_url || (result.meeting && (result.meeting.joinUrl || result.meeting.join_url)));
-    if(result && result.ok && validZoomUrl(joinUrl)){
-      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: joinUrl, zoomTopic: topic });
+    if(result && result.ok && result.joinUrl){
+      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
     } else {
       console.warn('createZoomMeeting: pas de joinUrl retourné, secours sur ZOOM_LINK.', result);
     }
@@ -206,7 +213,12 @@ let reserverSelectedDay = null;
 let studentRescheduleId = null;
 function toggleStudentReschedule(id){
   studentRescheduleId = (studentRescheduleId === id) ? null : id;
-  renderReserverBody();
+  /* Utilisé à la fois par la page "Réserver un cours" (élèves classiques) et par la
+     bannière "prochain cours" (élèves classiques ET élèves du cours expérimental,
+     qui n'ont pas accès à la page "Réserver") — on rafraîchit celui des deux
+     conteneurs qui est présent dans la page. */
+  if(document.getElementById('reserver-body')) renderReserverBody();
+  if(document.getElementById('next-course-banner')) loadNextCourseBanner();
 }
 function studentRescheduleFormHTML(s){
   return `<div class="rec-box" style="margin-top:10px;">
@@ -250,7 +262,13 @@ async function proposeCustomReschedule(id){
     return;
   }
 
-  const slot = dispoData.find(s=>s.id===id);
+  let slot = dispoData.find(s=>s.id===id);
+  if(!slot){
+    try{
+      const doc = await db.collection('disponibilites').doc(id).get();
+      if(doc.exists) slot = {id, ...doc.data()};
+    }catch(e){ /* slot restera indéfini, géré plus bas */ }
+  }
   if(!slot) return;
 
   if((new Date(slot.date).getTime() - Date.now()) <= 3600000){
@@ -292,6 +310,7 @@ async function proposeCustomReschedule(id){
   studentRescheduleId = null;
   alert('Tes 3 disponibilités ont été envoyées à ta professeure.');
   await loadDispoEleve();
+  if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
 
 async function acceptStudentAvailability(id, proposedDate){
@@ -317,7 +336,17 @@ async function acceptStudentAvailability(id, proposedDate){
 }
 
 async function confirmTeacherProposal(id){
-  const slot = dispoData.find(s=>s.id===id);
+  /* Peut être appelé depuis la page "Réserver" (dispoData déjà chargé) ou depuis la
+     bannière "prochain cours" (élèves classiques et élèves du cours expérimental,
+     qui n'ont jamais chargé dispoData) — on va chercher le créneau directement si
+     besoin plutôt que de dépendre du cache local. */
+  let slot = dispoData.find(s=>s.id===id);
+  if(!slot){
+    try{
+      const doc = await db.collection('disponibilites').doc(id).get();
+      if(doc.exists) slot = {id, ...doc.data()};
+    }catch(e){ /* slot restera indéfini, géré plus bas */ }
+  }
   if(!slot || !slot.rescheduleRequest) return;
   const newDate = slot.rescheduleRequest.proposedDate;
   const newDuree = slot.rescheduleRequest.proposedDuree || slot.duree;
@@ -328,11 +357,40 @@ async function confirmTeacherProposal(id){
   }catch(e){ alert("Impossible de confirmer pour le moment."); return; }
   await ensureZoomMeeting(id, newDate, newDuree, `${student.prenom} ${student.nom}`);
   await loadDispoEleve();
+  if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
 async function refuseTeacherProposal(id){
   try{ await db.collection('disponibilites').doc(id).update({ rescheduleRequest: null }); }
   catch(e){ alert("Impossible de refuser pour le moment."); return; }
   await loadDispoEleve();
+  if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
+}
+
+/* Annulation d'un cours expérimental, côté élève. À la différence de
+   annulerReservation() (cours classiques), on NE vide JAMAIS reservedBy /
+   reservedName ici : un créneau expérimental annulé doit rester associé au
+   prospect qui l'avait réservé (trace pour la professeure), et ne doit pas
+   redevenir un lien réutilisable par quelqu'un d'autre. */
+async function cancelExperimentalTrial(id){
+  if(!confirm('Annuler ton cours expérimental ?')) return;
+  let dateStr = '';
+  try{
+    const doc = await db.collection('disponibilites').doc(id).get();
+    if(doc.exists) dateStr = fmtSlotDate(doc.data().date);
+  }catch(e){ /* non bloquant */ }
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      experimentalCancelled: true,
+      zoomJoinUrl: null
+    });
+  }catch(e){
+    alert("Impossible d'annuler pour le moment.");
+    return;
+  }
+  try{
+    await notifyTeacherOfCancellation(`${student.prenom} ${student.nom}`, dateStr);
+  }catch(e){ /* non bloquant */ }
+  if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
 
 function selectReserverDayNav(delta){
