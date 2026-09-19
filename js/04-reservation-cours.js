@@ -145,6 +145,61 @@ function buildCalendarHTML(year, month, markers, selectedKey, onClickFnName){
   `;
 }
 
+/* ---- Liens de paiement (C6 Bank) ---- */
+/* Stockés dans Firestore (config/paiement) pour que Melissa puisse les changer
+   depuis l'app elle-même (ce sont des liens à usage unique côté C6, donc appelés
+   à être régénérés régulièrement) — jamais codés en dur ici. */
+let paymentLinks = {};
+let paymentLinksLoaded = false;
+const PAYMENT_METHODS = [
+  {key:'pix', label:'PIX'},
+  {key:'debitoMcVisa', label:'Débito (Mastercard, Visa)'},
+  {key:'debitoOutras', label:'Débito (Outras Bandeiras)'},
+  {key:'creditoMcVisa', label:'Crédito (Mastercard, Visa)'},
+  {key:'creditoOutras', label:'Crédito (Outras Bandeiras)'}
+];
+async function loadPaymentLinks(force){
+  if(paymentLinksLoaded && !force) return;
+  try{
+    const doc = await db.collection('config').doc('paiement').get();
+    paymentLinks = doc.exists ? doc.data() : {};
+  }catch(e){ paymentLinks = {}; }
+  paymentLinksLoaded = true;
+}
+/* Options de paiement affichées à l'élève juste après avoir réservé un créneau
+   classique. Le paiement est externe (lien C6) et validé manuellement par
+   Melissa à réception de son e-mail de confirmation — ce bouton ne fait
+   qu'ouvrir le lien, il ne change rien côté Firestore. */
+function paymentOptionsHTML(s){
+  const opts = PAYMENT_METHODS.filter(o => paymentLinks[o.key]);
+  if(!opts.length) return '';
+  return `
+    <div class="storage-note" style="background:#FFF7E6; margin-top:10px;">
+      💳 <b>Paiement du cours</b> — choisis ton mode de paiement :
+      <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+        ${opts.map(o=>`<a href="${paymentLinks[o.key]}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">${o.label}</a>`).join('')}
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:12px; font-weight:700; color:var(--navy); display:block;">CPF sur la nota fiscal (facultatif)</label>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <input type="text" id="cpf-${s.id}" value="${s.cpfNaNota||''}" placeholder="000.000.000-00" style="flex:1; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+          <button onclick="saveCpfNaNota('${s.id}')">Enregistrer</button>
+        </div>
+        <p id="cpf-fb-${s.id}" style="font-size:11px; color:var(--ok); display:none; margin-top:4px;">✅ Enregistré</p>
+      </div>
+      <p style="font-size:11.5px; color:var(--grey); margin-top:8px;">Ta réservation est déjà confirmée. Ta professeure validera ton paiement dès qu'elle le recevra.</p>
+    </div>
+  `;
+}
+async function saveCpfNaNota(id){
+  const el = document.getElementById('cpf-'+id);
+  const val = el ? el.value.trim() : '';
+  try{ await db.collection('disponibilites').doc(id).update({ cpfNaNota: val }); }
+  catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  const fb = document.getElementById('cpf-fb-'+id);
+  if(fb) fb.style.display = 'block';
+}
+
 /* ---- Élève : réserver un cours ---- */
 let dispoData = [];
 function renderHistorique(){
@@ -173,8 +228,8 @@ async function loadHistoriqueEleve(){
         <div class="slot-date">🗓️ ${fmtSlotDate(s.date)}</div>
         ${timezoneLineHTML(s.date)}
         ${s.anomalie ? `<p style="color:var(--bad); font-weight:700; font-size:13px; margin:4px 0;">⚠️ Cours en anomalie (toi et l'élève n'avez pas tous les deux rejoint le lien Zoom)</p>` : ''}
-        ${s.vocab ? `<div style="background:var(--cream); border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap; margin-top:8px;"><b>Vocabulaire vu :</b><br>${s.vocab}</div>` : `<p style="font-size:12.5px; color:var(--grey); margin-top:6px;">Le vocabulaire de ce cours n'a pas encore été ajouté.</p>`}
-        ${s.recordingUrl ? `<a class="source-link" href="${s.recordingUrl}" target="_blank" rel="noopener" style="display:inline-block; margin-top:8px;">🎥 Voir l'enregistrement</a>` : ''}
+        ${s.isExperimental ? '' : (s.vocab ? `<div style="background:var(--cream); border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap; margin-top:8px;"><b>Vocabulaire vu :</b><br>${s.vocab}</div>` : `<p style="font-size:12.5px; color:var(--grey); margin-top:6px;">Le vocabulaire de ce cours n'a pas encore été ajouté.</p>`)}
+        ${s.isExperimental ? '' : (s.recordingUrl ? `<a class="source-link" href="${s.recordingUrl}" target="_blank" rel="noopener" style="display:inline-block; margin-top:8px;">🎥 Voir l'enregistrement</a>` : '')}
       </div>
     `).join('');
   }catch(e){ body.innerHTML = `<p class="teacher-empty">Impossible de charger l'historique pour le moment.</p>`; }
@@ -187,6 +242,7 @@ async function loadDispoEleve(){
     const snap = await db.collection('disponibilites').orderBy('date').get();
     dispoData = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }catch(e){ dispoData = []; }
+  await loadPaymentLinks();
   renderReserverBody();
 }
 function renderReserver(){
@@ -444,6 +500,8 @@ function renderReserverBody(){
               </div>` : ''}
           </div>` : ''}
         ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
+        ${s.paymentStatus === 'pending' ? paymentOptionsHTML(s) : ''}
+        ${s.paymentStatus === 'paid' ? '<p style="color:var(--ok); font-size:12.5px; margin-top:8px;">✅ Paiement reçu, merci !</p>' : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="annulerReservation('${s.id}')">Annuler ma réservation</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
         ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement.</p>` : ''}
@@ -476,7 +534,8 @@ async function reserverCreneau(id){
   const slot = dispoData.find(s=>s.id===id);
   try{
     await db.collection('disponibilites').doc(id).update({
-      reservedBy: student.uid, reservedName: `${student.prenom} ${student.nom}`, reservedEmail: student.email
+      reservedBy: student.uid, reservedName: `${student.prenom} ${student.nom}`, reservedEmail: student.email,
+      paymentStatus: 'pending'
     });
   }catch(e){ alert("Impossible de réserver ce créneau pour le moment."); return; }
   if(slot){ await ensureZoomMeeting(id, slot.date, slot.duree, `${student.prenom} ${student.nom}`); }
