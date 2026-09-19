@@ -90,6 +90,7 @@ async function annulerReservation(id){
   );
 
   await loadDispoEleve();
+  if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
 
 
@@ -106,6 +107,7 @@ async function loadNextCourseBanner(){
       .map(d=>({id:d.id, ...d.data()}))
       .filter(s =>
         s.reservedBy === student.uid &&
+        !s.experimentalCancelled &&
         new Date(s.date).getTime() >= now - 3600000
       )
       .sort((a,b)=> new Date(a.date) - new Date(b.date));
@@ -116,6 +118,16 @@ async function loadNextCourseBanner(){
     }
 
     const s = mine[0];
+    /* Pour un cours expérimental, l'annulation/replanification n'a pas la limite
+       de 1h des cours classiques (pas d'historique de "tolérances" à gérer pour
+       un prospect qui n'a pas encore de forfait) — on la permet tant que le cours
+       n'a pas commencé. */
+    const canModify = s.isExperimental
+      ? (new Date(s.date).getTime() - now) > 0
+      : (new Date(s.date).getTime() - now) > 3600000;
+    const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
+    const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
+    const cancelFn = s.isExperimental ? 'cancelExperimentalTrial' : 'annulerReservation';
 
     el.innerHTML = `
       <div class="slot-card slot-mine" style="margin-bottom:18px;">
@@ -125,7 +137,29 @@ async function loadNextCourseBanner(){
         </div>
 
         ${timezoneLineHTML(s.date)}
+        ${pendingFromTeacher ? `
+          <div class="storage-note" style="background:#FCF3CF;">
+            📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.
+            <div style="margin-top:6px;">
+              <button class="rec-btn" onclick="confirmTeacherProposal('${s.id}')">✅ Confirmer</button>
+              <button onclick="refuseTeacherProposal('${s.id}')" style="background:none; color:var(--bad); margin-left:8px;">Refuser</button>
+            </div>
+          </div>` : ''}
+        ${pendingFromMe ? `
+          <div class="storage-note" style="background:#F4ECF7;">
+            ⏳ Ta demande de replanification est en attente de validation par ta professeure.
+            ${s.rescheduleRequest.availability1 ? `
+              <div style="margin-top:6px; font-size:12.5px;">
+                1. ${fmtSlotDate(s.rescheduleRequest.availability1)}<br>
+                2. ${fmtSlotDate(s.rescheduleRequest.availability2)}<br>
+                3. ${fmtSlotDate(s.rescheduleRequest.availability3)}
+              </div>` : ''}
+          </div>` : ''}
         ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
+        ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="${cancelFn}('${s.id}')">Annuler ${s.isExperimental ? 'mon cours expérimental' : 'ma réservation'}</button>` : ''}
+        ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
+        ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">${s.isExperimental ? 'Ce cours a déjà commencé ou est passé — contacte ta professeure directement pour tout changement.' : "Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement."}</p>` : ''}
+        ${studentRescheduleId===s.id ? studentRescheduleFormHTML(s) : ''}
       </div>
     `;
   }catch(e){
@@ -1168,7 +1202,9 @@ function toggleRecap(id){
   renderPastSessions();
 }
 
-function recapEditorHTML(s){
+function recapEditorHTML(s, saveFn, toggleFn){
+  saveFn = saveFn || 'saveSessionRecap';
+  toggleFn = toggleFn || 'toggleRecap';
   return `
     <div class="rec-box" style="margin-top:10px;">
       <p class="rec-consigne" style="font-weight:700;">
@@ -1198,12 +1234,12 @@ function recapEditorHTML(s){
       </label>
 
       <div class="teacher-entry-actions" style="margin-top:10px;">
-        <button onclick="saveSessionRecap('${s.id}')">
+        <button onclick="${saveFn}('${s.id}')">
           Enregistrer
         </button>
 
         <button
-          onclick="toggleRecap('${s.id}')"
+          onclick="${toggleFn}('${s.id}')"
           style="background:none; color:var(--grey);"
         >
           Fermer
@@ -1247,6 +1283,27 @@ async function saveSessionRecap(id){
   }
 
   await loadAdminDispo();
+}
+
+/* Même récap (vocabulaire + lien d'enregistrement) que saveSessionRecap, mais pour
+   un cours expérimental : recharge experimentalSlots (pas dispoData) ensuite,
+   sinon la liste affichée resterait périmée. */
+async function saveExperimentalRecap(id){
+  const vocab = document.getElementById('recap-vocab-'+id).value.trim();
+  const recordingUrl = document.getElementById('recap-rec-'+id).value.trim();
+  try{
+    await db.collection('disponibilites').doc(id).update({ vocab, recordingUrl });
+    openRecapId = null;
+  }catch(e){
+    alert("Impossible d'enregistrer pour le moment.");
+    return;
+  }
+  await loadExperimentalAdmin();
+}
+function toggleExperimentalRecap(id){
+  openRecapId = (openRecapId === id) ? null : id;
+  const listEl = document.getElementById('experimental-slots-list');
+  if(listEl) listEl.innerHTML = renderExperimentalSlotsHTML();
 }
 
 function renderPastSessions(){
@@ -1320,6 +1377,13 @@ function renderPastSessions(){
                   style="background:none; color:var(--bad);"
                 >
                   📅 Proposer un nouveau créneau
+                </button>
+                <button
+                  onclick="dismissAnomalie('${s.id}')"
+                  style="background:none; color:var(--ok);"
+                  title="À utiliser si vous avez bien rejoint le cours tous les deux — l'anomalie vient alors d'un bug de suivi, pas d'une absence."
+                >
+                  ✅ On a bien rejoint tous les deux
                 </button>
               `
               : ''
@@ -1461,6 +1525,31 @@ async function detectAnomalies(){
   }
 }
 
+/* Corrige une fausse anomalie : le suivi des clics Zoom repose sur une écriture
+   Firestore individuelle par personne (clickedByTeacher / clickedByStudent, voir
+   openZoomLink dans 04-reservation-cours.js) qui échoue parfois en silence — le
+   plus souvent parce que les règles de sécurité Firestore bloquent l'écriture
+   du côté élève sur la collection "disponibilites". Le cours a alors bien eu
+   lieu, mais Firestore ne l'a jamais su. Ce bouton permet à la professeure de
+   corriger ça manuellement quand elle sait que les deux ont bien rejoint. */
+async function dismissAnomalie(id){
+  try{
+    await db
+      .collection('disponibilites')
+      .doc(id)
+      .update({
+        anomalie: false,
+        anomalieHandled: true,
+        clickedByTeacher: true,
+        clickedByStudent: true
+      });
+  }catch(e){
+    alert("Impossible de corriger l'anomalie pour le moment.");
+    return;
+  }
+  await loadTeacherHistorique();
+}
+
 
 /* ---- Replanification (avec confirmation de l'autre partie) ---- */
 let rescheduleFormOpenId = null;
@@ -1474,7 +1563,9 @@ function toggleRescheduleForm(id){
   renderPastSessions();
 }
 
-function rescheduleFormHTML(s){
+function rescheduleFormHTML(s, submitFn, toggleFn){
+  submitFn = submitFn || 'submitRescheduleProposal';
+  toggleFn = toggleFn || 'toggleRescheduleForm';
   return `
     <div class="rec-box" style="margin-top:10px;">
       <p class="rec-consigne" style="font-weight:700;">
@@ -1495,12 +1586,12 @@ function rescheduleFormHTML(s){
       <div id="reschedule-tz-${s.id}"></div>
 
       <div class="teacher-entry-actions" style="margin-top:8px;">
-        <button onclick="submitRescheduleProposal('${s.id}')">
+        <button onclick="${submitFn}('${s.id}')">
           Envoyer la proposition
         </button>
 
         <button
-          onclick="toggleRescheduleForm('${s.id}')"
+          onclick="${toggleFn}('${s.id}')"
           style="background:none; color:var(--grey);"
         >
           Fermer
@@ -1571,6 +1662,57 @@ async function submitRescheduleProposal(id){
   );
 
   await loadTeacherHistorique();
+}
+
+/* Variante de submitRescheduleProposal pour un cours expérimental : lit et
+   recharge experimentalSlots (pas dispoData / loadTeacherHistorique), pour ne
+   pas faire sauter la professeure vers l'onglet Historique par erreur. */
+async function toggleExperimentalReschedule(id){
+  rescheduleFormOpenId = (rescheduleFormOpenId === id) ? null : id;
+  const listEl = document.getElementById('experimental-slots-list');
+  if(listEl) listEl.innerHTML = renderExperimentalSlotsHTML();
+}
+async function submitExperimentalReschedule(id){
+  const val = document.getElementById('reschedule-date-'+id).value;
+  if(!val){ alert('Choisis une date et une heure.'); return; }
+  const slot = experimentalSlots.find(s=>s.id===id);
+  const proposedDate = new Date(val).toISOString();
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      rescheduleRequest: { by:'teacher', proposedDate, proposedDuree: slot ? slot.duree : 45, status:'pending' }
+    });
+  }catch(e){
+    alert("Impossible d'envoyer la proposition pour le moment.");
+    return;
+  }
+  if(slot && slot.reservedEmail){
+    try{
+      await callDriveScript({
+        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
+        oldDate: fmtSlotDate(slot.date), newDate: fmtSlotDate(proposedDate)
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  rescheduleFormOpenId = null;
+  alert("Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par mail).");
+  await loadExperimentalAdmin();
+}
+
+/* Annulation d'un cours expérimental à l'initiative de la professeure — ne vide
+   jamais reservedBy/reservedName (voir cancelExperimentalTrial, côté élève, dans
+   04-reservation-cours.js, pour la même règle). */
+async function cancelExperimentalSlotAdmin(id){
+  if(!confirm('Annuler ce cours expérimental ?')) return;
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      experimentalCancelled: true,
+      zoomJoinUrl: null
+    });
+  }catch(e){
+    alert("Impossible d'annuler pour le moment.");
+    return;
+  }
+  await loadExperimentalAdmin();
 }
 
 async function acceptStudentReschedule(id){
