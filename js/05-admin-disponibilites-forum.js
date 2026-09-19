@@ -290,7 +290,8 @@ async function savePaymentLinks(){
   try{
     await db.collection('config').doc('paiement').set(updates, {merge:true});
   }catch(e){
-    alert("Impossible d'enregistrer les liens pour le moment.");
+    console.error('savePaymentLinks a échoué :', e);
+    alert("Impossible d'enregistrer les liens pour le moment. Détail dans la console (F12) : " + (e && e.message ? e.message : e));
     return;
   }
   paymentLinks = {...paymentLinks, ...updates};
