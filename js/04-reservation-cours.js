@@ -163,7 +163,7 @@ async function loadPaymentLinks(force){
   try{
     const doc = await db.collection('config').doc('paiement').get();
     paymentLinks = doc.exists ? doc.data() : {};
-  }catch(e){ paymentLinks = {}; }
+  }catch(e){ console.error('loadPaymentLinks a échoué :', e); paymentLinks = {}; }
   paymentLinksLoaded = true;
 }
 /* Options de paiement affichées à l'élève juste après avoir réservé un créneau
