@@ -20,13 +20,20 @@ const firebaseConfig = {
 };
 const TEACHER_UID = "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjVN3__9qJC3gsAkTUBE5oy2z9J0iu08gL1DadZceMaxONg-srJgDkccKDXobiSZleYA/exec";
-const ZOOM_LINK = "https://us06web.zoom.us/j/87396376216?pwd=b2G6XPCv9KCbzACXniXDKaALu1Aa2J.1";
+const ZOOM_LINK = "https://zoom.us/j/REMPLACE_PAR_TON_LIEN";
 const TEACHER_EMAIL = "prof.melissaradde@gmail.com";
 const ZOOM_MEETING_NAME = "Cours de français — Prof Melissa Radde";
 const ZOOM_OPEN_MINUTES_BEFORE = 15;
 const ZOOM_UNIQUE_LINKS = true;
 const FORFAIT_MIN = 5;
 const FORFAIT_MAX = 16;
+/* Tarification : un cours à l'unité coûte PRIX_COURS. À partir d'un forfait de
+   FORFAIT_MIN séances (et jusqu'à FORFAIT_MAX), une remise de FORFAIT_REMISE
+   s'applique sur le total — confirmé par Melissa. Sert à calculer le montant
+   et la modalité de paiement Crédito à choisir côté C6 Bank (voir
+   calculerPrixForfait dans 05-admin-disponibilites-forum.js). */
+const PRIX_COURS = 87;
+const FORFAIT_REMISE = 0.10;
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
