@@ -137,7 +137,7 @@ function renderExperimentalSlotsHTML(){
         <div class="teacher-entry-actions" style="margin-top:8px;">
           <button onclick="toggleExperimentalRecap('${slot.id}')">${openRecapId===slot.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}</button>
           ${!isPast ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
-          <button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>
+          ${!isPast ? `<button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>` : ''}
         </div>
         ${openRecapId===slot.id ? recapEditorHTML(slot, 'saveExperimentalRecap', 'toggleExperimentalRecap') : ''}
         ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule') : ''}
