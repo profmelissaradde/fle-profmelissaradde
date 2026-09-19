@@ -438,15 +438,44 @@ function renderTeacherStudentsList(){
       <div class="meta">${s.email} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
       <div class="meta">📍 Progression (Dossier 0) : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, 0)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, 0)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, 0)].note20}/20</b>` : ''}` : ''}</div>
       <div class="meta">✅ ${stats.total}/${TOTAL_ACTIVITIES} activités faites au total · <b style="color:${behind ? 'var(--bad)' : 'var(--ok)'}">${stats.thisWeek} cette semaine</b>${behind ? ' ⚠️ moins de la moitié' : ''}</div>
-      <div class="meta">📦 Forfait : ${packTotal ? `<b style="color:${packRemaining<=0?'var(--bad)':'var(--navy)'}">${packUsed}/${packTotal} séances utilisées</b> (${packRemaining} restante${packRemaining>1?'s':''})` : 'aucun forfait défini'}</div>
+      <div class="meta">📦 Forfait : ${packTotal ? `<b style="color:${packRemaining<=0?'var(--bad)':'var(--navy)'}">${packUsed}/${packTotal} séances utilisées</b> (${packRemaining} restante${packRemaining>1?'s':''})` : 'aucun forfait défini'}${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) ? ` · <span style="color:${pack.paymentStatus==='paid' ? 'var(--ok)' : 'var(--bad)'};">💳 ${pack.paymentStatus==='paid' ? 'Payé' : 'Paiement en attente'}</span>` : ''}</div>
       <div class="teacher-entry-actions">
         <select id="niv-${s.id}">${niveauOpts}</select>
         <select id="freq-${s.id}">${freqOpts}</select>
         <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
+        <div style="width:100%; margin-top:8px;">
+          <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">Liens de paiement du forfait (un par moyen de paiement — envoyés par e-mail + affichés à l'élève, qui choisit)</p>
+          ${PAYMENT_METHODS.map(m=>`
+            <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
+              ${m.label}
+              <input type="url" id="packlink-${s.id}-${m.key}" value="${(pack.paymentLinks && pack.paymentLinks[m.key]) || ''}" placeholder="https://..." style="width:100%; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
+            </label>
+          `).join('')}
+        </div>
         <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
         <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
+        ${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
         ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
       </div>
+      ${
+        pack.paymentStatus === 'paid' && !pack.notaFiscalSent
+          ? `
+            <div class="rec-box" style="margin-top:8px;">
+              <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal du forfait</p>
+              ${pack.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${pack.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
+              <input type="file" id="nota-pack-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
+              <div class="teacher-entry-actions">
+                <button onclick="sendNotaFiscalPack('${s.id}', 'nota-pack-${s.id}')">Téléverser et envoyer</button>
+              </div>
+            </div>
+          `
+          : ''
+      }
+      ${
+        pack.notaFiscalSent
+          ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal du forfait envoyée — <a href="${pack.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
+          : ''
+      }
       ${openBilanId === s.id ? bilanEditorHTML(s) : ''}
     </div>`;
   }).join('');
@@ -469,9 +498,96 @@ async function saveStudentNiveau(id){
     updates['pack.total'] = packTotalVal;
     if(!(s && s.pack && typeof s.pack.used === 'number')){ updates['pack.used'] = 0; }
   }
+  /* 5 liens (un par moyen de paiement), comme pour un cours à l'unité — l'élève
+     choisit celui qui lui convient. On ne les réenregistre (et on ne renvoie
+     l'e-mail) que si au moins un des 5 champs a effectivement changé, pour ne
+     pas spammer l'élève à chaque simple mise à jour de niveau/fréquence. */
+  const newLinks = {};
+  PAYMENT_METHODS.forEach(m=>{
+    const el = document.getElementById(`packlink-${id}-${m.key}`);
+    const val = el ? el.value.trim() : '';
+    if(val) newLinks[m.key] = val;
+  });
+  const existingLinks = (s && s.pack && s.pack.paymentLinks) || {};
+  const linksChanged = PAYMENT_METHODS.some(m => (newLinks[m.key]||'') !== (existingLinks[m.key]||''));
+  if(linksChanged && Object.keys(newLinks).length){
+    updates['pack.paymentLinks'] = newLinks;
+    updates['pack.paymentStatus'] = 'pending';
+  }
   try{
     await db.collection('eleves').doc(id).update(updates);
-  }catch(e){ alert("Impossible d'enregistrer pour le moment."); }
+  }catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  if(linksChanged && Object.keys(newLinks).length && s){
+    try{
+      await callDriveScript({
+        action: 'notifyPackPayment',
+        email: s.email,
+        prenom: s.prenom,
+        paymentLinks: newLinks
+      });
+    }catch(e){ /* non bloquant — les liens restent visibles sur la plateforme même si l'e-mail échoue */ }
+  }
+  await loadTeacherStudents();
+}
+async function markPackPaid(id){
+  const s = studentsData.find(x=>x.id===id);
+  try{
+    await db.collection('eleves').doc(id).update({
+      'pack.paymentStatus': 'paid',
+      'pack.paymentConfirmedAt': new Date().toISOString()
+    });
+  }catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  if(s && s.email){
+    try{
+      await callDriveScript({
+        action: 'notifyPaymentReceived',
+        email: s.email,
+        prenom: s.prenom,
+        context: 'ton forfait de cours'
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  await loadTeacherStudents();
+}
+
+/* Envoi de la nota fiscal du forfait — même mécanisme que sendNotaFiscal pour un
+   cours à l'unité (voir 05-admin-disponibilites-forum.js), mais écrit sur le
+   document élève (eleves/{id}) plutôt que sur un créneau. */
+async function sendNotaFiscalPack(id, inputElId){
+  const input = document.getElementById(inputElId);
+  const file = input && input.files && input.files[0];
+  if(!file){ alert('Choisis d\'abord le fichier de la nota fiscal.'); return; }
+  const s = studentsData.find(x=>x.id===id);
+  let base64;
+  try{ base64 = await fileToBase64(file); }
+  catch(e){ alert("Impossible de lire le fichier."); return; }
+  let uploadResult;
+  try{
+    uploadResult = await callDriveScript({
+      action: 'upload',
+      fileName: `nota-fiscal-forfait-${(s && s.prenom+'-'+s.nom) || id}.pdf`,
+      mimeType: file.type || 'application/pdf',
+      base64
+    });
+  }catch(e){ alert("Impossible de téléverser la nota fiscale pour le moment."); return; }
+  if(!uploadResult || !uploadResult.ok){ alert("Le téléversement a échoué."); return; }
+  try{
+    await db.collection('eleves').doc(id).update({
+      'pack.notaFiscalUrl': uploadResult.viewUrl,
+      'pack.notaFiscalSent': true,
+      'pack.notaFiscalSentAt': new Date().toISOString()
+    });
+  }catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
+  if(s && s.email){
+    try{
+      await callDriveScript({
+        action: 'notifyNotaFiscal',
+        email: s.email,
+        prenom: s.prenom,
+        notaFiscalUrl: uploadResult.viewUrl
+      });
+    }catch(e){ /* non bloquant */ }
+  }
   await loadTeacherStudents();
 }
 
