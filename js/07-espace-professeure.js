@@ -97,6 +97,9 @@ function renderExperimentalSlotsHTML(){
   return experimentalSlots.map(slot=>{
     const status = experimentalSlotStatus(slot);
     const isPast = new Date(slot.date).getTime() < now;
+    /* Replanification/annulation possibles jusqu'à 24h avant le cours (règle
+       confirmée par Melissa — distincte du badge "passé", qui reste littéral). */
+    const canModify = (new Date(slot.date).getTime() - now) > 24*3600000;
     const pill = `<span class="admin-pill" style="${badgeStyle[status]}">${badgeLabel[status]}${isPast ? ' · passé' : ''}</span>`;
     let studentLine = '';
     if(status !== 'free'){
@@ -112,9 +115,9 @@ function renderExperimentalSlotsHTML(){
           <span id="slot-copy-ok-${slot.id}" style="font-size:12.5px;color:var(--ok);"></span>
         </div>`;
     }
-    /* Statut de replanification en cours, et actions vocabulaire / enregistrement /
-       replanification / annulation — uniquement pour un créneau réservé, comme
-       pour les cours classiques (voir renderPastSessions et recapEditorHTML). */
+    /* Statut de replanification en cours + actions replanification / annulation —
+       uniquement pour un créneau réservé. Pas de vocabulaire/enregistrement ici :
+       ça ne s'applique pas à un cours expérimental (décision explicite de Melissa). */
     let recapAndActionsHTML = '';
     if(status === 'reserved'){
       const pendingFromTeacher = slot.rescheduleRequest && slot.rescheduleRequest.by==='teacher' && slot.rescheduleRequest.status==='pending';
@@ -135,16 +138,11 @@ function renderExperimentalSlotsHTML(){
       recapAndActionsHTML = `
         ${pendingHTML}
         <div class="teacher-entry-actions" style="margin-top:8px;">
-          <button onclick="toggleExperimentalRecap('${slot.id}')">${openRecapId===slot.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}</button>
-          ${!isPast ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
-          ${!isPast ? `<button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>` : ''}
+          ${canModify ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
+          ${canModify ? `<button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>` : ''}
         </div>
-        ${openRecapId===slot.id ? recapEditorHTML(slot, 'saveExperimentalRecap', 'toggleExperimentalRecap') : ''}
+        ${!canModify && !isPast ? `<p style="font-size:11.5px;color:var(--grey);margin-top:6px;">Replanification ou annulation possible jusqu'à 24h avant le cours seulement.</p>` : ''}
         ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule') : ''}
-        <div class="meta" style="margin-top:6px;">
-          ${slot.vocab ? '✅ Vocabulaire ajouté' : '⬜ Pas encore de vocabulaire'} ·
-          ${slot.recordingUrl ? '🎥 Enregistrement disponible' : "⬜ Pas encore d'enregistrement"}
-        </div>
       `;
     }
     return `
