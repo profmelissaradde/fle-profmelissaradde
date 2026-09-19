@@ -174,17 +174,15 @@ function renderPackPaymentBanner(){
   if(!el || isTeacher || !student.uid) return;
   const pack = student.pack || {};
   const links = pack.paymentLinks || {};
-  const opts = PAYMENT_METHODS.filter(m => links[m.key]);
-  if(!opts.length || pack.paymentStatus === 'paid'){
+  const flow = paymentFlowHTML('pack', links);
+  if(!flow || pack.paymentStatus === 'paid'){
     el.innerHTML = '';
     return;
   }
   el.innerHTML = `
     <div class="storage-note" style="background:#FFF7E6; margin-bottom:18px;">
       💳 <b>Ton forfait est prêt !</b> Choisis ton mode de paiement pour l'activer :
-      <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
-        ${opts.map(m=>`<a href="${links[m.key]}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">${m.label}</a>`).join('')}
-      </div>
+      ${flow}
       <div style="margin-top:10px;">
         <label style="font-size:12px; font-weight:700; color:var(--navy); display:block;">CPF sur la nota fiscal (facultatif)</label>
         <div style="display:flex; gap:6px; margin-top:4px;">
@@ -888,7 +886,7 @@ function renderAdminDispo(){
         <input
           type="datetime-local"
           id="pack-date-${i}"
-          oninput="previewTZ('pack-date-${i}','pack-tz-${i}')"
+          oninput="previewTZ('pack-date-${i}','pack-tz-${i}'); updatePackPriceHint();"
           style="padding:6px 8px; border:1px solid var(--line); border-radius:6px;"
         >
 
@@ -1192,7 +1190,8 @@ function renderAdminDispo(){
       ${packRows}
 
       <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
-        <p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">💳 Liens de paiement du forfait (l'élève choisira parmi ceux que tu remplis)</p>
+        <div id="pack-price-hint"></div>
+        <p style="font-size:12px; font-weight:700; color:var(--navy); margin:8px 0 6px;">💳 Liens de paiement du forfait (l'élève choisira parmi ceux que tu remplis)</p>
         ${PAYMENT_METHODS.map(m=>`
           <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
             ${m.label}
@@ -2227,6 +2226,43 @@ function fillPackDatesQuick(){
       'pack-tz-'+(i+1)
     );
   });
+
+  updatePackPriceHint();
+}
+
+/* Paliers de parcelamento Crédito C6 Bank — purement indicatif pour Melissa :
+   elle doit choisir la bonne option de son côté en générant le lien C6, cette
+   plateforme ne crée aucun lien elle-même. */
+function parcelamentoC6(total){
+  if(total <= 299) return "1x (jusqu'à R$ 299)";
+  if(total <= 599) return "jusqu'à 2x (R$ 300 – 599)";
+  if(total <= 899) return "jusqu'à 3x (R$ 600 – 899)";
+  return "jusqu'à 4x (R$ 900 et plus)";
+}
+function calculerPrixForfait(nbSeances){
+  const remise = nbSeances >= FORFAIT_MIN && nbSeances <= FORFAIT_MAX;
+  const total = PRIX_COURS * nbSeances * (remise ? (1 - FORFAIT_REMISE) : 1);
+  return { total, remise, parcelamento: parcelamentoC6(total) };
+}
+/* Recalcule au fil du remplissage des dates du forfait (voir oninput sur
+   chaque pack-date-N, et l'appel à la fin de fillPackDatesQuick ci-dessus). */
+function updatePackPriceHint(){
+  const el = document.getElementById('pack-price-hint');
+  if(!el) return;
+  let nb = 0;
+  for(let i=1;i<=FORFAIT_MAX;i++){
+    const input = document.getElementById('pack-date-'+i);
+    if(input && input.value) nb++;
+  }
+  if(nb === 0){ el.innerHTML = ''; return; }
+  const { total, remise, parcelamento } = calculerPrixForfait(nb);
+  el.innerHTML = `
+    <p style="font-size:12.5px; margin:0; background:var(--cream); border-radius:6px; padding:8px 10px;">
+      <b>${nb} séance${nb>1?'s':''}</b> × R$ ${PRIX_COURS}${remise ? ` avec ${(FORFAIT_REMISE*100).toFixed(0)}% de remise` : ''} =
+      <b>R$ ${total.toFixed(2).replace('.',',')}</b>
+      — modalité Crédito à choisir chez C6 : <b>${parcelamento}</b>
+    </p>
+  `;
 }
 
 async function reserverPack(){
