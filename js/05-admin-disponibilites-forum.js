@@ -118,12 +118,11 @@ async function loadNextCourseBanner(){
     }
 
     const s = mine[0];
-    /* Pour un cours expérimental, l'annulation/replanification n'a pas la limite
-       de 1h des cours classiques (pas d'historique de "tolérances" à gérer pour
-       un prospect qui n'a pas encore de forfait) — on la permet tant que le cours
-       n'a pas commencé. */
+    /* Pour un cours expérimental, l'annulation/replanification par l'élève est
+       possible jusqu'à 24h avant le cours (pas 1h comme pour les cours
+       classiques) — règle confirmée par Melissa. */
     const canModify = s.isExperimental
-      ? (new Date(s.date).getTime() - now) > 0
+      ? (new Date(s.date).getTime() - now) > 24*3600000
       : (new Date(s.date).getTime() - now) > 3600000;
     const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
     const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
@@ -158,7 +157,7 @@ async function loadNextCourseBanner(){
         ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="${cancelFn}('${s.id}')">Annuler ${s.isExperimental ? 'mon cours expérimental' : 'ma réservation'}</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
-        ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">${s.isExperimental ? 'Ce cours a déjà commencé ou est passé — contacte ta professeure directement pour tout changement.' : "Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement."}</p>` : ''}
+        ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">${s.isExperimental ? 'Annulation ou demande de replanification possible jusqu\'à 24h avant le cours seulement — contacte ta professeure directement en dessous de ce délai.' : "Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement."}</p>` : ''}
         ${studentRescheduleId===s.id ? studentRescheduleFormHTML(s) : ''}
       </div>
     `;
@@ -1285,27 +1284,6 @@ async function saveSessionRecap(id){
   await loadAdminDispo();
 }
 
-/* Même récap (vocabulaire + lien d'enregistrement) que saveSessionRecap, mais pour
-   un cours expérimental : recharge experimentalSlots (pas dispoData) ensuite,
-   sinon la liste affichée resterait périmée. */
-async function saveExperimentalRecap(id){
-  const vocab = document.getElementById('recap-vocab-'+id).value.trim();
-  const recordingUrl = document.getElementById('recap-rec-'+id).value.trim();
-  try{
-    await db.collection('disponibilites').doc(id).update({ vocab, recordingUrl });
-    openRecapId = null;
-  }catch(e){
-    alert("Impossible d'enregistrer pour le moment.");
-    return;
-  }
-  await loadExperimentalAdmin();
-}
-function toggleExperimentalRecap(id){
-  openRecapId = (openRecapId === id) ? null : id;
-  const listEl = document.getElementById('experimental-slots-list');
-  if(listEl) listEl.innerHTML = renderExperimentalSlotsHTML();
-}
-
 function renderPastSessions(){
   const el =
     document.getElementById(
@@ -1354,17 +1332,13 @@ function renderPastSessions(){
           }
 
           ${
-            s.vocab
-              ? '✅ Vocabulaire ajouté'
-              : '⬜ Pas encore de vocabulaire'
-          }
-
-          ·
-
-          ${
-            s.recordingUrl
-              ? "🎥 Enregistrement disponible"
-              : "⬜ Pas encore d'enregistrement"
+            s.isExperimental
+              ? ''
+              : `
+                ${s.vocab ? '✅ Vocabulaire ajouté' : '⬜ Pas encore de vocabulaire'}
+                ·
+                ${s.recordingUrl ? "🎥 Enregistrement disponible" : "⬜ Pas encore d'enregistrement"}
+              `
           }
         </div>
 
@@ -1389,17 +1363,19 @@ function renderPastSessions(){
               : ''
           }
 
-          <button onclick="toggleRecap('${s.id}')">
-            ${
-              openRecapId===s.id
-                ? 'Fermer'
-                : '📝 Ajouter vocabulaire / enregistrement'
-            }
-          </button>
+          ${
+            s.isExperimental
+              ? ''
+              : `
+                <button onclick="toggleRecap('${s.id}')">
+                  ${openRecapId===s.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}
+                </button>
+              `
+          }
         </div>
 
         ${
-          openRecapId === s.id
+          !s.isExperimental && openRecapId === s.id
             ? recapEditorHTML(s)
             : ''
         }
