@@ -963,7 +963,7 @@ function afterAuth(uid, record){
   student = {
     prenom:record.prenom, nom:record.nom, email:record.email, telephone:record.telephone, uid,
     uniteCourante: normaliseUniteCourante(record.uniteCourante), frequence: record.frequence || null,
-    bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {}
+    bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {}, pack: record.pack || {}
   };
   startStudentMessagesListener();
   if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
