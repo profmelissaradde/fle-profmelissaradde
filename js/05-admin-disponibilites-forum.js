@@ -103,14 +103,29 @@ async function loadNextCourseBanner(){
     const snap = await db.collection('disponibilites').orderBy('date').get();
     const now = Date.now();
 
+    /* Une proposition de nouveau créneau (par la prof) ne change pas encore
+       le champ "date" du cours — seul rescheduleRequest.proposedDate contient
+       la nouvelle date tant que l'élève n'a pas confirmé. Si on ne se fie
+       qu'à "date", un cours dont l'ancienne date est passée depuis plus d'1h
+       disparaît entièrement de cette bannière, alors même qu'une proposition
+       est en attente pour une date future — l'élève ne verrait plus jamais
+       la proposition à confirmer. On garde donc aussi les cours dont la date
+       ELLE-MÊME est passée, tant qu'une proposition future est en attente. */
     const mine = snap.docs
       .map(d=>({id:d.id, ...d.data()}))
-      .filter(s =>
-        s.reservedBy === student.uid &&
-        !s.experimentalCancelled &&
-        new Date(s.date).getTime() >= now - 3600000
-      )
-      .sort((a,b)=> new Date(a.date) - new Date(b.date));
+      .filter(s => {
+        if(s.reservedBy !== student.uid || s.experimentalCancelled) return false;
+        const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
+        const hasFutureProposal = pendingFromTeacher && new Date(s.rescheduleRequest.proposedDate).getTime() >= now;
+        return new Date(s.date).getTime() >= now - 3600000 || hasFutureProposal;
+      })
+      .sort((a,b)=>{
+        const aPending = a.rescheduleRequest && a.rescheduleRequest.by==='teacher' && a.rescheduleRequest.status==='pending';
+        const bPending = b.rescheduleRequest && b.rescheduleRequest.by==='teacher' && b.rescheduleRequest.status==='pending';
+        const aDate = aPending ? new Date(a.rescheduleRequest.proposedDate) : new Date(a.date);
+        const bDate = bPending ? new Date(b.rescheduleRequest.proposedDate) : new Date(b.date);
+        return aDate - bDate;
+      });
 
     if(mine.length===0){
       el.innerHTML = '';
@@ -118,24 +133,28 @@ async function loadNextCourseBanner(){
     }
 
     const s = mine[0];
+    const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
+    const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
+    /* Tant qu'une proposition de la prof est en attente, la date à afficher et
+       à utiliser pour les calculs (délai de modification, etc.) est la date
+       PROPOSÉE, pas l'ancienne date déjà passée. */
+    const displayDate = pendingFromTeacher ? s.rescheduleRequest.proposedDate : s.date;
     /* Pour un cours expérimental, l'annulation/replanification par l'élève est
        possible jusqu'à 24h avant le cours (pas 1h comme pour les cours
        classiques) — règle confirmée par Melissa. */
     const canModify = s.isExperimental
-      ? (new Date(s.date).getTime() - now) > 24*3600000
-      : (new Date(s.date).getTime() - now) > 3600000;
-    const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
-    const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
+      ? (new Date(displayDate).getTime() - now) > 24*3600000
+      : (new Date(displayDate).getTime() - now) > 3600000;
     const cancelFn = s.isExperimental ? 'cancelExperimentalTrial' : 'annulerReservation';
 
     el.innerHTML = `
       <div class="slot-card slot-mine" style="margin-bottom:18px;">
         <div class="slot-date">
-          🎥 Ton prochain cours : ${fmtSlotDate(s.date)}
+          🎥 Ton prochain cours : ${fmtSlotDate(displayDate)}
           <span class="slot-dur">(${s.duree} min)</span>
         </div>
 
-        ${timezoneLineHTML(s.date)}
+        ${timezoneLineHTML(displayDate)}
         ${pendingFromTeacher ? `
           <div class="storage-note" style="background:#FCF3CF;">
             📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.
@@ -154,7 +173,7 @@ async function loadNextCourseBanner(){
                 3. ${fmtSlotDate(s.rescheduleRequest.availability3)}
               </div>` : ''}
           </div>` : ''}
-        ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
+        ${!pendingFromTeacher ? zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl) : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="${cancelFn}('${s.id}')">Annuler ${s.isExperimental ? 'mon cours expérimental' : 'ma réservation'}</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
         ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">${s.isExperimental ? 'Annulation ou demande de replanification possible jusqu\'à 24h avant le cours seulement — contacte ta professeure directement en dessous de ce délai.' : "Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement."}</p>` : ''}
@@ -251,6 +270,33 @@ async function loadAdminDispo(){
 let adminRescheduleFormOpenId = null;
 let paymentLinksEditorOpen = false;
 
+/* Corrige les cours déjà réservés avant le correctif des règles Firestore, qui
+   se sont retrouvés avec le lien Zoom générique (ZOOM_LINK) au lieu de leur
+   vrai lien unique — voir ensureZoomMeeting dans 04-reservation-cours.js.
+   Sans risque de règles ici : le compte admin a déjà tous les droits
+   d'écriture sur "disponibilites". */
+async function regenerateMissingZoomLinks(){
+  const now = Date.now();
+  const candidates = dispoData.filter(s =>
+    s.reservedBy &&
+    !s.isExperimental &&
+    !s.zoomJoinUrl &&
+    new Date(s.date).getTime() >= now
+  );
+  if(candidates.length === 0){
+    alert('Aucun cours à venir avec un lien Zoom manquant.');
+    return;
+  }
+  if(!confirm(`Régénérer le lien Zoom unique pour ${candidates.length} cours à venir ?`)) return;
+  let ok = 0, fail = 0;
+  for(const s of candidates){
+    const success = await ensureZoomMeeting(s.id, s.date, s.duree, s.reservedName);
+    if(success) ok++; else fail++;
+  }
+  alert(`${ok} lien(s) régénéré(s) avec succès${fail ? `, ${fail} échec(s) — réessaie plus tard pour ceux-là (la connexion à Zoom peut échouer ponctuellement)` : ''}.`);
+  await loadAdminDispo();
+}
+
 function togglePaymentLinksEditor(){
   paymentLinksEditorOpen = !paymentLinksEditorOpen;
   renderAdminDispo();
@@ -264,12 +310,24 @@ function paymentLinksEditorHTML(){
   return `
     <div class="rec-box" style="margin-bottom:16px;">
       <p class="rec-consigne" style="font-weight:700;">💳 Liens de paiement (C6 Bank)</p>
-      <p style="font-size:12px; color:var(--grey); margin:2px 0 10px;">Ce sont ces liens que tes élèves classiques voient pour payer un cours réservé. Mets-les à jour ici si un lien change ou expire.</p>
+      <p style="font-size:12px; color:var(--grey); margin:2px 0 10px;">Ce sont ces liens que tes élèves classiques voient pour payer un cours réservé (toujours R$ ${PRIX_COURS}, donc en général 1x seulement suffit pour le Crédito). Mets-les à jour ici si un lien change ou expire.</p>
       ${PAYMENT_METHODS.map(f=>`
         <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:8px;">
           ${f.label}
           <input type="url" id="paylink-${f.key}" value="${paymentLinks[f.key]||''}" placeholder="https://api-gateway.c6bank.info/..." style="width:100%; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:7px;">
         </label>
+      `).join('')}
+      ${CREDIT_BRANDS.map(b=>`
+        <p style="font-size:12.5px; font-weight:700; color:var(--navy); margin-top:12px;">${b.label}</p>
+        <p style="font-size:11px; color:var(--grey); margin:0 0 4px;">Un lien C6 correspond à UN nombre de fois précis — remplis celles que tu proposes, laisse le reste vide.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          ${INSTALLMENTS.map(n=>`
+            <label style="font-size:11px; color:var(--grey);">
+              ${n}x
+              <input type="url" id="paylink-${b.key}-${n}" value="${(paymentLinks[b.key] && paymentLinks[b.key][n]) || ''}" placeholder="https://..." style="display:block; width:170px; margin-top:2px; padding:6px 7px; border:1px solid var(--line); border-radius:6px;">
+            </label>
+          `).join('')}
+        </div>
       `).join('')}
       <div class="teacher-entry-actions" style="margin-top:10px;">
         <button onclick="savePaymentLinks()">Enregistrer les liens</button>
@@ -284,6 +342,15 @@ async function savePaymentLinks(){
   PAYMENT_METHODS.forEach(f=>{
     const el = document.getElementById('paylink-'+f.key);
     updates[f.key] = el ? el.value.trim() : '';
+  });
+  CREDIT_BRANDS.forEach(b=>{
+    const obj = {};
+    INSTALLMENTS.forEach(n=>{
+      const el = document.getElementById(`paylink-${b.key}-${n}`);
+      const val = el ? el.value.trim() : '';
+      if(val) obj[n] = val;
+    });
+    updates[b.key] = obj;
   });
   try{
     await db.collection('config').doc('paiement').set(updates, {merge:true});
@@ -1008,6 +1075,7 @@ function renderAdminDispo(){
   body.innerHTML = `
     <div class="teacher-entry-actions" style="margin-bottom:10px;">
       <button onclick="togglePaymentLinksEditor()">${paymentLinksEditorOpen ? 'Fermer' : '💳 Liens de paiement'}</button>
+      <button onclick="regenerateMissingZoomLinks()" style="background:none; color:var(--navy);">🔧 Régénérer les liens Zoom manquants</button>
     </div>
     ${paymentLinksEditorOpen ? paymentLinksEditorHTML() : ''}
 
@@ -1197,6 +1265,18 @@ function renderAdminDispo(){
             ${m.label}
             <input type="url" id="pack-paylink-${m.key}" placeholder="https://..." style="width:100%; margin-top:2px; padding:6px 8px; border:1px solid var(--line); border-radius:5px;">
           </label>
+        `).join('')}
+        ${CREDIT_BRANDS.map(b=>`
+          <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:8px;">${b.label}</p>
+          <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis — remplis selon la modalité calculée ci-dessus.</p>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${INSTALLMENTS.map(n=>`
+              <label style="font-size:10.5px; color:var(--grey);">
+                ${n}x
+                <input type="url" id="pack-paylink-${b.key}-${n}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:5px 6px; border:1px solid var(--line); border-radius:5px;">
+              </label>
+            `).join('')}
+          </div>
         `).join('')}
         <p style="font-size:11px; color:var(--grey); margin-top:6px;">Laisse-les vides si tu préfères les remplir plus tard, dans « Élèves & niveaux » — mais l'élève ne verra rien à payer tant qu'aucun lien n'est renseigné quelque part.</p>
       </div>
@@ -1755,7 +1835,7 @@ function toggleRescheduleForm(id){
   renderPastSessions();
 }
 
-function rescheduleFormHTML(s, submitFn, toggleFn){
+function rescheduleFormHTML(s, submitFn, toggleFn, directFn){
   submitFn = submitFn || 'submitRescheduleProposal';
   toggleFn = toggleFn || 'toggleRescheduleForm';
   return `
@@ -1789,6 +1869,14 @@ function rescheduleFormHTML(s, submitFn, toggleFn){
           Fermer
         </button>
       </div>
+      ${directFn ? `
+        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--line);">
+          <button onclick="${directFn}('${s.id}')" style="background:none; color:var(--bad);">
+            ⚡ Changer directement, sans attendre de confirmation (cas exceptionnel)
+          </button>
+          <p style="font-size:11px; color:var(--grey); margin-top:4px;">La date change tout de suite et un nouveau lien Zoom est régénéré immédiatement — à utiliser plutôt que "Envoyer la proposition" quand c'est urgent et que tu n'as pas le temps d'attendre que l'élève confirme.</p>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -1887,6 +1975,47 @@ async function submitExperimentalReschedule(id){
   }
   rescheduleFormOpenId = null;
   alert("Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par mail).");
+  await loadExperimentalAdmin();
+}
+
+/* Change la date d'un cours expérimental TOUT DE SUITE, sans passer par une
+   proposition que l'élève doit confirmer — pour un cas exceptionnel et
+   urgent où Melissa n'a pas le temps d'attendre. Régénère aussi
+   immédiatement un vrai lien Zoom unique pour la nouvelle date (voir
+   ensureZoomMeeting dans 04-reservation-cours.js), et prévient l'élève par
+   e-mail que le changement est déjà fait (pas une proposition à valider). */
+async function directRescheduleExperimental(id){
+  const val = document.getElementById('reschedule-date-'+id).value;
+  if(!val){ alert('Choisis une date et une heure.'); return; }
+  const slot = experimentalSlots.find(s=>s.id===id);
+  if(!slot) return;
+  const newDate = new Date(val).toISOString();
+  const oldDateStr = fmtSlotDate(slot.date);
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      date: newDate,
+      rescheduleRequest: null,
+      zoomJoinUrl: null,
+      experimentalCancelled: false
+    });
+  }catch(e){
+    alert("Impossible de changer la date pour le moment.");
+    return;
+  }
+  const zoomOk = await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
+  if(slot.reservedEmail){
+    try{
+      await callDriveScript({
+        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
+        oldDate: oldDateStr, newDate: fmtSlotDate(newDate)
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  rescheduleFormOpenId = null;
+  alert(
+    `Cours déplacé au ${fmtSlotDate(newDate)}.` +
+    (zoomOk ? ' Nouveau lien Zoom généré avec succès.' : " ⚠️ Le lien Zoom n'a pas pu être régénéré automatiquement — utilise « Régénérer les liens Zoom manquants » dans l'onglet Disponibilités avant le cours.")
+  );
   await loadExperimentalAdmin();
 }
 
@@ -2405,6 +2534,15 @@ async function reserverPack(){
     const el = document.getElementById('pack-paylink-'+m.key);
     const val = el ? el.value.trim() : '';
     if(val) newPackLinks[m.key] = val;
+  });
+  CREDIT_BRANDS.forEach(b=>{
+    const obj = {};
+    INSTALLMENTS.forEach(n=>{
+      const el = document.getElementById(`pack-paylink-${b.key}-${n}`);
+      const val = el ? el.value.trim() : '';
+      if(val) obj[n] = val;
+    });
+    if(Object.keys(obj).length) newPackLinks[b.key] = obj;
   });
   if(created > 0 && Object.keys(newPackLinks).length){
     try{
