@@ -97,9 +97,12 @@ function renderExperimentalSlotsHTML(){
   return experimentalSlots.map(slot=>{
     const status = experimentalSlotStatus(slot);
     const isPast = new Date(slot.date).getTime() < now;
-    /* Replanification/annulation possibles jusqu'à 24h avant le cours (règle
-       confirmée par Melissa — distincte du badge "passé", qui reste littéral). */
-    const canModify = (new Date(slot.date).getTime() - now) > 24*3600000;
+    /* La limite de 24h (et même la notion de "passé") sont des politiques en
+       libre-service pour l'élève (voir loadNextCourseBanner dans
+       05-admin-disponibilites-forum.js) — elles ne s'appliquent pas ici :
+       c'est Melissa qui agit elle-même, donc elle garde toujours la main,
+       même sur un cours déjà passé (rattrapage, oubli, cas exceptionnel). */
+    const canModify = true;
     const pill = `<span class="admin-pill" style="${badgeStyle[status]}">${badgeLabel[status]}${isPast ? ' · passé' : ''}</span>`;
     let studentLine = '';
     if(status !== 'free'){
@@ -141,7 +144,6 @@ function renderExperimentalSlotsHTML(){
           ${canModify ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
           ${canModify ? `<button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>` : ''}
         </div>
-        ${!canModify && !isPast ? `<p style="font-size:11.5px;color:var(--grey);margin-top:6px;">Replanification ou annulation possible jusqu'à 24h avant le cours seulement.</p>` : ''}
         ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule') : ''}
       `;
     }
@@ -444,12 +446,24 @@ function renderTeacherStudentsList(){
         <select id="freq-${s.id}">${freqOpts}</select>
         <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
         <div style="width:100%; margin-top:8px;">
-          <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">Liens de paiement du forfait (un par moyen de paiement — envoyés par e-mail + affichés à l'élève, qui choisit)</p>
+          <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">Liens de paiement du forfait (envoyés par e-mail + affichés à l'élève, qui choisit)</p>
           ${PAYMENT_METHODS.map(m=>`
             <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
               ${m.label}
               <input type="url" id="packlink-${s.id}-${m.key}" value="${(pack.paymentLinks && pack.paymentLinks[m.key]) || ''}" placeholder="https://..." style="width:100%; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
             </label>
+          `).join('')}
+          ${CREDIT_BRANDS.map(b=>`
+            <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:6px;">${b.label}</p>
+            <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis.</p>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              ${INSTALLMENTS.map(n=>`
+                <label style="font-size:10.5px; color:var(--grey);">
+                  ${n}x
+                  <input type="url" id="packlink-${s.id}-${b.key}-${n}" value="${(pack.paymentLinks && pack.paymentLinks[b.key] && pack.paymentLinks[b.key][n]) || ''}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
+                </label>
+              `).join('')}
+            </div>
           `).join('')}
         </div>
         <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
@@ -498,18 +512,29 @@ async function saveStudentNiveau(id){
     updates['pack.total'] = packTotalVal;
     if(!(s && s.pack && typeof s.pack.used === 'number')){ updates['pack.used'] = 0; }
   }
-  /* 5 liens (un par moyen de paiement), comme pour un cours à l'unité — l'élève
-     choisit celui qui lui convient. On ne les réenregistre (et on ne renvoie
-     l'e-mail) que si au moins un des 5 champs a effectivement changé, pour ne
-     pas spammer l'élève à chaque simple mise à jour de niveau/fréquence. */
+  /* Liens de paiement (comme pour un cours à l'unité) — l'élève choisit celui
+     qui lui convient. On ne les réenregistre (et on ne renvoie l'e-mail) que
+     si au moins un lien a effectivement changé, pour ne pas spammer l'élève à
+     chaque simple mise à jour de niveau/fréquence. Le Crédito a jusqu'à 4
+     liens par bandeira (1x/2x/3x/4x), un lien C6 correspondant à un nombre
+     de fois précis. */
   const newLinks = {};
   PAYMENT_METHODS.forEach(m=>{
     const el = document.getElementById(`packlink-${id}-${m.key}`);
     const val = el ? el.value.trim() : '';
     if(val) newLinks[m.key] = val;
   });
+  CREDIT_BRANDS.forEach(b=>{
+    const obj = {};
+    INSTALLMENTS.forEach(n=>{
+      const el = document.getElementById(`packlink-${id}-${b.key}-${n}`);
+      const val = el ? el.value.trim() : '';
+      if(val) obj[n] = val;
+    });
+    if(Object.keys(obj).length) newLinks[b.key] = obj;
+  });
   const existingLinks = (s && s.pack && s.pack.paymentLinks) || {};
-  const linksChanged = PAYMENT_METHODS.some(m => (newLinks[m.key]||'') !== (existingLinks[m.key]||''));
+  const linksChanged = JSON.stringify(newLinks) !== JSON.stringify(existingLinks);
   if(linksChanged && Object.keys(newLinks).length){
     updates['pack.paymentLinks'] = newLinks;
     updates['pack.paymentStatus'] = 'pending';
