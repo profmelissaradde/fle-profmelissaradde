@@ -86,7 +86,7 @@ function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
    Non bloquant : si ZOOM_UNIQUE_LINKS est désactivé ou que l'appel échoue,
    la réservation reste valide et utilisera ZOOM_LINK (salle fixe) à la place. */
 async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum){
-  if(!ZOOM_UNIQUE_LINKS) return;
+  if(!ZOOM_UNIQUE_LINKS) return false;
   const topic = sessionNum ? `#${sessionNum} Cours de français avec ${studentName || ''}` : `Cours de français avec ${studentName || ''}`;
   try{
     const result = await callDriveScript({
@@ -97,10 +97,12 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
     });
     if(result && result.ok && result.joinUrl){
       await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+      return true;
     } else {
       console.warn('createZoomMeeting: pas de joinUrl retourné, secours sur ZOOM_LINK.', result);
+      return false;
     }
-  }catch(e){ console.warn('createZoomMeeting a échoué, secours sur ZOOM_LINK.', e); }
+  }catch(e){ console.warn('createZoomMeeting a échoué, secours sur ZOOM_LINK.', e); return false; }
 }
 
 /* ---- Mini-calendrier réutilisable ---- */
@@ -148,16 +150,23 @@ function buildCalendarHTML(year, month, markers, selectedKey, onClickFnName){
 /* ---- Liens de paiement (C6 Bank) ---- */
 /* Stockés dans Firestore (config/paiement) pour que Melissa puisse les changer
    depuis l'app elle-même (ce sont des liens à usage unique côté C6, donc appelés
-   à être régénérés régulièrement) — jamais codés en dur ici. */
+   à être régénérés régulièrement) — jamais codés en dur ici.
+   PIX et Débito : un seul lien chacun (par bandeira pour Débito). Crédito : un
+   lien C6 est généré pour UN nombre de fois précis, donc jusqu'à 4 liens par
+   bandeira (1x/2x/3x/4x) — stockés en objet {1:url,2:url,3:url,4:url} sous
+   paymentLinks.creditoMcVisa / paymentLinks.creditoOutras. */
 let paymentLinks = {};
 let paymentLinksLoaded = false;
 const PAYMENT_METHODS = [
   {key:'pix', label:'PIX'},
   {key:'debitoMcVisa', label:'Débito (Mastercard, Visa)'},
-  {key:'debitoOutras', label:'Débito (Outras Bandeiras)'},
-  {key:'creditoMcVisa', label:'Crédito (Mastercard, Visa)'},
-  {key:'creditoOutras', label:'Crédito (Outras Bandeiras)'}
+  {key:'debitoOutras', label:'Débito (Outras Bandeiras)'}
 ];
+const CREDIT_BRANDS = [
+  {key:'creditoMcVisa', label:'Crédito (Mastercard, Visa)', short:'Mastercard / Visa'},
+  {key:'creditoOutras', label:'Crédito (Outras Bandeiras)', short:'Autre marque'}
+];
+const INSTALLMENTS = [1,2,3,4];
 async function loadPaymentLinks(force){
   if(paymentLinksLoaded && !force) return;
   try{
@@ -167,26 +176,24 @@ async function loadPaymentLinks(force){
   paymentLinksLoaded = true;
 }
 /* Options de paiement affichées à l'élève juste après avoir réservé un créneau
-   classique. Le paiement est externe (lien C6) et validé manuellement par
-   Melissa à réception de son e-mail de confirmation — ce bouton ne fait
-   qu'ouvrir le lien, il ne change rien côté Firestore. */
-/* Options de paiement affichées à l'élève juste après avoir réservé un créneau
-   classique. Le paiement est externe (lien C6) et validé manuellement par
-   Melissa à réception de son e-mail de confirmation — ces boutons ne font
-   qu'ouvrir le bon lien, ils ne changent rien côté Firestore.
+   classique (ou pour payer un forfait). Le paiement est externe (lien C6) et
+   validé manuellement par Melissa à réception de son e-mail de confirmation —
+   ces boutons ne font qu'ouvrir le bon lien, ils ne changent rien côté
+   Firestore.
 
-   Flux en étapes plutôt que 5 boutons d'un coup :
+   Flux en étapes plutôt que tous les liens affichés d'un coup :
    1. L'élève choisit PIX / Débito / Crédito.
    2. PIX → le lien s'ouvre directement.
-      Débito / Crédito → l'élève choisit la bandeira (Mastercard/Visa ou
-      Outras Bandeiras), puis le bon lien s'ouvre. Le nombre de fois
-      (parcelamento) se choisit ensuite directement sur la page C6, selon
-      le montant — cette plateforme ne le propose pas elle-même. */
+      Débito → l'élève choisit la bandeira, puis le lien s'ouvre.
+      Crédito → l'élève choisit la bandeira, PUIS le nombre de fois parmi les
+      liens que Melissa a renseignés pour ce montant (voir CREDIT_BRANDS /
+      INSTALLMENTS) — chaque lien C6 correspond à un nombre de fois précis,
+      il n'y a pas de choix du parcelamento sur la page de paiement elle-même. */
 function paymentFlowHTML(uid, links){
   links = links || {};
   const hasPix = !!links.pix;
   const hasDebito = !!(links.debitoMcVisa || links.debitoOutras);
-  const hasCredito = !!(links.creditoMcVisa || links.creditoOutras);
+  const hasCredito = CREDIT_BRANDS.some(b => links[b.key] && INSTALLMENTS.some(n => links[b.key][n]));
   if(!hasPix && !hasDebito && !hasCredito) return '';
   return `
     <div style="margin-top:8px;">
@@ -196,6 +203,7 @@ function paymentFlowHTML(uid, links){
         ${hasCredito ? `<button class="rec-btn" onclick="choosePayType('${uid}','credito')">Crédito</button>` : ''}
       </div>
       <div id="payflow-step2-${uid}" style="display:none; margin-top:8px;"></div>
+      <div id="payflow-step3-${uid}" style="margin-top:8px;"></div>
     </div>
   `;
 }
@@ -203,10 +211,15 @@ function paymentFlowHTML(uid, links){
    global "paymentLinks"), soit le mot "pack" (paiement d'un forfait, liens
    dans student.pack.paymentLinks) — voir paymentOptionsHTML ci-dessous et
    renderPackPaymentBanner dans 05-admin-disponibilites-forum.js. */
+function paymentLinksFor(uid){
+  return (uid === 'pack') ? ((student.pack && student.pack.paymentLinks) || {}) : paymentLinks;
+}
 function choosePayType(uid, type){
-  const links = (uid === 'pack') ? ((student.pack && student.pack.paymentLinks) || {}) : paymentLinks;
+  const links = paymentLinksFor(uid);
   const step2 = document.getElementById('payflow-step2-'+uid);
+  const step3 = document.getElementById('payflow-step3-'+uid);
   if(!step2) return;
+  if(step3) step3.innerHTML = '';
 
   if(type === 'pix'){
     if(links.pix) window.open(links.pix, '_blank', 'noopener');
@@ -217,21 +230,39 @@ function choosePayType(uid, type){
     return;
   }
 
-  const isDebito = type === 'debito';
-  const mcVisa = isDebito ? links.debitoMcVisa : links.creditoMcVisa;
-  const outras = isDebito ? links.debitoOutras : links.creditoOutras;
-
-  let html = `<p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">Quelle est la marque de ta carte ?</p><div style="display:flex; gap:6px; flex-wrap:wrap;">`;
-  if(mcVisa) html += `<a href="${mcVisa}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Mastercard / Visa</a>`;
-  if(outras) html += `<a href="${outras}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Autre marque</a>`;
-  html += `</div>`;
-
-  if(type === 'credito'){
-    html += `<p style="font-size:11px; color:var(--grey); margin-top:8px;">Le nombre de fois (parcelamento) se choisit directement sur la page de paiement, selon le montant.</p>`;
+  if(type === 'debito'){
+    let html = `<p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">Quelle est la marque de ta carte ?</p><div style="display:flex; gap:6px; flex-wrap:wrap;">`;
+    if(links.debitoMcVisa) html += `<a href="${links.debitoMcVisa}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Mastercard / Visa</a>`;
+    if(links.debitoOutras) html += `<a href="${links.debitoOutras}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">Autre marque</a>`;
+    html += `</div>`;
+    step2.innerHTML = html;
+    step2.style.display = 'block';
+    return;
   }
 
+  // Crédito : choisir la bandeira d'abord, le nombre de fois ensuite (étape 3).
+  let html = `<p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">Quelle est la marque de ta carte ?</p><div style="display:flex; gap:6px; flex-wrap:wrap;">`;
+  CREDIT_BRANDS.forEach(b=>{
+    const parcelas = links[b.key] || {};
+    if(INSTALLMENTS.some(n => parcelas[n])){
+      html += `<button class="rec-btn" onclick="chooseCreditBrand('${uid}','${b.key}')">${b.short}</button>`;
+    }
+  });
+  html += `</div>`;
   step2.innerHTML = html;
   step2.style.display = 'block';
+}
+function chooseCreditBrand(uid, brandKey){
+  const links = paymentLinksFor(uid);
+  const parcelas = links[brandKey] || {};
+  const step3 = document.getElementById('payflow-step3-'+uid);
+  if(!step3) return;
+  let html = `<p style="font-size:12px; font-weight:700; color:var(--navy); margin:0 0 6px;">En combien de fois ?</p><div style="display:flex; gap:6px; flex-wrap:wrap;">`;
+  INSTALLMENTS.forEach(n=>{
+    if(parcelas[n]) html += `<a href="${parcelas[n]}" target="_blank" rel="noopener" class="rec-btn" style="text-decoration:none; display:inline-block;">${n}x</a>`;
+  });
+  html += `</div>`;
+  step3.innerHTML = html;
 }
 function paymentOptionsHTML(s){
   const flow = paymentFlowHTML(s.id, paymentLinks);
