@@ -475,8 +475,56 @@ function adminRescheduleFormHTML(s){
           Fermer
         </button>
       </div>
+
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--line);">
+        <button onclick="directRescheduleAdmin('${s.id}')" style="background:none; color:var(--bad);">
+          ⚡ Changer directement, sans attendre de confirmation (cas exceptionnel)
+        </button>
+        <p style="font-size:11px; color:var(--grey); margin-top:4px;">La date change tout de suite et un nouveau lien Zoom est régénéré immédiatement — à utiliser quand c'est urgent et que tu n'as pas le temps d'attendre que l'élève confirme.</p>
+      </div>
     </div>
   `;
+}
+
+/* Change la date d'un cours CLASSIQUE (pas expérimental) tout de suite, sans
+   passer par une demande que l'élève doit confirmer — même principe que
+   directRescheduleExperimental, pour les cas exceptionnels et urgents. */
+async function directRescheduleAdmin(id){
+  const slot = dispoData.find(s=>s.id===id);
+  const input = document.getElementById('admin-reschedule-date-'+id);
+  if(!slot || !input || !input.value){
+    alert('Choisis une date et une heure.');
+    return;
+  }
+  const newDate = new Date(input.value).toISOString();
+  const oldDateStr = fmtSlotDate(slot.date);
+  try{
+    await db.collection('disponibilites').doc(id).update({
+      date: newDate,
+      rescheduleRequest: null,
+      zoomJoinUrl: null,
+      anomalie: false,
+      anomalieHandled: true
+    });
+  }catch(e){
+    alert("Impossible de changer la date pour le moment.");
+    return;
+  }
+  const zoomOk = await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
+  if(slot.reservedEmail){
+    try{
+      await callDriveScript({
+        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
+        oldDate: oldDateStr, newDate: fmtSlotDate(newDate)
+      });
+    }catch(e){ /* non bloquant */ }
+  }
+  adminRescheduleFormOpenId = null;
+  alert(
+    `Cours déplacé au ${fmtSlotDate(newDate)}.` +
+    (zoomOk ? ' Nouveau lien Zoom généré avec succès.' : " ⚠️ Le lien Zoom n'a pas pu être régénéré automatiquement — utilise « Régénérer les liens Zoom manquants » avant le cours.")
+  );
+  await loadAdminDispo();
 }
 
 async function submitAdminRescheduleRequest(id){
@@ -485,11 +533,6 @@ async function submitAdminRescheduleRequest(id){
 
   if(!slot || !input || !input.value){
     alert('Choisis une date et une heure.');
-    return;
-  }
-
-  if((new Date(slot.date).getTime() - Date.now()) <= 3600000){
-    alert("La demande de replanification n'est plus possible à moins d'1h du cours.");
     return;
   }
 
@@ -1366,11 +1409,11 @@ function renderAdminDispo(){
           <div class="meta">
             ${
               s.reservedBy
-                ? `✅ Réservé par <b>${s.reservedName}</b>`
+                ? `✅ Réservé par <b>${s.reservedName}</b>${s.isPack ? ' <span style="color:var(--grey);">(séance de forfait — paiement suivi dans « Élèves &amp; niveaux »)</span>' : ''}`
                 : '⬜ Libre'
             }
             ${
-              s.reservedBy && !s.isExperimental
+              s.reservedBy && !s.isExperimental && !s.isPack
                 ? (s.paymentStatus === 'paid'
                     ? ' · <span style="color:var(--ok);">💳 Payé</span>'
                     : ' · <span style="color:var(--bad);">💳 Paiement en attente</span>')
@@ -1391,7 +1434,7 @@ function renderAdminDispo(){
 
           <div class="teacher-entry-actions">
             ${
-              s.reservedBy && !s.isExperimental && s.paymentStatus !== 'paid'
+              s.reservedBy && !s.isExperimental && !s.isPack && s.paymentStatus !== 'paid'
                 ? `
                   <button
                     onclick="markPaymentReceived('${s.id}')"
@@ -1405,7 +1448,7 @@ function renderAdminDispo(){
           </div>
 
           ${
-            s.reservedBy && !s.isExperimental && s.paymentStatus === 'paid' && !s.notaFiscalSent
+            s.reservedBy && !s.isExperimental && !s.isPack && s.paymentStatus === 'paid' && !s.notaFiscalSent
               ? `
                 <div class="rec-box" style="margin-top:8px;">
                   <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal</p>
@@ -1427,7 +1470,6 @@ function renderAdminDispo(){
           <div class="teacher-entry-actions">
             ${
               s.reservedBy &&
-              (new Date(s.date).getTime() - Date.now()) > 3600000 &&
               !(
                 s.rescheduleRequest &&
                 s.rescheduleRequest.status==='pending'
@@ -1444,8 +1486,7 @@ function renderAdminDispo(){
             }
 
             ${
-              s.reservedBy &&
-              (new Date(s.date).getTime() - Date.now()) > 3600000
+              s.reservedBy
                 ? `
                   <button
                     onclick="adminCancelReservation('${s.id}')"
@@ -1468,17 +1509,6 @@ function renderAdminDispo(){
           ${
             adminRescheduleFormOpenId === s.id
               ? adminRescheduleFormHTML(s)
-              : ''
-          }
-
-          ${
-            s.reservedBy &&
-            (new Date(s.date).getTime() - Date.now()) <= 3600000
-              ? `
-                <p style="font-size:11.5px; color:var(--grey); margin-top:6px;">
-                  Annulation ou replanification impossible à moins d'1h du cours.
-                </p>
-              `
               : ''
           }
         </div>
