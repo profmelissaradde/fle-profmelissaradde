@@ -351,6 +351,15 @@ async function copyExperimentalLink(){
 
 let studentsData = [];
 let openBilanId = null;
+/* Un seul élève à la fois peut avoir ses liens de paiement de forfait dépliés
+   dans cette liste — repliés par défaut, pour ne pas afficher en permanence
+   11 champs d'URL (PIX, 2×Débito, 2×4 Crédito) pour chaque élève, y compris
+   ceux qui n'ont même pas de forfait. */
+let packLinksOpenId = null;
+function togglePackLinks(id){
+  packLinksOpenId = (packLinksOpenId === id) ? null : id;
+  renderTeacherStudentsList();
+}
 async function loadTeacherStudents(){
   const body = document.getElementById('teacher-body');
   if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
@@ -490,25 +499,34 @@ function renderStudentsFlatList(){
         <select id="freq-${s.id}">${freqOpts}</select>
         <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
         <div style="width:100%; margin-top:8px;">
-          <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">Liens de paiement du forfait (envoyés par e-mail + affichés à l'élève, qui choisit)</p>
-          ${PAYMENT_METHODS.map(m=>`
-            <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
-              ${m.label}
-              <input type="url" id="packlink-${s.id}-${m.key}" value="${(pack.paymentLinks && pack.paymentLinks[m.key]) || ''}" placeholder="https://..." style="width:100%; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
-            </label>
-          `).join('')}
-          ${CREDIT_BRANDS.map(b=>`
-            <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:6px;">${b.label}</p>
-            <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis.</p>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              ${INSTALLMENTS.map(n=>`
-                <label style="font-size:10.5px; color:var(--grey);">
-                  ${n}x
-                  <input type="url" id="packlink-${s.id}-${b.key}-${n}" value="${(pack.paymentLinks && pack.paymentLinks[b.key] && pack.paymentLinks[b.key][n]) || ''}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
+          ${(()=>{
+            const filledCount = PAYMENT_METHODS.filter(m=>pack.paymentLinks && pack.paymentLinks[m.key]).length
+              + CREDIT_BRANDS.reduce((sum,b)=> sum + (pack.paymentLinks && pack.paymentLinks[b.key] ? Object.keys(pack.paymentLinks[b.key]).length : 0), 0);
+            return `<button onclick="togglePackLinks('${s.id}')" style="background:none; color:var(--navy); font-size:12px;">${packLinksOpenId===s.id ? 'Fermer' : `💳 Liens de paiement du forfait (${filledCount} renseigné${filledCount>1?'s':''})`}</button>`;
+          })()}
+          ${packLinksOpenId===s.id ? `
+            <div style="margin-top:8px;">
+              <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">L'élève choisit celui qui lui convient parmi ceux que tu remplis</p>
+              ${PAYMENT_METHODS.map(m=>`
+                <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
+                  ${m.label}
+                  <input type="url" id="packlink-${s.id}-${m.key}" value="${(pack.paymentLinks && pack.paymentLinks[m.key]) || ''}" placeholder="https://..." style="width:100%; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
                 </label>
               `).join('')}
+              ${CREDIT_BRANDS.map(b=>`
+                <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:6px;">${b.label}</p>
+                <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis.</p>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  ${INSTALLMENTS.map(n=>`
+                    <label style="font-size:10.5px; color:var(--grey);">
+                      ${n}x
+                      <input type="url" id="packlink-${s.id}-${b.key}-${n}" value="${(pack.paymentLinks && pack.paymentLinks[b.key] && pack.paymentLinks[b.key][n]) || ''}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
+                    </label>
+                  `).join('')}
+                </div>
+              `).join('')}
             </div>
-          `).join('')}
+          ` : ''}
         </div>
         <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
         <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
