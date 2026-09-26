@@ -144,7 +144,7 @@ function renderExperimentalSlotsHTML(){
           ${canModify ? `<button onclick="toggleExperimentalReschedule('${slot.id}')" style="background:none;color:var(--navy);">${rescheduleFormOpenId===slot.id ? 'Fermer' : '📅 Proposer un nouveau créneau'}</button>` : ''}
           ${canModify ? `<button onclick="cancelExperimentalSlotAdmin('${slot.id}')" style="background:none;color:var(--bad);">❌ Annuler ce cours</button>` : ''}
         </div>
-        ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule') : ''}
+        ${rescheduleFormOpenId===slot.id ? rescheduleFormHTML(slot, 'submitExperimentalReschedule', 'toggleExperimentalReschedule', 'directRescheduleExperimental') : ''}
       `;
     }
     return `
@@ -284,6 +284,42 @@ async function createExperimentalCourse(){
   if(!dateEl.value){ err.textContent = 'Choisis une date et une heure.'; err.style.display = 'block'; return; }
   const iso = new Date(dateEl.value).toISOString();
   if(new Date(iso).getTime() <= Date.now()){ err.textContent = 'Choisis un créneau dans le futur.'; err.style.display = 'block'; return; }
+
+  /* Vérifie qu'il n'y a pas déjà un autre créneau (classique ou expérimental)
+     exactement à cette date et heure, pour éviter de te retrouver avec deux
+     cours en même temps sans t'en rendre compte.
+     - Si ce créneau est déjà réservé par un élève (classique ou expérimental),
+       c'est un vrai double-booking : on bloque et on te le signale clairement.
+     - S'il est encore libre (personne n'a réservé dessus), il ne sert à rien
+       de le garder : on le supprime tout seul et on met le cours expérimental
+       à la place, sans te demander de choisir une autre heure. */
+  try{
+    const conflictSnap = await db.collection('disponibilites').where('date', '==', iso).get();
+    if(!conflictSnap.empty){
+      const reservedConflict = conflictSnap.docs.find(d => d.data().reservedBy);
+      if(reservedConflict){
+        const conflict = reservedConflict.data();
+        err.textContent = `⚠️ Tu as déjà un cours réservé à cette heure-là (${conflict.reservedName || 'un élève'}) — choisis un autre créneau.`;
+        err.style.display = 'block';
+        return;
+      }
+      // Aucun des créneaux trouvés à cette heure n'est réservé : on les retire.
+      for(const doc of conflictSnap.docs){
+        try{ await db.collection('disponibilites').doc(doc.id).delete(); }
+        catch(e){ console.error('Suppression du créneau libre en conflit échouée :', e); }
+      }
+      // Si l'un de ces créneaux supprimés était déjà dans la liste affichée
+      // (un autre cours expérimental libre), on l'enlève aussi de la liste
+      // en mémoire pour ne pas laisser une entrée fantôme.
+      const deletedIds = new Set(conflictSnap.docs.map(d=>d.id));
+      experimentalSlots = experimentalSlots.filter(s=>!deletedIds.has(s.id));
+    }
+  }catch(e){
+    console.error('Vérification de conflit de créneau échouée :', e);
+    /* Non bloquant : mieux vaut laisser créer le créneau que bloquer toute
+       la fonctionnalité si cette vérification échoue ponctuellement. */
+  }
+
   const token = experimentalToken();
   try{
     const ref = await db.collection('disponibilites').add({
