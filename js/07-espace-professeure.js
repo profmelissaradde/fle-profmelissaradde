@@ -504,7 +504,7 @@ function renderTeacherStudentsList(){
         </div>
         <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
         <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
-        ${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
+        ${packTotal && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
         ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
       </div>
       ${
