@@ -592,8 +592,8 @@ function renderReserverBody(){
               </div>` : ''}
           </div>` : ''}
         ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
-        ${s.paymentStatus === 'pending' ? paymentOptionsHTML(s) : ''}
-        ${s.paymentStatus === 'paid' ? '<p style="color:var(--ok); font-size:12.5px; margin-top:8px;">✅ Paiement reçu, merci !</p>' : ''}
+        ${!s.isPack && s.paymentStatus === 'pending' ? paymentOptionsHTML(s) : ''}
+        ${!s.isPack && s.paymentStatus === 'paid' ? '<p style="color:var(--ok); font-size:12.5px; margin-top:8px;">✅ Paiement reçu, merci !</p>' : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="annulerReservation('${s.id}')">Annuler ma réservation</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
         ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement.</p>` : ''}
