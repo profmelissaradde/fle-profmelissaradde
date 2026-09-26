@@ -445,7 +445,15 @@ function reminderMailto(s){
   const body = `Bonjour ${s.prenom},\n\nJe vois que tu n'as pas encore beaucoup avancé sur tes activités cette semaine. N'hésite pas à t'y remettre un peu avant notre prochaine séance !\n\nÀ bientôt,\nMelissa`;
   return `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
-function renderTeacherStudentsList(){
+/* Liste riche (paiement/forfait/bilan rapide) construite ici. Le NOM
+   "renderTeacherStudentsList" est volontairement laissé libre pour
+   10-profils-regles-evaluations.js, qui s'en sert comme petit aiguilleur :
+   s'il n'y a pas de fiche élève ouverte, il retombe sur CETTE fonction ;
+   sinon il affiche la fiche détaillée (Dossiers & bilans / Profil / Forfait).
+   Sans ce partage de nom, l'un des deux fichiers écrase silencieusement
+   l'autre selon l'ordre de chargement — c'est exactement le bug qu'on vient
+   de trouver. */
+function renderStudentsFlatList(){
   const body = document.getElementById('teacher-body');
   if(!body) return;
   if(studentsData.length===0){ body.innerHTML = '<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>'; return; }
@@ -505,6 +513,7 @@ function renderTeacherStudentsList(){
         <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
         <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
         ${packTotal && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
+        <button onclick="openAdminStudent('${s.id}')" style="background:none; color:var(--navy);">📁 Fiche complète (tous les dossiers)</button>
         ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
       </div>
       ${
