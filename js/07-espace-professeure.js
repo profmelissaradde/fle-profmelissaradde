@@ -360,6 +360,40 @@ function togglePackLinks(id){
   packLinksOpenId = (packLinksOpenId === id) ? null : id;
   renderTeacherStudentsList();
 }
+/* Un seul élève à la fois a son panneau d'édition (niveau/rythme/forfait/
+   liens/actions) déplié — replié par défaut pour que la liste reste lisible :
+   chaque élève n'affiche qu'un résumé en lecture seule tant qu'on ne clique
+   pas sur "✏️ Gérer". */
+let editOpenId = null;
+function toggleEditStudent(id){
+  editOpenId = (editOpenId === id) ? null : id;
+  if(editOpenId !== id){ packLinksOpenId = null; }
+  renderTeacherStudentsList();
+}
+/* Séances de forfait (isPack:true) de tous les élèves, regroupées par élève —
+   une seule requête pour tout le monde plutôt qu'une par élève. Sert à
+   afficher l'avancement réel (passées/à venir) et à savoir quand proposer un
+   renouvellement, dans renderStudentsFlatList ci-dessous. */
+let packSlotsByStudent = {};
+async function loadPackSlotsByStudent(){
+  try{
+    const snap = await db.collection('disponibilites').where('isPack','==',true).get();
+    const now = Date.now();
+    packSlotsByStudent = {};
+    snap.docs.forEach(d=>{
+      const slot = d.data();
+      if(!slot.reservedBy) return;
+      if(!packSlotsByStudent[slot.reservedBy]) packSlotsByStudent[slot.reservedBy] = {past:0, upcoming:0, nextDate:null};
+      const entry = packSlotsByStudent[slot.reservedBy];
+      const t = new Date(slot.date).getTime();
+      if(t < now){ entry.past++; }
+      else{
+        entry.upcoming++;
+        if(!entry.nextDate || t < new Date(entry.nextDate).getTime()) entry.nextDate = slot.date;
+      }
+    });
+  }catch(e){ packSlotsByStudent = {}; }
+}
 async function loadTeacherStudents(){
   const body = document.getElementById('teacher-body');
   if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
@@ -370,6 +404,7 @@ async function loadTeacherStudents(){
       (!s.status && s.experimentalLesson !== true && s.registrationSource !== 'cours-experimental')
     );
   }catch(e){ studentsData = []; }
+  await loadPackSlotsByStudent();
   renderTeacherStudentsList();
 }
 async function loadTeacherStudentsQuiet(){
@@ -494,10 +529,26 @@ function renderStudentsFlatList(){
       <div class="meta">📍 Progression (Dossier 0) : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, 0)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, 0)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, 0)].note20}/20</b>` : ''}` : ''}</div>
       <div class="meta">✅ ${stats.total}/${TOTAL_ACTIVITIES} activités faites au total · <b style="color:${behind ? 'var(--bad)' : 'var(--ok)'}">${stats.thisWeek} cette semaine</b>${behind ? ' ⚠️ moins de la moitié' : ''}</div>
       <div class="meta">📦 Forfait : ${packTotal ? `<b style="color:${packRemaining<=0?'var(--bad)':'var(--navy)'}">${packUsed}/${packTotal} séances utilisées</b> (${packRemaining} restante${packRemaining>1?'s':''})` : 'aucun forfait défini'}${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) ? ` · <span style="color:${pack.paymentStatus==='paid' ? 'var(--ok)' : 'var(--bad)'};">💳 ${pack.paymentStatus==='paid' ? 'Payé' : 'Paiement en attente'}</span>` : ''}</div>
-      <div class="teacher-entry-actions">
-        <select id="niv-${s.id}">${niveauOpts}</select>
-        <select id="freq-${s.id}">${freqOpts}</select>
-        <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
+      ${(()=>{
+        if(!packTotal) return '';
+        const p = packSlotsByStudent[s.id] || {past:0, upcoming:0, nextDate:null};
+        const renewSoon = p.upcoming <= 2;
+        return `<div class="meta">📆 Séances programmées : <b>${p.past} passée${p.past>1?'s':''}</b>, <b style="color:${renewSoon ? 'var(--bad)' : 'var(--navy)'}">${p.upcoming} à venir</b>${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ Pense à renouveler le forfait bientôt</span>` : ''}</div>`;
+      })()}
+
+      <div class="teacher-entry-actions" style="margin-top:8px;">
+        <button onclick="toggleEditStudent('${s.id}')">${editOpenId===s.id ? 'Fermer' : '✏️ Gérer'}</button>
+        <button onclick="openAdminStudent('${s.id}')" style="background:none; color:var(--navy);">📁 Fiche complète (tous les dossiers)</button>
+        ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
+      </div>
+
+      ${editOpenId === s.id ? `
+      <div class="rec-box" style="margin-top:10px;">
+        <div class="teacher-entry-actions">
+          <select id="niv-${s.id}">${niveauOpts}</select>
+          <select id="freq-${s.id}">${freqOpts}</select>
+          <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
+        </div>
         <div style="width:100%; margin-top:8px;">
           ${(()=>{
             const filledCount = PAYMENT_METHODS.filter(m=>pack.paymentLinks && pack.paymentLinks[m.key]).length
@@ -528,32 +579,33 @@ function renderStudentsFlatList(){
             </div>
           ` : ''}
         </div>
-        <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
-        <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
-        ${packTotal && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
-        <button onclick="openAdminStudent('${s.id}')" style="background:none; color:var(--navy);">📁 Fiche complète (tous les dossiers)</button>
-        ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
-      </div>
-      ${
-        pack.paymentStatus === 'paid' && !pack.notaFiscalSent
-          ? `
-            <div class="rec-box" style="margin-top:8px;">
-              <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal du forfait</p>
-              ${pack.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${pack.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
-              <input type="file" id="nota-pack-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
-              <div class="teacher-entry-actions">
-                <button onclick="sendNotaFiscalPack('${s.id}', 'nota-pack-${s.id}')">Téléverser et envoyer</button>
+        <div class="teacher-entry-actions" style="margin-top:8px;">
+          <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
+          <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
+          ${packTotal && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
+        </div>
+        ${
+          pack.paymentStatus === 'paid' && !pack.notaFiscalSent
+            ? `
+              <div class="rec-box" style="margin-top:8px;">
+                <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal du forfait</p>
+                ${pack.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${pack.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
+                <input type="file" id="nota-pack-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
+                <div class="teacher-entry-actions">
+                  <button onclick="sendNotaFiscalPack('${s.id}', 'nota-pack-${s.id}')">Téléverser et envoyer</button>
+                </div>
               </div>
-            </div>
-          `
-          : ''
-      }
-      ${
-        pack.notaFiscalSent
-          ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal du forfait envoyée — <a href="${pack.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
-          : ''
-      }
-      ${openBilanId === s.id ? bilanEditorHTML(s) : ''}
+            `
+            : ''
+        }
+        ${
+          pack.notaFiscalSent
+            ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal du forfait envoyée — <a href="${pack.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
+            : ''
+        }
+        ${openBilanId === s.id ? bilanEditorHTML(s) : ''}
+      </div>
+      ` : ''}
     </div>`;
   }).join('');
 }
