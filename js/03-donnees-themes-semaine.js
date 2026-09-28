@@ -468,6 +468,220 @@ const temasSemanas = [
         }
       }
     }
+  },
+  {
+    id: "temps-argent-2026-09-28",
+    periode: "28 septembre → 4 octobre 2026",
+    titre_fr: "Le temps ou l'argent ?",
+    titre_pt: "O tempo ou o dinheiro?",
+    sub_fr: "Un thème pour débattre de tes priorités de vie, à faire en 15 à 30 minutes, à ton rythme.",
+    sub_pt: "Um tema para debater suas prioridades de vida, para fazer em 15 a 30 minutos, no seu ritmo.",
+    niveaux: {
+      A1: {
+        duree: "≈ 15 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde cette vidéo sur le travail en France et repère les mots que tu comprends déjà.",
+          consigne_pt: "Assista a este vídeo sobre o trabalho na França e identifique as palavras que você já conhece.",
+          media: {type:"video", id:"Oh2YMQTnrzk", label:"Le travail en France — 5 minutes de français"},
+          exos: [
+            {type:"qcm", q:"En France, la semaine de travail classique est de combien d'heures ?", options:["35 heures","50 heures","60 heures"], correct:0},
+            {type:"qcm", q:"Le droit à la déconnexion, ça veut dire…", options:["Ne plus répondre aux e-mails du travail le soir ou le week-end","Ne plus avoir internet","Changer de travail"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "5 min",
+          texte_fr: "Léo travaille 35 heures par semaine. Le week-end, il ne regarde jamais ses e-mails de travail. Pour lui, le temps libre est plus important que l'argent.",
+          texte_pt: "Léo trabalha 35 horas por semana. No fim de semana, ele nunca olha seus e-mails de trabalho. Para ele, o tempo livre é mais importante que o dinheiro.",
+          exos: [
+            {type:"qcm", q:"Combien d'heures par semaine travaille Léo ?", options:["35 heures","50 heures","60 heures"], correct:0},
+            {type:"qcm", q:"Pour Léo, qu'est-ce qui est le plus important ?", options:["Le temps libre","L'argent","Le travail"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "3 min",
+          consigne_fr: "Écris 3 phrases : préfères-tu avoir plus de temps libre ou plus d'argent ? Utilise « Je préfère... parce que... ».",
+          consigne_pt: "Escreva 3 frases: você prefere ter mais tempo livre ou mais dinheiro? Use « Je préfère... parce que... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "2 min",
+          consigne_fr: "Enregistre-toi : dis à voix haute si tu préfères le temps libre ou l'argent, et donne une raison.",
+          consigne_pt: "Grave-se: diga em voz alta se você prefere tempo livre ou dinheiro, e dê uma razão."
+        }
+      },
+      A2: {
+        duree: "≈ 20 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "6 min",
+          consigne_fr: "Regarde cette vidéo sur le travail en France et note deux mots ou expressions liés à l'équilibre vie professionnelle / vie personnelle.",
+          consigne_pt: "Assista a este vídeo sobre o trabalho na França e anote duas palavras ou expressões ligadas ao equilíbrio vida profissional / vida pessoal.",
+          media: {type:"video", id:"Oh2YMQTnrzk", label:"Le travail en France — 5 minutes de français"},
+          exos: [
+            {type:"qcm", q:"Que signifie « les RTT » ?", options:["Des jours de repos en plus, en compensation du temps travaillé","Un impôt sur le salaire","Un type de contrat de travail"], correct:0},
+            {type:"qcm", q:"D'après la vidéo, la pause déjeuner en France est considérée comme…", options:["Un moment important, presque sacré","Une perte de temps","Facultative"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "6 min",
+          texte_fr: "Je travaille beaucoup, mais j'essaie toujours de garder du temps pour moi. Le week-end, je déconnecte complètement : pas d'e-mails, pas de réunions. J'ai appris que l'argent peut attendre, mais certains moments ne reviennent pas. Le temps libre est un luxe que je choisis de protéger.",
+          texte_pt: "Trabalho muito, mas sempre tento guardar tempo para mim. No fim de semana, desligo completamente: sem e-mails, sem reuniões. Aprendi que o dinheiro pode esperar, mas certos momentos não voltam. O tempo livre é um luxo que escolho proteger.",
+          exos: [
+            {type:"qcm", q:"Que fait cette personne le week-end ?", options:["Elle répond à ses e-mails de travail","Elle déconnecte complètement du travail","Elle travaille encore plus"], correct:1},
+            {type:"qcm", q:"Selon le texte, qu'est-ce qui « peut attendre » ?", options:["Le temps libre","L'argent","Les amis"], correct:1}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "5 min",
+          consigne_fr: "Écris un petit texte (5-6 phrases) : comment organises-tu ton temps entre le travail (ou les études) et ta vie personnelle ?",
+          consigne_pt: "Escreva um pequeno texto (5-6 frases): como você organiza seu tempo entre o trabalho (ou os estudos) e sua vida pessoal?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "3 min",
+          consigne_fr: "Enregistre-toi : explique en 4-5 phrases ce que tu ferais si tu avais plus de temps libre. Essaie d'utiliser « je voyagerais », « je ferais », « j'aurais » si tu peux.",
+          consigne_pt: "Grave-se: explique em 4-5 frases o que você faria se tivesse mais tempo livre. Tente usar «je voyagerais», «je ferais», «j'aurais» se conseguir."
+        }
+      },
+      B1: {
+        duree: "≈ 25 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "8 min",
+          consigne_fr: "Regarde cet extrait du documentaire ARTE sur le temps et l'argent, et repère au moins un exemple concret donné dans le reportage.",
+          consigne_pt: "Assista a este trecho do documentário da ARTE sobre o tempo e o dinheiro, e identifique pelo menos um exemplo concreto dado na reportagem.",
+          media: {type:"video", id:"U6jnmLUW9Jw", label:"Le temps, c'est de l'argent — ARTE, « C'est juste une question de temps » (2/4)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Ce documentaire est diffusé par quelle chaîne ?", options:["ARTE","TF1","France 2"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"D'après le reportage, le temps est devenu…", options:["Une marchandise, quelque chose qu'on achète et qu'on vend","Une chose gratuite pour tout le monde","Un droit garanti par la loi dans tous les pays"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Au-delà des exemples, quel est le sujet central du documentaire ?", options:["Le lien entre l'histoire du temps, le capitalisme et la mondialisation","La météo en France","Les vacances scolaires en Europe"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "8 min",
+          texte_fr: "À 35 ans, Camille avait tout ce qu'on considère comme une réussite : un bon salaire, un appartement à Paris, une carrière prometteuse. Mais elle travaillait soixante heures par semaine et ne voyait presque plus ses amis. Un jour, elle a refusé une promotion bien payée pour accepter un poste moins rémunéré mais avec des horaires plus humains. Aujourd'hui, elle dit qu'elle gagne moins, mais qu'elle vit mieux. Son histoire soulève une question que beaucoup évitent de se poser : si vous deviez choisir entre plus d'argent et plus de temps libre, que choisiriez-vous vraiment ?",
+          texte_pt: "Aos 35 anos, Camille tinha tudo o que se considera sucesso: um bom salário, um apartamento em Paris, uma carreira promissora. Mas trabalhava sessenta horas por semana e quase não via mais os amigos. Um dia, recusou uma promoção bem paga para aceitar um cargo menos remunerado, mas com horários mais humanos. Hoje, ela diz que ganha menos, mas vive melhor. Sua história levanta uma questão que muitos evitam se fazer: se você tivesse que escolher entre mais dinheiro e mais tempo livre, o que escolheria de verdade?",
+          link: {url:"https://fr.wikipedia.org/wiki/%C3%89quilibre_vie_professionnelle-vie_priv%C3%A9e", label:"Équilibre vie professionnelle-vie privée — Wikipédia"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Avant son changement, combien d'heures par semaine travaillait Camille ?", options:["35 heures","60 heures","80 heures"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Qu'a-t-elle refusé ?", options:["Une promotion bien payée","Un licenciement","Des vacances supplémentaires"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quelle est la vraie question que soulève cette histoire, d'après le texte ?", options:["Si on devait choisir entre plus d'argent et plus de temps libre, que choisirait-on vraiment ?","Comment gagner plus d'argent rapidement ?","Pourquoi Camille a-t-elle déménagé à Paris ?"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un paragraphe (6-8 phrases) en utilisant le conditionnel présent : que ferais-tu si tu n'avais pas besoin de travailler ? Utilise au moins 3 verbes au conditionnel (par exemple : je voyagerais, je pourrais, j'aurais...).",
+          consigne_pt: "Redija um parágrafo (6-8 frases) usando o condicional presente: o que você faria se não precisasse trabalhar? Use pelo menos 3 verbos no condicional (por exemplo: je voyagerais, je pourrais, j'aurais...)."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (1 min) : es-tu d'accord avec l'idée « Le temps, c'est de l'argent » ? Utilise des connecteurs comme « d'un côté... de l'autre... » ou « certes, mais... » pour structurer ton avis.",
+          consigne_pt: "Grave-se (1 min): você concorda com a ideia «Le temps, c'est de l'argent»? Use conectores como «d'un côté... de l'autre...» ou «certes, mais...» para estruturar sua opinião."
+        }
+      },
+      B2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "9 min",
+          consigne_fr: "Regarde cet extrait du documentaire ARTE. Note trois exemples concrets donnés dans le reportage, dans trois pays différents.",
+          consigne_pt: "Assista a este trecho do documentário da ARTE. Anote três exemplos concretos dados na reportagem, em três países diferentes.",
+          media: {type:"video", id:"U6jnmLUW9Jw", label:"Le temps, c'est de l'argent — ARTE, « C'est juste une question de temps » (2/4)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Quel exemple illustre une pression extrême à « travailler plus », aux États-Unis ?", options:["Des ouvriers de l'industrie du poulet à qui l'on refuse le droit d'aller aux toilettes","Les congés payés","Les 35 heures"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Qu'est-ce que la loi Mathys, mentionnée dans le reportage ?", options:["Elle permet aux parents d'enfants gravement malades de recevoir des dons de jours de repos","Elle interdit le travail le dimanche","Elle réduit le temps de travail légal à 32h"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quel phénomène japonais est cité comme conséquence extrême de la pression au travail ?", options:["Le karoshi (la mort par surmenage)","Le RTT","La retraite anticipée"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "« Le temps est ce que nous voulons le plus, mais ce que nous utilisons le pire », écrivait le philosophe William Penn au XVIIe siècle. Cette réflexion reste étonnamment actuelle : aujourd'hui encore, beaucoup rêvent de plus de temps libre tout en continuant de sacrifier leurs soirées et leurs week-ends pour gagner davantage. Le paradoxe est que l'argent, une fois un certain seuil de confort atteint, n'augmente plus vraiment le bonheur — alors que le temps de qualité passé avec ses proches, lui, continue d'y contribuer.",
+          texte_pt: "« O tempo é o que mais queremos, mas o que pior utilizamos », escrevia o filósofo William Penn no século XVII. Essa reflexão permanece surpreendentemente atual: ainda hoje, muitos sonham com mais tempo livre enquanto continuam sacrificando suas noites e fins de semana para ganhar mais. O paradoxo é que o dinheiro, uma vez atingido certo patamar de conforto, não aumenta mais realmente a felicidade — enquanto o tempo de qualidade passado com entes queridos continua contribuindo para ela.",
+          link: {url:"https://fr.wikipedia.org/wiki/William_Penn", label:"William Penn — Wikipédia"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Qui est l'auteur de la citation présentée dans le texte ?", options:["William Penn","Voltaire","Victor Hugo"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Selon le texte, que se passe-t-il une fois un certain seuil de confort financier atteint ?", options:["L'argent supplémentaire n'augmente plus vraiment le bonheur","Le bonheur augmente proportionnellement à l'argent gagné","Le temps libre devient inutile"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quel est le paradoxe décrit dans le texte ?", options:["Vouloir plus de temps libre tout en sacrifiant son temps pour gagner plus d'argent","Vouloir travailler moins tout en étant payé davantage","Vouloir de l'argent sans jamais travailler"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "8 min",
+          consigne_fr: "Rédige un texte argumentatif (8-10 phrases), en utilisant le conditionnel présent quand c'est pertinent : selon vous, le bonheur est-il plus lié au temps ou à l'argent ? Justifiez votre position avec au moins un exemple concret.",
+          consigne_pt: "Redija um texto argumentativo (8-10 frases), usando o condicional presente quando pertinente: na sua opinião, a felicidade está mais ligada ao tempo ou ao dinheiro? Justifique sua posição com pelo menos um exemplo concreto."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "9 min",
+          consigne_fr: "Enregistre-toi (1-2 min) : défends ou nuance la citation de William Penn — « Le temps est ce que nous voulons le plus, mais ce que nous utilisons le pire. » Essaie d'utiliser au moins deux registres différents pour parler d'argent (par exemple « le salaire », registre courant, et « le fric », registre familier), pour montrer que tu maîtrises les nuances de registre.",
+          consigne_pt: "Grave-se (1-2 min): defenda ou nuance a citação de William Penn — « O tempo é o que mais queremos, mas o que pior utilizamos. » Tente usar pelo menos dois registros diferentes para falar de dinheiro (por exemplo «le salaire», registro corrente, e «le fric», registro informal), para mostrar que você domina as nuances de registro."
+        }
+      },
+      C1: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse", titre_pt: "Compreensão oral — análise", dur: "9 min",
+          consigne_fr: "Regarde à nouveau l'extrait du documentaire ARTE, mais cette fois analyse le point de vue implicite du reportage, au-delà des faits présentés.",
+          consigne_pt: "Assista novamente ao trecho do documentário da ARTE, mas desta vez analise o ponto de vista implícito da reportagem, além dos fatos apresentados.",
+          media: {type:"video", id:"U6jnmLUW9Jw", label:"Le temps, c'est de l'argent — ARTE, « C'est juste une question de temps » (2/4)"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Le reportage établit un lien explicite entre l'histoire du temps et…", options:["Le capitalisme et la mondialisation","La météorologie","Les traditions culinaires régionales"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"À travers ses exemples (ouvriers de l'industrie du poulet, karoshi), quel présupposé le documentaire semble-t-il défendre ?", options:["Une critique de la marchandisation du temps par le système économique","Un éloge du progrès industriel sans réserve","Une simple comparaison touristique entre pays"], correct:0},
+            {niveau:"très difficile", type:"qcm", q:"Pourquoi le documentaire mentionne-t-il à la fois la loi Mathys (France) et l'association de consommateurs allemande contre les réseaux sociaux ?", options:["Pour montrer que des résistances au « vol de temps » existent, sous des formes différentes selon les pays","Pour comparer uniquement les salaires moyens des deux pays","Pour démontrer la supériorité du modèle social allemand"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "En France, le débat sur la réduction du temps de travail ne date pas d'hier : la mise en place des 35 heures, à la fin des années 1990, aurait permis la création d'environ 350 000 emplois selon certaines estimations. Aujourd'hui, c'est la semaine de quatre jours qui alimente la réflexion : plusieurs expérimentations, en France comme à l'étranger, suggèrent que la productivité ne baisse pas nécessairement avec un jour de travail en moins — elle augmenterait même parfois. Reste une question de fond, plus philosophique qu'économique : au-delà des chiffres, que gagne-t-on vraiment à travailler moins ?",
+          texte_pt: "Na França, o debate sobre a redução do tempo de trabalho não é recente: a implementação das 35 horas, no final dos anos 1990, teria permitido a criação de cerca de 350 mil empregos segundo algumas estimativas. Hoje, é a semana de quatro dias que alimenta a reflexão: várias experiências, na França e no exterior, sugerem que a produtividade não cai necessariamente com um dia de trabalho a menos — às vezes até aumentaria. Resta uma questão de fundo, mais filosófica do que econômica: além dos números, o que realmente se ganha ao trabalhar menos?",
+          link: {url:"https://fr.wikipedia.org/wiki/Semaine_de_quatre_jours", label:"La semaine de quatre jours — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Selon le texte, la mise en place des 35 heures aurait eu quel effet ?", options:["La création d'environ 350 000 emplois","La suppression de 350 000 emplois","Aucun effet mesurable"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Que suggèrent les expérimentations sur la semaine de 4 jours mentionnées dans le texte ?", options:["La productivité ne baisse pas forcément, et peut même augmenter","La productivité baisse toujours de manière significative","Les salariés préfèrent travailler davantage de jours"], correct:0},
+            {niveau:"très difficile", type:"qcm", q:"Quelle est la « question de fond » soulevée à la fin du texte ?", options:["Ce qu'on gagne réellement, au-delà des chiffres, à travailler moins","Comment calculer précisément un taux de productivité","Combien coûterait la semaine de 4 jours à l'État"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "6 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), en utilisant le subjonctif quand c'est pertinent (par exemple : « il est possible que... », « bien que... ») : la réduction du temps de travail est-elle avant tout une bonne politique économique, ou surtout une question de qualité de vie ? Nuance ta position.",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), usando o subjuntivo quando pertinente (por exemplo: «il est possible que...», «bien que...»): a redução do tempo de trabalho é sobretudo uma boa política econômica, ou principalmente uma questão de qualidade de vida? Nuance sua posição."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : présente les arguments pour et contre la semaine de 4 jours en France, puis donne ta position personnelle. Utilise au moins une structure au subjonctif.",
+          consigne_pt: "Grave-se (cerca de 2 min): apresente os argumentos a favor e contra a semana de 4 dias na França, depois dê sua posição pessoal. Use pelo menos uma estrutura no subjuntivo."
+        }
+      },
+      C2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse fine", titre_pt: "Compreensão oral — análise fina", dur: "9 min",
+          consigne_fr: "Regarde à nouveau l'extrait du documentaire ARTE en portant attention à la construction rhétorique du reportage (comparaisons implicites, choix des mots).",
+          consigne_pt: "Assista novamente ao trecho do documentário da ARTE prestando atenção à construção retórica da reportagem (comparações implícitas, escolha das palavras).",
+          media: {type:"video", id:"U6jnmLUW9Jw", label:"Le temps, c'est de l'argent — ARTE, « C'est juste une question de temps » (2/4)"},
+          exos: [
+            {niveau:"difficile", type:"qcm", q:"En comparant implicitement la France, les États-Unis et le Japon, quel effet rhétorique le documentaire cherche-t-il à produire ?", options:["Montrer que le rapport au temps de travail varie culturellement, mais que la pression économique est mondiale","Prouver que la France est le seul pays à bien traiter ses travailleurs","Démontrer la supériorité générale du modèle américain"], correct:0},
+            {niveau:"très difficile", type:"qcm", q:"L'expression « voleurs de temps », employée à propos des réseaux sociaux, relève de quel procédé stylistique ?", options:["Une métaphore qui assimile la captation de l'attention à un vol","Une comparaison scientifique chiffrée","Une citation directe attribuée à William Penn"], correct:0},
+            {niveau:"expert", type:"qcm", q:"Quelle tension le documentaire met-il en lumière entre progrès technique et rapport au temps ?", options:["Le progrès censé faire gagner du temps peut aussi en faire perdre (réseaux sociaux, cadences industrielles)","Le progrès technique n'a aucun lien avec le temps de travail","Le temps de travail a disparu grâce à la technologie"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "Si William Penn avait pu observer notre époque, qu'aurait-il pensé des réseaux sociaux, des notifications incessantes, du droit à la déconnexion inscrit dans la loi française depuis 2017 ? Sans doute aurait-il vu, dans cette légifération même, la confirmation de son propos : si le temps s'était naturellement bien employé, nul n'aurait eu besoin d'en faire un droit. Le paradoxe contemporain n'est donc plus seulement individuel — travailler plus pour gagner plus — il est devenu structurel : nos outils mêmes, conçus pour nous faire gagner du temps, sont ceux qui nous en font perdre le plus.",
+          texte_pt: "Se William Penn pudesse observar nossa época, o que teria pensado das redes sociais, das notificações incessantes, do direito à desconexão inscrito na lei francesa desde 2017? Sem dúvida teria visto, nessa própria legislação, a confirmação de seu argumento: se o tempo tivesse sido naturalmente bem empregado, ninguém teria precisado transformá-lo em um direito. O paradoxo contemporâneo não é mais apenas individual — trabalhar mais para ganhar mais — ele se tornou estrutural: são as próprias ferramentas concebidas para nos fazer ganhar tempo que são as que mais nos fazem perdê-lo.",
+          link: {url:"https://fr.wikipedia.org/wiki/Droit_%C3%A0_la_d%C3%A9connexion", label:"Le droit à la déconnexion — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"D'après le texte, depuis quand le droit à la déconnexion est-il inscrit dans la loi française ?", options:["2017","1998","2020"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quel argument le texte tire-t-il du fait même que ce droit ait dû être inscrit dans la loi ?", options:["Cela confirme, selon l'auteur, que le temps n'est justement pas naturellement bien employé","Cela prouve que les Français ne travaillent pas assez","Cela montre surtout que la loi elle-même est inutile"], correct:0},
+            {niveau:"expert", type:"qcm", q:"En quoi le texte affirme-t-il que le paradoxe est devenu « structurel » plutôt qu'« individuel » ?", options:["Parce que ce sont les outils eux-mêmes, censés faire gagner du temps, qui en font perdre","Parce que chaque individu choisit librement et isolément de perdre son temps","Parce que le problème ne concernerait que certains métiers précis"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "6 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), en utilisant au moins une fois le conditionnel passé ou le plus-que-parfait (hypothèse dans le passé, par exemple : « si j'avais choisi..., j'aurais... ») : la technologie nous fait-elle, au fond, gagner ou perdre du temps ? Développe une position nuancée, en reconnaissant explicitement au moins un contre-argument.",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), usando pelo menos uma vez o condicional passado ou o mais-que-perfeito (hipótese no passado, por exemplo: «si j'avais choisi..., j'aurais...»): a tecnologia, no fundo, nos faz ganhar ou perder tempo? Desenvolva uma posição nuançada, reconhecendo explicitamente pelo menos um contra-argumento."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : en t'appuyant sur la citation de William Penn, explique en quoi le rapport au temps a changé — ou n'a pas changé — depuis le XVIIe siècle. Utilise un registre soutenu et au moins une figure de style (métaphore, antithèse...).",
+          consigne_pt: "Grave-se (cerca de 2 min): apoiando-se na citação de William Penn, explique em que medida a relação com o tempo mudou — ou não mudou — desde o século XVII. Use um registro elevado e pelo menos uma figura de linguagem (metáfora, antítese...)."
+        }
+      }
+    }
   }
 ];
 
@@ -513,13 +727,26 @@ function temaNiveauEffectif(){
 function temaExoHTML(exo, uid, skill){
   if(!exo) return '';
   const opts = exo.options.map((o,i)=>`<button class="exo-opt" onclick="temaAnswerQCM('${uid}',${i},${exo.correct},'${skill}')">${o}</button>`).join('');
+  const niveauBadge = exo.niveau ? `<span class="niveau-badge niveau-${exo.niveau}">${exo.niveau}</span>` : '';
   return `<div class="exo-box">
+    ${niveauBadge}
     <p class="exo-consigne"><span class="label-fr">Consigne —</span> Choisis la bonne réponse.</p>
     <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
     <p class="exo-question">${exo.q}</p>
     <div class="exo-options" id="opts-${uid}">${opts}</div>
     <p class="exo-feedback" id="fb-${uid}"></p>
   </div>`;
+}
+/* Plusieurs questions pour une même compétence (CO ou CE) — les thèmes plus
+   anciens n'ont qu'un seul "exo" (voir temaExoHTML ci-dessus, toujours
+   utilisée pour eux) ; les thèmes plus récents et plus exigeants peuvent
+   fournir un tableau "exos" à la place, un sous-uid par question. La
+   complétion (temaSaveField) reste suivie au niveau de la compétence dans
+   son ensemble, comme avant — répondre à n'importe laquelle des questions
+   met à jour le même statut. */
+function temaExoListHTML(exos, uid, skill){
+  if(!Array.isArray(exos) || !exos.length) return '';
+  return exos.map((exo,i)=> temaExoHTML(exo, `${uid}_${i}`, skill)).join('');
 }
 async function temaAnswerQCM(uid, chosen, correct, skill){
   const container = document.getElementById('opts-'+uid);
@@ -789,6 +1016,7 @@ function renderTemas(){
       <p class="tema-consigne-pt">🇧🇷 ${co.consigne_pt}</p>
       ${coMedia}
       ${temaExoHTML(co.exo, coUid, 'co')}
+      ${temaExoListHTML(co.exos, coUid, 'co')}
     </div>
   `;
 
@@ -805,6 +1033,7 @@ function renderTemas(){
       </div>
       ${ceLink}
       ${temaExoHTML(ce.exo, ceUid, 'ce')}
+      ${temaExoListHTML(ce.exos, ceUid, 'ce')}
     </div>
   `;
 
