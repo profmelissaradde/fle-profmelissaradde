@@ -105,50 +105,11 @@ async function doSignup(){
     if(btn){ btn.disabled = false; btn.textContent = 'Créer mon compte →'; }
   }
 }
-async function doSignin(){
-  const email = document.getElementById('si-email').value.trim();
-  const pw = document.getElementById('si-pw').value;
-  if(!email || !pw){ showAuthErr('Merci de renseigner ton e-mail et ton mot de passe.'); return; }
-  const btn = document.getElementById('si-btn'); if(btn){ btn.disabled = true; btn.textContent = 'Connexion…'; }
-  try{
-    const cred = await auth.signInWithEmailAndPassword(email, pw);
-    if(cred.user.uid === TEACHER_UID){
-      isTeacher = true;
-      /* Le compte admin garde toujours son niveau "vue élève" (par défaut A1, modifiable
-         dans la barre latérale via les pastilles de niveau) — pas besoin de forfait ni
-         d'attribution de niveau côté Firestore pour accéder au Thème de la semaine, aux
-         dossiers, etc. Voir setAdminNiveau() dans 01-utilitaires-nav.js. */
-      niveau = niveau || 'A1'; current = null;
-      student = {prenom:'Melissa', nom:'Radde', email: cred.user.email || email, telephone:'', uid: cred.user.uid, uniteCourante:{}, frequence:null, temas:{}};
-      teacherTab = 'eleves';
-      screen = 'teacher';
-      startTeacherPresenceHeartbeat();
-      startTeacherMessagesListener();
-      render();
-      return;
-    }
-    const doc = await db.collection('eleves').doc(cred.user.uid).get();
-    if(!doc.exists){ showAuthErr("Ce compte n'a pas de profil élève associé."); return; }
-    const profileData = doc.data();
-    if(profileData.status === 'archived'){
-      await auth.signOut();
-      showAuthErr("Ce compte a été archivé. Contacte la professeure si tu souhaites reprendre les cours.");
-      return;
-    }
-    if(!cred.user.emailVerified){
-      const d = doc.data();
-      student = {prenom:d.prenom, nom:d.nom, email:d.email, telephone:d.telephone, uid: cred.user.uid};
-      screen = 'verify';
-      render();
-      return;
-    }
-    afterAuth(cred.user.uid, doc.data());
-  }catch(e){
-    showAuthErr(friendlyAuthError(e.code));
-  }finally{
-    if(btn){ btn.disabled = false; btn.textContent = 'Se connecter →'; }
-  }
-}
+/* doSignin() n'est plus redéfini ici — voir la note dans 00-config-etat.js.
+   Cette redéfinition ne s'exécutait de toute façon jamais en pratique une
+   fois la page chargée (écrasée par celle de 00-config-etat.js), et elle
+   bloquait par erreur les comptes issus du parcours expérimental sur l'écran
+   de vérification d'e-mail, même une fois convertis en élèves actifs. */
 
 /* ======================= ÉCRAN : CONFIRMATION E-MAIL ======================= */
 function renderVerify(){
