@@ -978,17 +978,13 @@ function normaliseUniteCourante(uc){
   if(uc && typeof uc === 'object') return uc;
   return {};
 }
-function afterAuth(uid, record){
-  student = {
-    prenom:record.prenom, nom:record.nom, email:record.email, telephone:record.telephone, uid,
-    uniteCourante: normaliseUniteCourante(record.uniteCourante), frequence: record.frequence || null,
-    bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {}, pack: record.pack || {}
-  };
-  startStudentMessagesListener();
-  if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
-  else { niveau = null; screen = 'waiting'; }
-  render();
-}
+/* afterAuth() est défini une seule fois, dans 00-config-etat.js (à l'intérieur
+   d'un écouteur "load", pour être sûr de s'exécuter après tous les scripts).
+   Une redéfinition existait ici auparavant — comme une déclaration de fonction
+   au premier niveau écrase silencieusement toute version chargée avant elle,
+   elle empêchait l'autre version (plus complète : status, experimentalLesson,
+   pack, evaluations...) de jamais s'exécuter. Supprimée : ne jamais redéfinir
+   afterAuth ailleurs que dans 00-config-etat.js. */
 async function refreshBilan(){
   if(!student.uid) return;
   try{
