@@ -90,29 +90,39 @@ window.addEventListener('load', () => {
     };
   }
 
-  if(typeof afterAuth === 'function'){
-    window.afterAuth = function(uid, record){
-      /* uniteCourante : ancien format = une chaîne pour le Dossier 0, nouveau format =
-         { [numéroDossier]: tag }. On normalise toujours en objet (voir aussi la même
-         normalisation dans 01-utilitaires-nav.js pour l'autre copie de afterAuth). */
-      let uc = record.uniteCourante;
-      if(typeof uc === 'string'){ uc = {0: uc}; } else if(!uc || typeof uc !== 'object'){ uc = {}; }
-      student = {
-        prenom:record.prenom, nom:record.nom, email:record.email, telephone:record.telephone, uid,
-        uniteCourante: uc, frequence:record.frequence || null,
-        bilans:record.bilans || {}, completed:record.completed || {}, temas:record.temas || {},
-        pack:record.pack || {}, evaluations:record.evaluations || [],
-        experimentalLesson:record.experimentalLesson === true,
-        registrationSource:record.registrationSource || null, status:record.status || null
-      };
-      startStudentMessagesListener();
-      const isExperimental = record.experimentalLesson === true || record.registrationSource === 'cours-experimental' || record.status === 'experimental';
-      if(isExperimental){ niveau = record.niveau || null; screen = 'dossiers'; }
-      else if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
-      else{ niveau = null; screen = 'waiting'; }
-      render();
+  /* afterAuth() est désormais défini une seule fois, ici, sans condition
+     préalable — l'ancienne garde ("if(typeof afterAuth === 'function')")
+     vérifiait qu'une autre déclaration existait déjà avant de l'écraser ;
+     cette autre déclaration (dans 01-utilitaires-nav.js) a été retirée pour
+     éviter toute redéfinition concurrente, donc la garde ne devait plus
+     conditionner cette assignation. */
+  window.afterAuth = function(uid, record){
+    /* uniteCourante : ancien format = une chaîne pour le Dossier 0, nouveau format =
+       { [numéroDossier]: tag }. On normalise toujours en objet. */
+    let uc = record.uniteCourante;
+    if(typeof uc === 'string'){ uc = {0: uc}; } else if(!uc || typeof uc !== 'object'){ uc = {}; }
+    student = {
+      prenom:record.prenom, nom:record.nom, email:record.email, telephone:record.telephone, uid,
+      uniteCourante: uc, frequence:record.frequence || null,
+      bilans:record.bilans || {}, completed:record.completed || {}, temas:record.temas || {},
+      pack:record.pack || {}, evaluations:record.evaluations || [],
+      experimentalLesson:record.experimentalLesson === true,
+      registrationSource:record.registrationSource || null, status:record.status || null,
+      lastAnnouncementSeenId: record.lastAnnouncementSeenId || null
     };
-  }
+    startStudentMessagesListener();
+    loadLatestAnnouncement(); /* pour le badge de notification — non bloquant */
+    /* Un élève au stade expérimental (status actuel — jamais experimentalLesson
+       ni registrationSource, qui restent vrais pour toujours même après
+       conversion, voir isStudentExperimental dans 01-utilitaires-nav.js et
+       isExperimentalStudent dans 09-espace-experimental.js) atterrit sur son
+       espace expérimental restreint, sans niveau. */
+    const isExperimental = record.status === 'experimental';
+    if(isExperimental){ niveau = null; screen = 'experimental'; }
+    else if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
+    else{ niveau = null; screen = 'waiting'; }
+    render();
+  };
 });
 
 /* Module complémentaire chargé après tous les scripts historiques afin qu'il puisse
