@@ -5,21 +5,23 @@
   Leur accueil affiche uniquement leur cours expérimental réservé et les accès utiles.
 */
 (function(){
+  /* Se fie uniquement au statut ACTUEL (student.status) — experimentalLesson
+     et registrationSource restent vrais pour toujours, même après conversion
+     en élève actif (trace historique volontaire, voir
+     convertExperimentalStudent dans 07-espace-professeure.js). S'y fier ici
+     bloquait injustement, et pour toujours, tout élève converti : Dossiers,
+     Forum, Réserver un cours, Thème de la semaine restaient inaccessibles
+     alors que l'élève était censé redevenir un élève classique à part
+     entière. */
   function isExperimentalStudent(){
-    return !isTeacher && !!student && (
-      student.experimentalLesson === true ||
-      student.registrationSource === 'cours-experimental' ||
-      student.status === 'experimental'
-    );
+    return !isTeacher && !!student && student.status === 'experimental';
   }
 
   const baseAfterAuth = window.afterAuth;
   window.afterAuth = function(uid, record){
-    const experimental = record && (
-      record.experimentalLesson === true ||
-      record.registrationSource === 'cours-experimental' ||
-      record.status === 'experimental'
-    );
+    /* Même correction qu'isExperimentalStudent() ci-dessus : ne se fier qu'au
+       statut ACTUEL, jamais aux traces historiques permanentes. */
+    const experimental = record && record.status === 'experimental';
     if(!experimental) return baseAfterAuth(uid, record);
 
     student = {
