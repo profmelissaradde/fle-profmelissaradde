@@ -92,7 +92,12 @@ window.addEventListener('load', () => {
           screen = 'verify'; render(); return;
         }
         afterAuth(cred.user.uid, profileData);
-    }catch(e){ showAuthErr(friendlyAuthError(e.code)); }
+    }catch(e){
+      console.error('doSignin a échoué :', e);
+      const known = friendlyAuthError(e.code);
+      const isKnown = known !== "Une erreur est survenue. Réessaie.";
+      showAuthErr(isKnown ? known : `${known} (détail : ${e.code || e.message || e})`);
+    }
     finally{ if(btn){ btn.disabled = false; btn.textContent = 'Se connecter →'; } }
   };
 
