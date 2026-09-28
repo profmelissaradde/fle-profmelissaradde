@@ -52,14 +52,13 @@ const BILAN_COLOR = "#d98c00";
 
 /* ======================= CORRECTIF AUTH COURS EXPÉRIMENTAL ======================= */
 window.addEventListener('load', () => {
-  if(typeof doSignin === 'function'){
-    window.doSignin = async function(){
-      const emailEl = document.getElementById('si-email');
-      const pwEl = document.getElementById('si-pw');
-      const email = emailEl ? emailEl.value.trim() : '';
-      const pw = pwEl ? pwEl.value : '';
-      if(!email || !pw){ showAuthErr('Merci de renseigner ton e-mail et ton mot de passe.'); return; }
-      const btn = document.getElementById('si-btn');
+  window.doSignin = async function(){
+    const emailEl = document.getElementById('si-email');
+    const pwEl = document.getElementById('si-pw');
+    const email = emailEl ? emailEl.value.trim() : '';
+    const pw = pwEl ? pwEl.value : '';
+    if(!email || !pw){ showAuthErr('Merci de renseigner ton e-mail et ton mot de passe.'); return; }
+    const btn = document.getElementById('si-btn');
       if(btn){ btn.disabled = true; btn.textContent = 'Connexion…'; }
       try{
         const cred = await auth.signInWithEmailAndPassword(email, pw);
@@ -74,21 +73,28 @@ window.addEventListener('load', () => {
           teacherTab = 'eleves'; screen = 'teacher';
           startTeacherPresenceHeartbeat(); startTeacherMessagesListener(); render(); return;
         }
-        if(!cred.user.emailVerified){
-          student = {prenom:'', nom:'', email:cred.user.email || email, telephone:'', uid:cred.user.uid};
-          screen = 'verify'; render(); return;
-        }
         const doc = await db.collection('eleves').doc(cred.user.uid).get();
         if(!doc.exists){ showAuthErr("Ce compte n'a pas de profil élève associé."); return; }
         const profileData = doc.data();
         if(profileData.status === 'archived'){
           await auth.signOut(); showAuthErr("Ce compte a été archivé. Contacte la professeure si tu souhaites reprendre les cours."); return;
         }
+        /* La vérification d'e-mail n'est exigée que pour une inscription CLASSIQUE —
+           un compte issu du parcours expérimental (converti ou non) n'est jamais
+           invité à vérifier son adresse (voir la règle Firestore correspondante), donc
+           le lui réclamer ici le bloquerait indéfiniment sur l'écran de vérification,
+           même une fois devenu élève actif à part entière. */
+        const originallyExperimental = profileData.experimentalLesson === true
+          || profileData.registrationSource === 'cours-experimental'
+          || profileData.status === 'experimental';
+        if(!cred.user.emailVerified && !originallyExperimental){
+          student = {prenom:'', nom:'', email:cred.user.email || email, telephone:'', uid:cred.user.uid};
+          screen = 'verify'; render(); return;
+        }
         afterAuth(cred.user.uid, profileData);
-      }catch(e){ showAuthErr(friendlyAuthError(e.code)); }
-      finally{ if(btn){ btn.disabled = false; btn.textContent = 'Se connecter →'; } }
-    };
-  }
+    }catch(e){ showAuthErr(friendlyAuthError(e.code)); }
+    finally{ if(btn){ btn.disabled = false; btn.textContent = 'Se connecter →'; } }
+  };
 
   /* afterAuth() est désormais défini une seule fois, ici, sans condition
      préalable — l'ancienne garde ("if(typeof afterAuth === 'function')")
