@@ -842,6 +842,7 @@ function renderSidebar(){
       if(w) progressLine += ` · Unité ${w.id}/5`;
     }
     html += `<div class="student-badge"><b>${student.prenom} ${student.nom}</b>${isTeacher ? '<span class="admin-pill">⚙️ Admin</span>' : ''}${progressLine}</div>
+    ${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? `<button class="nav-btn" onclick="goDossiers()"><span class="tag">📣</span> Message de ta professeure <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span></button>` : ''}
     <button class="nav-btn" onclick="goLogin()">🚪 Se déconnecter</button>`;
   }
   if(screen==='week' || screen==='bilan'){
@@ -857,8 +858,8 @@ function renderSidebar(){
         ${niveauxMenu.map(n=>`<button class="tab-btn ${niveau===n.code?'active':''}" style="padding:4px 10px; font-size:12px;" onclick="setAdminNiveau('${n.code}')">${n.code}</button>`).join('')}
       </div>`;
   }
-  if(student.prenom && niveau && screen!=='login'){
-    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:#e08a1e" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine</button>`;
+  if(student.prenom && niveau && screen!=='login' && !isStudentExperimental()){
+    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:#e08a1e" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? ` <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span>` : ''}</button>`;
     html += `<button class="nav-btn ${screen==='survie'?'active':''}" style="--tag-color:#ef476f" onclick="goSurvie()"><span class="tag">🆘</span> Phrases de survie</button>`;
   }
   if(student.prenom && screen!=='login'){
@@ -889,7 +890,25 @@ function goLogin(){ isTeacher=false; teacherTab='eleves'; niveau=null; current=n
 function goWaiting(){ screen='waiting'; render(); }
 function goDossiers(){ screen='dossiers'; render(); }
 function goSurvie(){ screen='survie'; render(); }
-function goTemas(){ screen='temas'; render(); }
+/* Vrai si l'élève courant est encore au stade expérimental (prospect qui n'a
+   pas encore de forfait) — sert à restreindre certaines fonctionnalités
+   (Thème de la semaine) aux élèves réguliers uniquement. Se fie uniquement au
+   statut ACTUEL (student.status) : experimentalLesson et registrationSource
+   restent vrais pour toujours, même après conversion en élève actif (trace
+   historique volontaire, voir convertExperimentalStudent) — s'y fier ici
+   aurait bloqué l'accès définitivement, même une fois l'élève converti.
+   Jamais vrai pour la professeure. */
+function isStudentExperimental(){
+  if(isTeacher) return false;
+  return student.status === 'experimental';
+}
+function goTemas(){
+  /* Le Thème de la semaine est réservé aux élèves réguliers (décision de
+     Melissa) — un élève encore au stade expérimental est redirigé vers ses
+     dossiers plutôt que d'accéder à l'écran. */
+  if(isStudentExperimental()){ screen='dossiers'; render(); return; }
+  screen='temas'; render();
+}
 /* Change le niveau affiché pour le compte admin (aperçu élève) — jamais écrit dans
    Firestore, aucun forfait ni attribution requis. Si on est sur un écran élève qui
    dépend du niveau, on reste dessus ; sinon on ouvre directement les dossiers. */
