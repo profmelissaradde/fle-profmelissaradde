@@ -17,21 +17,13 @@
     return !isTeacher && !!student && student.status === 'experimental';
   }
 
-  const baseAfterAuth = window.afterAuth;
-  window.afterAuth = function(uid, record){
-    /* Même correction qu'isExperimentalStudent() ci-dessus : ne se fier qu'au
-       statut ACTUEL, jamais aux traces historiques permanentes. */
-    const experimental = record && record.status === 'experimental';
-    if(!experimental) return baseAfterAuth(uid, record);
-
-    student = {
-      prenom: record.prenom || '', nom: record.nom || '', email: record.email || '', telephone: record.telephone || '', uid,
-      uniteCourante: {}, frequence: null, bilans: record.bilans || {}, completed: record.completed || {}, temas: record.temas || {},
-      experimentalLesson: true, registrationSource: record.registrationSource || 'cours-experimental', status: record.status || 'experimental'
-    };
-    niveau = null; current = null; screen = 'experimental';
-    startStudentMessagesListener(); render();
-  };
+  /* afterAuth() n'est plus redéfini ici — voir la note dans 00-config-etat.js.
+     Cette redéfinition ne s'exécutait de toute façon jamais en pratique : elle
+     était systématiquement écrasée par celle de 00-config-etat.js (assignée
+     dans un écouteur "load", qui se déclenche après tous les scripts). La
+     bascule vers l'espace expérimental se fait maintenant directement dans
+     afterAuth (00-config-etat.js) ; tout ce qui suit ici (isExperimentalStudent,
+     renderExperimentalHome, et les surcharges de navigation) reste nécessaire. */
 
   function renderExperimentalHome(){
     const c = document.getElementById('content'); if(!c) return;
