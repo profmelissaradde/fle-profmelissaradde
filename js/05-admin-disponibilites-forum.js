@@ -103,14 +103,6 @@ async function loadNextCourseBanner(){
     const snap = await db.collection('disponibilites').orderBy('date').get();
     const now = Date.now();
 
-    /* Une proposition de nouveau créneau (par la prof) ne change pas encore
-       le champ "date" du cours — seul rescheduleRequest.proposedDate contient
-       la nouvelle date tant que l'élève n'a pas confirmé. Si on ne se fie
-       qu'à "date", un cours dont l'ancienne date est passée depuis plus d'1h
-       disparaît entièrement de cette bannière, alors même qu'une proposition
-       est en attente pour une date future — l'élève ne verrait plus jamais
-       la proposition à confirmer. On garde donc aussi les cours dont la date
-       ELLE-MÊME est passée, tant qu'une proposition future est en attente. */
     const mine = snap.docs
       .map(d=>({id:d.id, ...d.data()}))
       .filter(s => {
@@ -135,13 +127,7 @@ async function loadNextCourseBanner(){
     const s = mine[0];
     const pendingFromTeacher = s.rescheduleRequest && s.rescheduleRequest.by==='teacher' && s.rescheduleRequest.status==='pending';
     const pendingFromMe = s.rescheduleRequest && s.rescheduleRequest.by==='student' && s.rescheduleRequest.status==='pending';
-    /* Tant qu'une proposition de la prof est en attente, la date à afficher et
-       à utiliser pour les calculs (délai de modification, etc.) est la date
-       PROPOSÉE, pas l'ancienne date déjà passée. */
     const displayDate = pendingFromTeacher ? s.rescheduleRequest.proposedDate : s.date;
-    /* Pour un cours expérimental, l'annulation/replanification par l'élève est
-       possible jusqu'à 24h avant le cours (pas 1h comme pour les cours
-       classiques) — règle confirmée par Melissa. */
     const canModify = s.isExperimental
       ? (new Date(displayDate).getTime() - now) > 24*3600000
       : (new Date(displayDate).getTime() - now) > 3600000;
@@ -185,9 +171,76 @@ async function loadNextCourseBanner(){
   }
 }
 
-/* Bannière "payer mon forfait" — student.pack est déjà en mémoire (chargé à la
-   connexion), donc pas besoin d'appel Firestore ici. 5 liens (un par moyen de
-   paiement), comme pour un cours à l'unité (voir paymentOptionsHTML). */
+/* ---- Annonces de la professeure (notification pour tous les élèves) ---- */
+let latestAnnouncement = null;
+async function loadLatestAnnouncement(){
+  try{
+    const snap = await db.collection('annonces').orderBy('ts','desc').limit(1).get();
+    latestAnnouncement = snap.empty ? null : {id:snap.docs[0].id, ...snap.docs[0].data()};
+  }catch(e){ latestAnnouncement = null; }
+  renderSidebar();
+  renderAnnouncementBanner();
+}
+function hasUnseenAnnouncement(){
+  if(isTeacher || !latestAnnouncement || !student.uid) return false;
+  return student.lastAnnouncementSeenId !== latestAnnouncement.id;
+}
+async function dismissAnnouncement(){
+  if(!latestAnnouncement) return;
+  student.lastAnnouncementSeenId = latestAnnouncement.id;
+  renderSidebar();
+  renderAnnouncementBanner();
+  if(!student.uid) return;
+  try{ await db.collection('eleves').doc(student.uid).update({ lastAnnouncementSeenId: latestAnnouncement.id }); }
+  catch(e){ /* non bloquant */ }
+}
+function renderAnnouncementBanner(){
+  const el = document.getElementById('announcement-banner');
+  if(!el) return;
+  if(!hasUnseenAnnouncement()){ el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="storage-note" style="background:#E8F0FE; margin-bottom:18px;">
+      📣 <b>Message de ta professeure</b>
+      <p style="margin:6px 0 0; font-size:13.5px; white-space:pre-wrap;">${esc(latestAnnouncement.text)}</p>
+      <button onclick="dismissAnnouncement()" style="margin-top:8px; background:none; color:var(--navy);">J'ai vu, fermer</button>
+    </div>
+  `;
+}
+
+let announcementFormOpen = false;
+function toggleAnnouncementForm(){
+  announcementFormOpen = !announcementFormOpen;
+  renderAdminDispo();
+}
+function announcementFormHTML(){
+  return `
+    <div class="rec-box" style="margin-bottom:16px;">
+      <p class="rec-consigne" style="font-weight:700;">📣 Faire une annonce à tous les élèves</p>
+      <p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">Chaque élève verra un badge de notification et cette annonce dans une bannière, jusqu'à ce qu'il clique sur "J'ai vu".</p>
+      <textarea id="announcement-text" placeholder="Écris ton message ici... (ex : le thème de la semaine est disponible !)" style="width:100%; min-height:70px; padding:10px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px;"></textarea>
+      <div class="teacher-entry-actions" style="margin-top:8px;">
+        <button onclick="publishAnnouncement()">Publier l'annonce</button>
+        <button onclick="toggleAnnouncementForm()" style="background:none; color:var(--grey);">Fermer</button>
+      </div>
+      <p class="exo-feedback ok" id="announcement-fb" style="display:none; color:var(--ok); margin-top:6px;">✅ Annonce publiée — tes élèves verront un badge dès leur prochaine visite.</p>
+    </div>
+  `;
+}
+async function publishAnnouncement(){
+  const el = document.getElementById('announcement-text');
+  const text = el ? el.value.trim() : '';
+  if(!text){ alert('Écris un message avant de publier.'); return; }
+  try{
+    await db.collection('annonces').add({ text, ts: firebase.firestore.FieldValue.serverTimestamp() });
+  }catch(e){
+    alert("Impossible de publier l'annonce pour le moment.");
+    return;
+  }
+  const fb = document.getElementById('announcement-fb');
+  if(fb) fb.style.display = 'block';
+  await loadLatestAnnouncement();
+}
+
 function renderPackPaymentBanner(){
   const el = document.getElementById('pack-payment-banner');
   if(!el || isTeacher || !student.uid) return;
@@ -270,11 +323,6 @@ async function loadAdminDispo(){
 let adminRescheduleFormOpenId = null;
 let paymentLinksEditorOpen = false;
 
-/* Corrige les cours déjà réservés avant le correctif des règles Firestore, qui
-   se sont retrouvés avec le lien Zoom générique (ZOOM_LINK) au lieu de leur
-   vrai lien unique — voir ensureZoomMeeting dans 04-reservation-cours.js.
-   Sans risque de règles ici : le compte admin a déjà tous les droits
-   d'écriture sur "disponibilites". */
 async function regenerateMissingZoomLinks(){
   const now = Date.now();
   const candidates = dispoData.filter(s =>
@@ -302,10 +350,6 @@ function togglePaymentLinksEditor(){
   renderAdminDispo();
 }
 
-/* Éditeur des 5 liens de paiement C6 Bank, modifiable depuis l'app (voir
-   loadPaymentLinks dans 04-reservation-cours.js) — ce sont des liens à usage
-   unique côté C6, donc appelés à changer régulièrement ; Melissa n'a jamais
-   besoin de toucher au code pour les mettre à jour. */
 function paymentLinksEditorHTML(){
   return `
     <div class="rec-box" style="margin-bottom:16px;">
@@ -364,9 +408,6 @@ async function savePaymentLinks(){
   if(fb){ fb.style.display = 'block'; }
 }
 
-/* Marque manuellement un cours comme payé — Melissa clique dessus une fois
-   qu'elle a reçu l'e-mail de confirmation C6 Bank (Pix reçu, débit ou crédit
-   approuvé). Rien n'est automatique : le paiement se passe hors de l'app. */
 async function markPaymentReceived(id){
   const slot = dispoData.find(s=>s.id===id);
   try{
@@ -391,9 +432,6 @@ async function markPaymentReceived(id){
   await loadAdminDispo();
 }
 
-/* Envoi de la nota fiscal (téléversée par Melissa depuis son logiciel de
-   facturation) : upload sur son Drive (même mécanisme que les enregistrements),
-   puis e-mail automatique à l'élève avec le lien. */
 async function sendNotaFiscal(id, inputElId){
   const input = document.getElementById(inputElId);
   const file = input && input.files && input.files[0];
@@ -486,9 +524,6 @@ function adminRescheduleFormHTML(s){
   `;
 }
 
-/* Change la date d'un cours CLASSIQUE (pas expérimental) tout de suite, sans
-   passer par une demande que l'élève doit confirmer — même principe que
-   directRescheduleExperimental, pour les cas exceptionnels et urgents. */
 async function directRescheduleAdmin(id){
   const slot = dispoData.find(s=>s.id===id);
   const input = document.getElementById('admin-reschedule-date-'+id);
@@ -1117,9 +1152,11 @@ function renderAdminDispo(){
 
   body.innerHTML = `
     <div class="teacher-entry-actions" style="margin-bottom:10px;">
+      <button onclick="toggleAnnouncementForm()">${announcementFormOpen ? 'Fermer' : "📣 Faire une annonce"}</button>
       <button onclick="togglePaymentLinksEditor()">${paymentLinksEditorOpen ? 'Fermer' : '💳 Liens de paiement'}</button>
       <button onclick="regenerateMissingZoomLinks()" style="background:none; color:var(--navy);">🔧 Régénérer les liens Zoom manquants</button>
     </div>
+    ${announcementFormOpen ? announcementFormHTML() : ''}
     ${paymentLinksEditorOpen ? paymentLinksEditorHTML() : ''}
 
     ${pendingHTML}
@@ -1827,13 +1864,6 @@ async function detectAnomalies(){
   }
 }
 
-/* Corrige une fausse anomalie : le suivi des clics Zoom repose sur une écriture
-   Firestore individuelle par personne (clickedByTeacher / clickedByStudent, voir
-   openZoomLink dans 04-reservation-cours.js) qui échoue parfois en silence — le
-   plus souvent parce que les règles de sécurité Firestore bloquent l'écriture
-   du côté élève sur la collection "disponibilites". Le cours a alors bien eu
-   lieu, mais Firestore ne l'a jamais su. Ce bouton permet à la professeure de
-   corriger ça manuellement quand elle sait que les deux ont bien rejoint. */
 async function dismissAnomalie(id){
   try{
     await db
@@ -1974,9 +2004,6 @@ async function submitRescheduleProposal(id){
   await loadTeacherHistorique();
 }
 
-/* Variante de submitRescheduleProposal pour un cours expérimental : lit et
-   recharge experimentalSlots (pas dispoData / loadTeacherHistorique), pour ne
-   pas faire sauter la professeure vers l'onglet Historique par erreur. */
 async function toggleExperimentalReschedule(id){
   rescheduleFormOpenId = (rescheduleFormOpenId === id) ? null : id;
   const listEl = document.getElementById('experimental-slots-list');
@@ -2008,12 +2035,6 @@ async function submitExperimentalReschedule(id){
   await loadExperimentalAdmin();
 }
 
-/* Change la date d'un cours expérimental TOUT DE SUITE, sans passer par une
-   proposition que l'élève doit confirmer — pour un cas exceptionnel et
-   urgent où Melissa n'a pas le temps d'attendre. Régénère aussi
-   immédiatement un vrai lien Zoom unique pour la nouvelle date (voir
-   ensureZoomMeeting dans 04-reservation-cours.js), et prévient l'élève par
-   e-mail que le changement est déjà fait (pas une proposition à valider). */
 async function directRescheduleExperimental(id){
   const val = document.getElementById('reschedule-date-'+id).value;
   if(!val){ alert('Choisis une date et une heure.'); return; }
@@ -2049,9 +2070,6 @@ async function directRescheduleExperimental(id){
   await loadExperimentalAdmin();
 }
 
-/* Annulation d'un cours expérimental à l'initiative de la professeure — ne vide
-   jamais reservedBy/reservedName (voir cancelExperimentalTrial, côté élève, dans
-   04-reservation-cours.js, pour la même règle). */
 async function cancelExperimentalSlotAdmin(id){
   if(!confirm('Annuler ce cours expérimental ?')) return;
   try{
@@ -2389,9 +2407,6 @@ function fillPackDatesQuick(){
   updatePackPriceHint();
 }
 
-/* Paliers de parcelamento Crédito C6 Bank — purement indicatif pour Melissa :
-   elle doit choisir la bonne option de son côté en générant le lien C6, cette
-   plateforme ne crée aucun lien elle-même. */
 function parcelamentoC6(total){
   if(total <= 299) return "1x (jusqu'à R$ 299)";
   if(total <= 599) return "jusqu'à 2x (R$ 300 – 599)";
@@ -2403,8 +2418,6 @@ function calculerPrixForfait(nbSeances){
   const total = PRIX_COURS * nbSeances * (remise ? (1 - FORFAIT_REMISE) : 1);
   return { total, remise, parcelamento: parcelamentoC6(total) };
 }
-/* Recalcule au fil du remplissage des dates du forfait (voir oninput sur
-   chaque pack-date-N, et l'appel à la fin de fillPackDatesQuick ci-dessus). */
 function updatePackPriceHint(){
   const el = document.getElementById('pack-price-hint');
   if(!el) return;
@@ -2509,6 +2522,7 @@ async function reserverPack(){
   }
 
   let created = 0;
+  const createdDates = [];
   const baseUsed = pack.used || 0;
 
   for(const dateISO of dates){
@@ -2536,6 +2550,7 @@ async function reserverPack(){
       );
 
       created++;
+      createdDates.push(dateISO);
     }catch(e){
       /* on continue */
     }
@@ -2543,22 +2558,34 @@ async function reserverPack(){
 
   if(created > 0){
     try{
+      const updates = {
+        'pack.used':
+          (pack.used||0) +
+          created
+      };
+      if(!pack.total){
+        updates['pack.total'] = created;
+      }
       await db
         .collection('eleves')
         .doc(id)
-        .update({
-          'pack.used':
-            (pack.used||0) +
-            created
-        });
+        .update(updates);
     }catch(e){
       /* non bloquant */
     }
+
+    if(email){
+      try{
+        await callDriveScript({
+          action: 'notifyPackBooked',
+          email,
+          prenom: (name || '').split(' ')[0] || name,
+          dates: createdDates.map(d => fmtSlotDate(d))
+        });
+      }catch(e){ /* non bloquant */ }
+    }
   }
 
-  /* Liens de paiement du forfait, remplis dans ce même formulaire — évite
-     d'avoir à refaire l'étape séparément dans « Élèves & niveaux » juste
-     après, et surtout évite d'oublier de le faire, comme c'était arrivé. */
   const newPackLinks = {};
   PAYMENT_METHODS.forEach(m=>{
     const el = document.getElementById('pack-paylink-'+m.key);
@@ -4516,6 +4543,7 @@ function renderDossiers(){
       Dossiers du niveau ${niveau}
     </h1>
 
+    <div id="announcement-banner"></div>
     <div id="next-course-banner"></div>
     <div id="pack-payment-banner"></div>
 
@@ -4536,6 +4564,7 @@ function renderDossiers(){
   `;
 
   loadNextCourseBanner();
+  renderAnnouncementBanner();
   renderPackPaymentBanner();
 
   const grid =
@@ -4567,9 +4596,6 @@ function renderDossiers(){
         : '🔒 Bientôt disponible';
 
     if(isOpen){
-      /* Chaque dossier garde sa propre progression : on pointe "weeks" vers le
-         contenu du dossier d.num avant de chercher l'unité en cours pour CE
-         dossier précis (student.uniteCourante est maintenant { [num]: tag }). */
       setActiveDossier(d.num);
       const tagCourant = student.uniteCourante && student.uniteCourante[d.num];
       if(tagCourant){
