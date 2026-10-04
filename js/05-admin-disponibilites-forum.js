@@ -64,7 +64,7 @@ async function loadNextCourseBanner(){
   if(!el || isTeacher || !student.uid) return;
 
   try{
-    const snap = await db.collection('disponibilites').orderBy('date').get();
+    const snap = await db.collection('disponibilites').where('reservedBy','==',student.uid).get();
     const now = Date.now();
 
     const mine = snap.docs
