@@ -321,10 +321,11 @@ function renderHistorique(){
 async function loadHistoriqueEleve(){
   const body = document.getElementById('historique-body');
   try{
-    const snap = await db.collection('disponibilites').orderBy('date','desc').get();
+    const snap = await db.collection('disponibilites').where('reservedBy','==',student.uid).get();
     const now = Date.now();
     const past = snap.docs.map(d=>({id:d.id, ...d.data()}))
-      .filter(s => s.reservedBy === student.uid && new Date(s.date).getTime() < now - 3600000);
+      .filter(s => new Date(s.date).getTime() < now - 3600000)
+      .sort((a,b)=>new Date(b.date)-new Date(a.date));
     if(past.length===0){
       body.innerHTML = `<p class="teacher-empty">Aucun cours passé pour le moment.</p>`;
       return;
@@ -345,9 +346,19 @@ async function loadDispoEleve(){
   const body = document.getElementById('reserver-body');
   if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
   try{
-    const snap = await db.collection('disponibilites').orderBy('date').get();
-    dispoData = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  }catch(e){ dispoData = []; }
+    const [availableResult, mineSnap] = await Promise.all([
+      callDriveScript({action:'listAvailableSlots'}),
+      db.collection('disponibilites').where('reservedBy','==',student.uid).get()
+    ]);
+    const available = (availableResult && Array.isArray(availableResult.slots)) ? availableResult.slots : [];
+    const mine = mineSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    const byId = new Map();
+    [...available, ...mine].forEach(s=>{ if(s && s.id) byId.set(s.id, s); });
+    dispoData = Array.from(byId.values()).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  }catch(e){
+    console.error('loadDispoEleve :', e);
+    dispoData = [];
+  }
   await loadPaymentLinks();
   renderReserverBody();
 }
