@@ -51,6 +51,10 @@ function zoomAccess(dateStr, duree){
 const zoomUrlMap = {};
 function openZoomLink(slotId){
   const url = zoomUrlMap[slotId] || ZOOM_LINK;
+  if(!url){
+    alert("Le lien Zoom n'est pas encore disponible. Réessaie dans quelques instants ou contacte Melissa.");
+    return;
+  }
   window.open(url, '_blank', 'noopener');
   const field = isTeacher ? 'clickedByTeacher' : 'clickedByStudent';
   /* Cette écriture est ce qui permet au système de savoir que la personne a bien
@@ -70,9 +74,13 @@ function openZoomLink(slotId){
 }
 function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
   const acc = zoomAccess(dateStr, duree);
-  zoomUrlMap[slotId] = joinUrl || ZOOM_LINK;
-  if(acc.open){
+  const effectiveUrl = joinUrl || ZOOM_LINK || '';
+  zoomUrlMap[slotId] = effectiveUrl;
+  if(acc.open && effectiveUrl){
     return `<button class="primary-btn" style="width:auto; padding:10px 18px; margin-top:8px;" onclick="openZoomLink('${slotId}')">🎥 Rejoindre : ${ZOOM_MEETING_NAME}</button>`;
+  }
+  if(acc.open && !effectiveUrl){
+    return '<button class="rec-btn" disabled style="opacity:.65;cursor:not-allowed;margin-top:8px;">⏳ Lien Zoom en cours de préparation</button>';
   }
   const mins = acc.minutesLeft;
   let when;
@@ -91,18 +99,24 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
   try{
     const result = await callDriveScript({
       action: 'createZoomMeeting',
+      slotId,
       topic,
       startTime: dateISO,
       duration: duree || 45
     });
     if(result && result.ok && result.joinUrl){
-      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+      // Nouveau backend : le lien est enregistré côté serveur. Compatibilité
+      // temporaire avec l'ancien Apps Script pendant le déploiement.
+      if(result.serverPersisted !== true){
+        try{
+          await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+        }catch(e){ console.warn('Lien Zoom créé mais non enregistré côté client.', e); }
+      }
       return true;
-    } else {
-      console.warn('createZoomMeeting: pas de joinUrl retourné, secours sur ZOOM_LINK.', result);
-      return false;
     }
-  }catch(e){ console.warn('createZoomMeeting a échoué, secours sur ZOOM_LINK.', e); return false; }
+    console.warn('createZoomMeeting: pas de joinUrl retourné.', result);
+    return false;
+  }catch(e){ console.warn('createZoomMeeting a échoué.', e); return false; }
 }
 
 /* ---- Mini-calendrier réutilisable ---- */
