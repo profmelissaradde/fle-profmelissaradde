@@ -175,8 +175,8 @@ function renderExperimentalAdmin(){
 
   const prospectHTML = prospects.length ? prospects.map(s=>`
     <div class="teacher-entry">
-      <div class="who">${s.prenom || ''} ${s.nom || ''} · <span style="color:var(--gold-dark)">Cours expérimental</span></div>
-      <div class="meta">${s.email || '—'} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
+      <div class="who">${esc(s.prenom || '')} ${esc(s.nom || '')} · <span style="color:var(--gold-dark)">Cours expérimental</span></div>
+      <div class="meta">${esc(s.email || '—')} · ${esc(s.telephone || '—')} · inscrit le ${fmtDate(s.createdAt)}</div>
       <div class="meta">Historique expérimental : ${s.experimentalLesson ? 'oui' : 'enregistré'}${s.experimentalCompleted ? ' · cours effectué' : ''}</div>
       <div class="teacher-entry-actions">
         <button onclick="convertExperimentalStudent('${s.id}')">Convertir en élève</button>
@@ -187,8 +187,8 @@ function renderExperimentalAdmin(){
 
   const archivedHTML = archived.length ? archived.map(s=>`
     <div class="teacher-entry" style="opacity:.78;">
-      <div class="who">${s.prenom || ''} ${s.nom || ''} · <span style="color:var(--grey)">Archivé</span></div>
-      <div class="meta">${s.email || '—'} · ${s.telephone || '—'}</div>
+      <div class="who">${esc(s.prenom || '')} ${esc(s.nom || '')} · <span style="color:var(--grey)">Archivé</span></div>
+      <div class="meta">${esc(s.email || '—')} · ${esc(s.telephone || '—')}</div>
       <div class="meta">Cours expérimental déjà enregistré${s.experimentalCompleted ? ' · effectué' : ''} · archivé le ${fmtDate(s.archivedAt)}</div>
       <div class="teacher-entry-actions">
         <button onclick="restoreExperimentalStudent('${s.id}')">Restaurer en expérimental</button>
