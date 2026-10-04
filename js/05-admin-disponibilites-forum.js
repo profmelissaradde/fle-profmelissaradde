@@ -4,54 +4,18 @@
    l'élève qui annule, remboursement dû si c'est la professeure.
    ============================================================================ */
 async function processCancellation(slot, by){
-  const result = { excessive:false, refundDue:false };
-  if(!slot || !slot.reservedBy) return result;
-  const start = new Date(slot.date).getTime();
-  const isLate = (start - Date.now()) < 3600000;
-  const studentId = slot.reservedBy;
-
-  let studentDoc = null;
-  try{ studentDoc = (await db.collection('eleves').doc(studentId).get()).data(); }catch(e){ studentDoc = {}; }
-  const log = (studentDoc && studentDoc.noShowLog) || [];
-
-  if(isLate){
-    const thirtyDaysAgo = Date.now() - 30*24*3600*1000;
-    const recentCount = log.filter(l => l.by===by && l.late && new Date(l.ts).getTime() >= thirtyDaysAgo).length;
-    const newLog = [...log, { ts: new Date().toISOString(), by, late: true }];
-    try{ await db.collection('eleves').doc(studentId).update({ noShowLog: newLog }); }catch(e){ /* non bloquant */ }
-    if(recentCount + 1 > 2){ result.excessive = true; }
+  if(!slot || !slot.id || !slot.reservedBy){ return { excessive:false, refundDue:false }; }
+  const result = await callDriveScript({
+    action: 'cancelReservation',
+    slotId: slot.id
+  });
+  if(!result || result.ok === false){
+    throw new Error((result && result.error) || "Annulation impossible");
   }
-
-  if(result.excessive){
-    try{
-      await db.collection('disponibilites').doc(slot.id).update({ definitivelyCancelled: true, cancelledBy: by });
-    }catch(e){ /* non bloquant */ }
-
-    if(by === 'teacher'){
-      result.refundDue = true;
-      try{
-        await db.collection('eleves').doc(studentId).update({ refundDue: true });
-      }catch(e){ /* non bloquant */ }
-    }
-  } else {
-    try{
-      await db.collection('disponibilites').doc(slot.id).update({
-        reservedBy: null,
-        reservedName: null,
-        reservedEmail: null,
-        zoomJoinUrl: null
-      });
-
-      if(slot.isPack){
-        const pack = studentDoc.pack || {};
-        await db.collection('eleves').doc(studentId).update({
-          'pack.used': Math.max(0, (pack.used||0) - 1)
-        });
-      }
-    }catch(e){ /* non bloquant */ }
-  }
-
-  return result;
+  return {
+    excessive: result.excessive === true,
+    refundDue: result.refundDue === true
+  };
 }
 
 async function annulerReservation(id){
