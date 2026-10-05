@@ -4,54 +4,18 @@
    l'élève qui annule, remboursement dû si c'est la professeure.
    ============================================================================ */
 async function processCancellation(slot, by){
-  const result = { excessive:false, refundDue:false };
-  if(!slot || !slot.reservedBy) return result;
-  const start = new Date(slot.date).getTime();
-  const isLate = (start - Date.now()) < 3600000;
-  const studentId = slot.reservedBy;
-
-  let studentDoc = null;
-  try{ studentDoc = (await db.collection('eleves').doc(studentId).get()).data(); }catch(e){ studentDoc = {}; }
-  const log = (studentDoc && studentDoc.noShowLog) || [];
-
-  if(isLate){
-    const thirtyDaysAgo = Date.now() - 30*24*3600*1000;
-    const recentCount = log.filter(l => l.by===by && l.late && new Date(l.ts).getTime() >= thirtyDaysAgo).length;
-    const newLog = [...log, { ts: new Date().toISOString(), by, late: true }];
-    try{ await db.collection('eleves').doc(studentId).update({ noShowLog: newLog }); }catch(e){ /* non bloquant */ }
-    if(recentCount + 1 > 2){ result.excessive = true; }
+  if(!slot || !slot.id || !slot.reservedBy){ return { excessive:false, refundDue:false }; }
+  const result = await callDriveScript({
+    action: 'cancelReservation',
+    slotId: slot.id
+  });
+  if(!result || result.ok === false){
+    throw new Error((result && result.error) || "Annulation impossible");
   }
-
-  if(result.excessive){
-    try{
-      await db.collection('disponibilites').doc(slot.id).update({ definitivelyCancelled: true, cancelledBy: by });
-    }catch(e){ /* non bloquant */ }
-
-    if(by === 'teacher'){
-      result.refundDue = true;
-      try{
-        await db.collection('eleves').doc(studentId).update({ refundDue: true });
-      }catch(e){ /* non bloquant */ }
-    }
-  } else {
-    try{
-      await db.collection('disponibilites').doc(slot.id).update({
-        reservedBy: null,
-        reservedName: null,
-        reservedEmail: null,
-        zoomJoinUrl: null
-      });
-
-      if(slot.isPack){
-        const pack = studentDoc.pack || {};
-        await db.collection('eleves').doc(studentId).update({
-          'pack.used': Math.max(0, (pack.used||0) - 1)
-        });
-      }
-    }catch(e){ /* non bloquant */ }
-  }
-
-  return result;
+  return {
+    excessive: result.excessive === true,
+    refundDue: result.refundDue === true
+  };
 }
 
 async function annulerReservation(id){
@@ -100,7 +64,7 @@ async function loadNextCourseBanner(){
   if(!el || isTeacher || !student.uid) return;
 
   try{
-    const snap = await db.collection('disponibilites').orderBy('date').get();
+    const snap = await db.collection('disponibilites').where('reservedBy','==',student.uid).get();
     const now = Date.now();
 
     const mine = snap.docs
@@ -997,8 +961,8 @@ function renderAdminDispo(){
   });
 
   const studentOptions = studentsData.map(s=>`
-    <option value="${s.id}|${s.prenom} ${s.nom}|${s.email||''}">
-      ${s.prenom} ${s.nom}${s.niveau ? ' · '+s.niveau : ''}
+    <option value="${esc(s.id)}">
+      ${esc(s.prenom)} ${esc(s.nom)}${s.niveau ? ' · '+esc(s.niveau) : ''}
     </option>
   `).join('');
 
@@ -1007,8 +971,8 @@ function renderAdminDispo(){
     const remaining = (pack.total||0) - (pack.used||0);
 
     return `
-      <option value="${s.id}|${s.prenom} ${s.nom}|${s.email||''}">
-        ${s.prenom} ${s.nom}${s.niveau ? ' · '+s.niveau : ''}
+      <option value="${esc(s.id)}">
+        ${esc(s.prenom)} ${esc(s.nom)}${s.niveau ? ' · '+esc(s.niveau) : ''}
         — forfait ${
           pack.total
             ? `${pack.used||0}/${pack.total} (${remaining} restante${remaining>1?'s':''})`
@@ -1570,7 +1534,7 @@ function recapEditorHTML(s, saveFn, toggleFn){
   return `
     <div class="rec-box" style="margin-top:10px;">
       <p class="rec-consigne" style="font-weight:700;">
-        📚 Récap du cours — ${s.reservedName || ''} · ${fmtSlotDate(s.date)}
+        📚 Récap du cours — ${esc(s.reservedName || '')} · ${fmtSlotDate(s.date)}
       </p>
 
       <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:10px;">
@@ -1683,7 +1647,7 @@ function renderPastSessions(){
         <div class="who">
           🗓️ ${fmtSlotDate(s.date)}
           <span style="font-weight:400; color:var(--grey);">
-            — ${s.reservedName}
+            — ${esc(s.reservedName || 'Élève')}
           </span>
         </div>
 
@@ -2219,11 +2183,8 @@ async function addDisponibilite(){
       duree
     );
 
-  let name = null;
-
-  if(eleveVal){
-    [, name] = eleveVal.split('|');
-  }
+  const selectedStudent = eleveVal ? studentsData.find(s=>s.id===eleveVal) : null;
+  const name = selectedStudent ? `${selectedStudent.prenom || ''} ${selectedStudent.nom || ''}`.trim() : null;
 
   let created = 0;
 
@@ -2241,13 +2202,10 @@ async function addDisponibilite(){
         firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    if(eleveVal){
-      const [id, nm, email] =
-        eleveVal.split('|');
-
-      slot.reservedBy = id;
-      slot.reservedName = nm;
-      slot.reservedEmail = email;
+    if(selectedStudent){
+      slot.reservedBy = selectedStudent.id;
+      slot.reservedName = name;
+      slot.reservedEmail = selectedStudent.email || '';
     }
 
     try{
@@ -2302,8 +2260,7 @@ function prefillPackCount(){
     return;
   }
 
-  const [id] =
-    eleveVal.split('|');
+  const id = eleveVal;
 
   const s =
     studentsData.find(
@@ -2458,8 +2415,14 @@ async function reserverPack(){
     return;
   }
 
-  const [id, name, email] =
-    eleveVal.split('|');
+  const selectedStudent = studentsData.find(x=>x.id===eleveVal);
+  if(!selectedStudent){
+    alert('Élève introuvable. Recharge la page et réessaie.');
+    return;
+  }
+  const id = selectedStudent.id;
+  const name = `${selectedStudent.prenom || ''} ${selectedStudent.nom || ''}`.trim();
+  const email = selectedStudent.email || '';
 
   const dates = [];
 

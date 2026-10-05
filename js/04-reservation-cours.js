@@ -51,6 +51,10 @@ function zoomAccess(dateStr, duree){
 const zoomUrlMap = {};
 function openZoomLink(slotId){
   const url = zoomUrlMap[slotId] || ZOOM_LINK;
+  if(!url){
+    alert("Le lien Zoom n'est pas encore disponible. Réessaie dans quelques instants ou contacte Melissa.");
+    return;
+  }
   window.open(url, '_blank', 'noopener');
   const field = isTeacher ? 'clickedByTeacher' : 'clickedByStudent';
   /* Cette écriture est ce qui permet au système de savoir que la personne a bien
@@ -70,9 +74,13 @@ function openZoomLink(slotId){
 }
 function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
   const acc = zoomAccess(dateStr, duree);
-  zoomUrlMap[slotId] = joinUrl || ZOOM_LINK;
-  if(acc.open){
+  const effectiveUrl = joinUrl || ZOOM_LINK || '';
+  zoomUrlMap[slotId] = effectiveUrl;
+  if(acc.open && effectiveUrl){
     return `<button class="primary-btn" style="width:auto; padding:10px 18px; margin-top:8px;" onclick="openZoomLink('${slotId}')">🎥 Rejoindre : ${ZOOM_MEETING_NAME}</button>`;
+  }
+  if(acc.open && !effectiveUrl){
+    return '<button class="rec-btn" disabled style="opacity:.65;cursor:not-allowed;margin-top:8px;">⏳ Lien Zoom en cours de préparation</button>';
   }
   const mins = acc.minutesLeft;
   let when;
@@ -91,18 +99,24 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
   try{
     const result = await callDriveScript({
       action: 'createZoomMeeting',
+      slotId,
       topic,
       startTime: dateISO,
       duration: duree || 45
     });
     if(result && result.ok && result.joinUrl){
-      await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+      // Nouveau backend : le lien est enregistré côté serveur. Compatibilité
+      // temporaire avec l'ancien Apps Script pendant le déploiement.
+      if(result.serverPersisted !== true){
+        try{
+          await db.collection('disponibilites').doc(slotId).update({ zoomJoinUrl: result.joinUrl, zoomTopic: topic });
+        }catch(e){ console.warn('Lien Zoom créé mais non enregistré côté client.', e); }
+      }
       return true;
-    } else {
-      console.warn('createZoomMeeting: pas de joinUrl retourné, secours sur ZOOM_LINK.', result);
-      return false;
     }
-  }catch(e){ console.warn('createZoomMeeting a échoué, secours sur ZOOM_LINK.', e); return false; }
+    console.warn('createZoomMeeting: pas de joinUrl retourné.', result);
+    return false;
+  }catch(e){ console.warn('createZoomMeeting a échoué.', e); return false; }
 }
 
 /* ---- Mini-calendrier réutilisable ---- */
@@ -307,10 +321,11 @@ function renderHistorique(){
 async function loadHistoriqueEleve(){
   const body = document.getElementById('historique-body');
   try{
-    const snap = await db.collection('disponibilites').orderBy('date','desc').get();
+    const snap = await db.collection('disponibilites').where('reservedBy','==',student.uid).get();
     const now = Date.now();
     const past = snap.docs.map(d=>({id:d.id, ...d.data()}))
-      .filter(s => s.reservedBy === student.uid && new Date(s.date).getTime() < now - 3600000);
+      .filter(s => new Date(s.date).getTime() < now - 3600000)
+      .sort((a,b)=>new Date(b.date)-new Date(a.date));
     if(past.length===0){
       body.innerHTML = `<p class="teacher-empty">Aucun cours passé pour le moment.</p>`;
       return;
@@ -331,9 +346,19 @@ async function loadDispoEleve(){
   const body = document.getElementById('reserver-body');
   if(body) body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
   try{
-    const snap = await db.collection('disponibilites').orderBy('date').get();
-    dispoData = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  }catch(e){ dispoData = []; }
+    const [availableResult, mineSnap] = await Promise.all([
+      callDriveScript({action:'listAvailableSlots'}),
+      db.collection('disponibilites').where('reservedBy','==',student.uid).get()
+    ]);
+    const available = (availableResult && Array.isArray(availableResult.slots)) ? availableResult.slots : [];
+    const mine = mineSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    const byId = new Map();
+    [...available, ...mine].forEach(s=>{ if(s && s.id) byId.set(s.id, s); });
+    dispoData = Array.from(byId.values()).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  }catch(e){
+    console.error('loadDispoEleve :', e);
+    dispoData = [];
+  }
   await loadPaymentLinks();
   renderReserverBody();
 }

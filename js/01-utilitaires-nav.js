@@ -819,13 +819,18 @@ function blobToBase64(blob){
    Content-Type text/plain volontaire : ça évite le préflight CORS qui bloquerait
    sinon les requêtes vers un Web App Apps Script depuis un autre nom de domaine. */
 async function callDriveScript(payload){
+  const user = auth.currentUser;
+  if(!user) throw new Error('Utilisateur non connecté.');
+  const idToken = await user.getIdToken();
   const res = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify(payload)
+    body: JSON.stringify({...payload, idToken})
   });
   if(!res.ok) throw new Error('Réponse HTTP ' + res.status);
-  return await res.json();
+  const data = await res.json();
+  if(data && data.ok === false) throw new Error(data.error || 'Erreur Apps Script');
+  return data;
 }
 
 /* ======================= SIDEBAR ======================= */

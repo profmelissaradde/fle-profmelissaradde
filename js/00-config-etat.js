@@ -20,7 +20,7 @@ const firebaseConfig = {
 };
 const TEACHER_UID = "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjVN3__9qJC3gsAkTUBE5oy2z9J0iu08gL1DadZceMaxONg-srJgDkccKDXobiSZleYA/exec";
-const ZOOM_LINK = "https://zoom.us/j/REMPLACE_PAR_TON_LIEN";
+const ZOOM_LINK = ""; // aucun lien de secours public : les liens sont créés individuellement
 const TEACHER_EMAIL = "prof.melissaradde@gmail.com";
 const ZOOM_MEETING_NAME = "Cours de français — Prof Melissa Radde";
 const ZOOM_OPEN_MINUTES_BEFORE = 15;
@@ -136,12 +136,3 @@ window.addEventListener('load', () => {
   };
 });
 
-/* Module complémentaire chargé après tous les scripts historiques afin qu'il puisse
-   étendre la navigation et les écrans sans casser leur ordre de chargement. */
-window.addEventListener('load', () => {
-  if(document.querySelector('script[data-fle-profiles]')) return;
-  const script = document.createElement('script');
-  script.src = 'js/10-profils-regles-evaluations.js';
-  script.dataset.fleProfiles = '1';
-  document.body.appendChild(script);
-});
