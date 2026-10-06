@@ -1164,3 +1164,436 @@ function renderTeacherTemas(){
       </div>`;
     }).join('');
 }
+/* ===================== THÈME 05 → 11 octobre 2026 : C'est une blague ? ===================== */
+  {
+    id: "blague-2026-10-05",
+    date_debut: "2026-10-05",
+    periode: "5 → 11 octobre 2026",
+    titre_fr: "C'est une blague ?",
+    titre_pt: "É piada?",
+    sub_fr: "Un thème pour rire, raconter et comprendre l'humour français, à faire en 15 à 30 minutes, à ton rythme.",
+    sub_pt: "Um tema para rir, contar e entender o humor francês, para fazer em 15 a 30 minutos, no seu ritmo.",
+    niveaux: {
+      A1: {
+        duree: "≈ 15 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde cette courte vidéo sur le « poisson d'avril », le jour des blagues en France. Écoute bien les dates.",
+          consigne_pt: "Assista a este vídeo curto sobre o « poisson d'avril », o dia das brincadeiras na França. Preste atenção às datas.",
+          media: {type:"video", id:"PF8_dAPMmIM", label:"D'où vient le poisson d'avril ? — Pratiks"},
+          exos: [
+            {type:"qcm", q:"En France, le jour des blagues, c'est…", options:["Le 1er janvier","Le 1er avril","Le 14 juillet"], correct:1},
+            {type:"qcm", q:"Dans la vidéo, avant, la nouvelle année commençait…", options:["En avril","En août","En décembre"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "4 min",
+          texte_fr: "Tout le monde a une blague préférée. La semaine dernière, mon collègue m'a raconté une histoire très drôle. J'ai ri pendant dix minutes ! Rire, ça fait du bien.",
+          texte_pt: "Todo mundo tem uma piada preferida. Na semana passada, meu colega me contou uma história muito engraçada. Eu ri durante dez minutos! Rir faz bem.",
+          exos: [
+            {type:"qcm", q:"Qui a raconté l'histoire ?", options:["Le professeur","La mère","Le collègue"], correct:2},
+            {type:"qcm", q:"Combien de temps la personne a-t-elle ri ?", options:["Deux minutes","Dix minutes","Une heure"], correct:1}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "3 min",
+          consigne_fr: "Écris 3 phrases : qu'est-ce qui te fait rire ? Utilise « Je ris quand... » et « C'est drôle ! ».",
+          consigne_pt: "Escreva 3 frases: o que te faz rir? Use « Je ris quand... » e « C'est drôle ! »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "3 min",
+          consigne_fr: "Enregistre-toi : dis « C'est une blague ?! » avec un ton très surpris, puis dis en une phrase si tu aimes les blagues.",
+          consigne_pt: "Grave-se: diga « C'est une blague ?! » com um tom bem surpreso, depois diga em uma frase se você gosta de piadas."
+        }
+      },
+      A2: {
+        duree: "≈ 20 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "6 min",
+          consigne_fr: "Regarde la vidéo et essaie de comprendre les explications : pourquoi le 1er avril ? Pourquoi un poisson ?",
+          consigne_pt: "Assista ao vídeo e tente entender as explicações: por que 1º de abril? Por que um peixe?",
+          media: {type:"video", id:"PF8_dAPMmIM", label:"D'où vient le poisson d'avril ? — Pratiks"},
+          exos: [
+            {type:"qcm", q:"D'après la vidéo, au XVIe siècle, le roi décide que l'année commencera désormais…", options:["Le 1er avril","Le 1er janvier","Le 1er mai"], correct:1},
+            {type:"qcm", q:"Qu'est-ce qu'on offrait « pour rire » à ceux qui fêtaient encore le Nouvel An en avril ?", options:["De l'argent","Des fleurs","De faux cadeaux"], correct:2},
+            {type:"qcm", q:"Une explication du « poisson » : pendant le carême, les chrétiens ne devaient pas manger de…", options:["Viande","Pain","Fruits"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "5 min",
+          texte_fr: "L'humour est partout en France : entre amis, au bureau, dans les films. Mais attention, ce qui fait rire en France ne fait pas toujours rire ailleurs. Les Français aiment particulièrement l'ironie et l'autodérision. Raconter une blague sur soi-même est souvent vu comme un signe d'intelligence et de confiance.",
+          texte_pt: "O humor está em toda parte na França: entre amigos, no escritório, nos filmes. Mas atenção, o que faz rir na França nem sempre faz rir em outros lugares. Os franceses gostam particularmente da ironia e da autodepreciação. Contar uma piada sobre si mesmo é muitas vezes visto como um sinal de inteligência e confiança.",
+          exos: [
+            {type:"qcm", q:"Qu'est-ce que les Français aiment particulièrement ?", options:["Les blagues physiques","Les histoires tristes","L'ironie et l'autodérision"], correct:2},
+            {type:"qcm", q:"Raconter une blague sur soi-même est souvent vu comme…", options:["Un signe de confiance","Un manque de respect","Une erreur de politesse"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "5 min",
+          consigne_fr: "Raconte une petite anecdote drôle (5-6 phrases). Utilise l'imparfait pour le décor (« C'était..., il faisait..., j'étais... ») et le passé composé pour l'action (« tout à coup, il a... »).",
+          consigne_pt: "Conte uma pequena anedota engraçada (5-6 frases). Use o imperfeito para o cenário (« C'était..., il faisait..., j'étais... ») e o passé composé para a ação (« tout à coup, il a... »)."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "4 min",
+          consigne_fr: "Enregistre-toi : raconte en 4-5 phrases une blague que tu as faite ou qu'on t'a faite (un poisson d'avril, par exemple).",
+          consigne_pt: "Grave-se: conte em 4-5 frases uma brincadeira que você fez ou que fizeram com você (um 1º de abril, por exemplo)."
+        }
+      },
+      B1: {
+        duree: "≈ 25 min",
+        co: {
+          titre_fr: "Compréhension orale — Musique", titre_pt: "Compreensão oral — Música", dur: "7 min",
+          consigne_fr: "Écoute cette chanson de Boby Lapointe, grand amoureux des jeux de mots. Suis l'histoire du personnage et repère les sons « t » et « k » qui se répètent.",
+          consigne_pt: "Ouça esta canção de Boby Lapointe, grande amante dos jogos de palavras. Acompanhe a história do personagem e identifique os sons « t » e « k » que se repetem.",
+          media: {type:"video", id:"a7P8dcPsfyE", label:"Boby Lapointe — Ta Katie t'a quitté (Archive INA)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Où se passe l'histoire ?", options:["Sur une plage","Dans le bar d'une gare","Dans un avion"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Pourquoi Igor, le personnage, est-il malheureux ?", options:["Sa Katie l'a quitté","Il a perdu son travail","Il a raté son train"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Le refrain « Ta Katie t'a quitté » joue sur les sons d'un objet. Lequel ?", options:["Un train qui freine","La pluie sur la fenêtre","Le tic-tac d'un réveil"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "6 min",
+          texte_fr: "Le quiproquo est l'un des plus vieux ressorts comiques : deux personnes parlent de choses différentes sans le savoir. Imaginez : votre ami vous annonce qu'« elle » est enfin arrivée, après trois semaines de retard. Vous pensez à sa belle-mère, il parle… de la plante qu'il a commandée pour son salon ! Molière utilisait déjà ce procédé au XVIIe siècle, et on le retrouve aujourd'hui dans les séries et les films. Pour un apprenant de français, les homophones et les mots ambigus créent aussi de nombreux quiproquos involontaires.",
+          texte_pt: "O quiproquo é um dos mais antigos recursos cômicos: duas pessoas falam de coisas diferentes sem saber. Imagine: seu amigo anuncia que « ela » finalmente chegou, depois de três semanas de atraso. Você pensa na sogra dele, e ele está falando… da planta que encomendou para a sala! Molière já usava esse recurso no século XVII, e o encontramos hoje em séries e filmes. Para quem aprende francês, os homófonos e as palavras ambíguas também criam muitos mal-entendidos involuntários.",
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Un quiproquo, c'est quand…", options:["Deux personnes parlent de choses différentes sans le savoir","On raconte une blague très longue","On se moque de quelqu'un"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Dans l'exemple, de quoi parle vraiment l'ami ?", options:["De sa belle-mère","D'une plante","D'un colis perdu"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Pourquoi les apprenants de français vivent-ils souvent des quiproquos ?", options:["Parce que les Français parlent trop vite","Parce que le français a beaucoup d'homophones et de mots ambigus","Parce que l'humour français est interdit à l'étranger"], correct:1}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "6 min",
+          consigne_fr: "Raconte un quiproquo ou un malentendu que tu as vécu (6-8 phrases), en alternant imparfait (contexte) et passé composé (événements). Termine par la « chute » : comment le malentendu a été découvert.",
+          consigne_pt: "Conte um quiproquo ou mal-entendido que você viveu (6-8 frases), alternando imperfeito (contexto) e passé composé (acontecimentos). Termine com o « desfecho »: como o mal-entendido foi descoberto."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (1 min) : tes amis t'apprennent une expression française « normale »… qui est en fait très vulgaire, et tu l'utilises toute la soirée. Drôle ou pas drôle ? Où est la limite entre blague et méchanceté ?",
+          consigne_pt: "Grave-se (1 min): seus amigos te ensinam uma expressão francesa « normal »… que na verdade é muito vulgar, e você a usa a noite toda. Engraçado ou não? Onde fica o limite entre brincadeira e maldade?"
+        }
+      },
+      B2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — Sketch", titre_pt: "Compreensão oral — Esquete", dur: "8 min",
+          consigne_fr: "Écoute ce sketch célèbre de Raymond Devos (enregistré en public en 1957), maître du jeu de mots. Suis les aventures de l'automobiliste et repère les différents sens du mot « sens ».",
+          consigne_pt: "Ouça este esquete famoso de Raymond Devos (gravado ao vivo em 1957), mestre do jogo de palavras. Acompanhe as aventuras do motorista e identifique os diferentes sentidos da palavra « sens ».",
+          media: {type:"video", id:"pMUoWPh4G2k", label:"Raymond Devos — Le plaisir des sens (live, 1957)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Quel problème rencontre le narrateur, en voiture ?", options:["Il tombe en panne d'essence","Il arrive sur une place dont toutes les rues sont en sens interdit","Il perd ses clés"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Que finit par faire le narrateur, faute de pouvoir sortir ?", options:["Il tourne en rond sur la place","Il abandonne sa voiture","Il prend le train"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Sur quoi repose l'essentiel de l'humour du sketch ?", options:["Sur des grimaces et des gestes","Sur des imitations de personnalités","Sur le double sens du mot « sens » : direction et signification"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "8 min",
+          texte_fr: "« L'humour, c'est l'arme blanche des hommes désarmés », écrivait Romain Gary. Écrivain, diplomate et résistant pendant la Seconde Guerre mondiale, Gary reste le seul auteur à avoir reçu deux fois le prix Goncourt — la seconde fois sous le pseudonyme d'Émile Ajar. Pour lui, l'humour n'est pas une fuite : c'est une manière de rester digne face à ce qui nous écrase, de reprendre un peu de pouvoir sur une situation qu'on ne contrôle pas. Rire d'une épreuve, ce n'est pas la nier, c'est refuser qu'elle ait le dernier mot.",
+          texte_pt: "« O humor é a arma branca dos homens desarmados », escrevia Romain Gary. Escritor, diplomata e resistente durante a Segunda Guerra Mundial, Gary continua sendo o único autor a ter recebido duas vezes o prêmio Goncourt — a segunda vez sob o pseudônimo de Émile Ajar. Para ele, o humor não é uma fuga: é uma forma de permanecer digno diante do que nos esmaga, de retomar um pouco de poder sobre uma situação que não controlamos. Rir de uma provação não é negá-la, é recusar que ela tenha a última palavra.",
+          link: {url:"https://fr.wikipedia.org/wiki/Romain_Gary", label:"Romain Gary — Wikipédia"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Qu'a d'unique Romain Gary dans l'histoire littéraire française ?", options:["Il a reçu deux fois le prix Goncourt","Il a écrit uniquement des comédies","Il n'a jamais publié sous son nom"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Selon le texte, pour Gary, l'humour est surtout…", options:["Une façon de fuir la réalité","Une façon de rester digne face aux épreuves","Une technique pour vendre plus de livres"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Que signifie « refuser qu'elle ait le dernier mot » à propos d'une épreuve ?", options:["Ne jamais parler de ses problèmes","Oublier complètement ce qui s'est passé","Ne pas laisser la difficulté décider seule de notre état d'esprit"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (8-10 phrases) à partir de la formule attribuée à Pierre Desproges : « On peut rire de tout, mais pas avec n'importe qui. » Existe-t-il des sujets dont on ne devrait jamais rire ? Donne au moins un exemple concret.",
+          consigne_pt: "Redija um texto argumentativo (8-10 frases) a partir da frase atribuída a Pierre Desproges: « Pode-se rir de tudo, mas não com qualquer um. » Existem assuntos dos quais nunca se deveria rir? Dê pelo menos um exemplo concreto."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "7 min",
+          consigne_fr: "Enregistre-toi (1-2 min) : défends ou nuance la citation de Romain Gary — « L'humour, c'est l'arme blanche des hommes désarmés. » Donne un exemple (personnel, historique ou culturel) où l'humour a servi de résistance.",
+          consigne_pt: "Grave-se (1-2 min): defenda ou nuance a citação de Romain Gary — « O humor é a arma branca dos homens desarmados. » Dê um exemplo (pessoal, histórico ou cultural) em que o humor serviu de resistência."
+        }
+      },
+      C1: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse", titre_pt: "Compreensão oral — análise", dur: "8 min",
+          consigne_fr: "Réécoute le sketch de Raymond Devos, mais cette fois analyse la mécanique du comique : comment une situation banale devient-elle absurde ?",
+          consigne_pt: "Ouça novamente o esquete de Raymond Devos, mas desta vez analise a mecânica do cômico: como uma situação banal se torna absurda?",
+          media: {type:"video", id:"pMUoWPh4G2k", label:"Raymond Devos — Le plaisir des sens (live, 1957)"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Le titre « Le plaisir des sens » joue sur…", options:["Les cinq sens (le plaisir sensuel) et le sens de circulation","La gastronomie française","La musique classique"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quel procédé Devos utilise-t-il principalement pour construire le comique ?", options:["La satire politique directe","Une logique rigoureuse poussée jusqu'à l'absurde, à partir d'une situation banale","Le comique de gestes et de chutes"], correct:1},
+            {niveau:"très difficile", type:"qcm", q:"En quoi ce sketch peut-il se lire comme une petite fable sur la société ?", options:["Il fait l'éloge du code de la route","Il raconte un fait divers réel","Il montre des individus pris au piège de règles absurdes qu'ils respectent sans pouvoir en sortir"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "On dit souvent que l'humour est la dernière frontière de l'apprentissage d'une langue. Comprendre une blague suppose en effet de maîtriser bien plus que le vocabulaire : les références culturelles, le rythme, les sous-entendus, et surtout la polysémie des mots. Raymond Devos en avait fait son terrain de jeu, au point que le ministère de la Culture a créé un Grand Prix Raymond-Devos de la langue française. Paradoxalement, c'est précisément ce qui rend un jeu de mots brillant dans une langue qui le rend presque intraduisible dans une autre : on peut traduire une idée, beaucoup plus difficilement une sonorité.",
+          texte_pt: "Costuma-se dizer que o humor é a última fronteira do aprendizado de uma língua. Entender uma piada supõe de fato dominar muito mais que o vocabulário: as referências culturais, o ritmo, os subentendidos e sobretudo a polissemia das palavras. Raymond Devos fez disso seu campo de jogo, a ponto de o Ministério da Cultura criar um Grande Prêmio Raymond-Devos da língua francesa. Paradoxalmente, é justamente o que torna um trocadilho brilhante numa língua que o torna quase intraduzível em outra: pode-se traduzir uma ideia, muito mais dificilmente uma sonoridade.",
+          link: {url:"https://fr.wikipedia.org/wiki/Raymond_Devos", label:"Raymond Devos — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Selon le texte, comprendre une blague suppose de maîtriser…", options:["Uniquement le vocabulaire","Les références culturelles, le rythme, les sous-entendus et la polysémie","Seulement la grammaire"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Quelle reconnaissance officielle est mentionnée à propos de Devos ?", options:["Un prix de la langue française créé à son nom par le ministère de la Culture","Une entrée à l'Académie française","Une rue à son nom à Paris"], correct:0},
+            {niveau:"très difficile", type:"qcm", q:"Quel est le paradoxe exposé à la fin du texte ?", options:["Plus une blague est courte, plus elle est drôle","Les jeux de mots n'intéressent que les enfants","Ce qui fait la force d'un jeu de mots dans une langue est ce qui le rend intraduisible dans une autre"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), en utilisant le subjonctif quand c'est pertinent (« bien que... », « il est rare que... », « pour que... ») : l'humour peut-il vraiment se traduire d'une langue à l'autre ? Appuie-toi sur un exemple d'humour brésilien ou français.",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), usando o subjuntivo quando pertinente (« bien que... », « il est rare que... », « pour que... »): o humor pode realmente ser traduzido de uma língua para outra? Apoie-se em um exemplo de humor brasileiro ou francês."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : compare l'humour français et l'humour brésilien (ironie, autodérision, comique de situation…). Nuance ta position et utilise au moins une structure au subjonctif.",
+          consigne_pt: "Grave-se (cerca de 2 min): compare o humor francês e o humor brasileiro (ironia, autodepreciação, comédia de situação…). Nuance sua posição e use pelo menos uma estrutura no subjuntivo."
+        }
+      },
+      C2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse fine", titre_pt: "Compreensão oral — análise fina", dur: "8 min",
+          consigne_fr: "Réécoute le sketch de Raymond Devos en portant attention à la construction rhétorique : ton du narrateur, enchaînements logiques, jeux sur la langue.",
+          consigne_pt: "Ouça novamente o esquete de Raymond Devos prestando atenção à construção retórica: tom do narrador, encadeamentos lógicos, jogos com a língua.",
+          media: {type:"video", id:"pMUoWPh4G2k", label:"Raymond Devos — Le plaisir des sens (live, 1957)"},
+          exos: [
+            {niveau:"difficile", type:"qcm", q:"Le sketch exploite un même mot employé avec plusieurs significations. Comment appelle-t-on ce phénomène ?", options:["L'hyperbole","La polysémie, exploitée ici comme une antanaclase","L'anaphore"], correct:1},
+            {niveau:"très difficile", type:"qcm", q:"Le narrateur garde un ton calme et raisonné face à une situation absurde. Quel effet produit ce décalage ?", options:["Il renforce le comique : plus le ton est sérieux, plus l'absurde ressort","Il rend le sketch tragique","Il montre que le narrateur ne comprend pas la situation"], correct:0},
+            {niveau:"expert", type:"qcm", q:"Pourquoi dit-on souvent que l'humour de Devos est presque intraduisible ?", options:["Parce qu'il ne parle que de la France","Parce que ses sketches sont trop longs","Parce qu'il travaille la matière même de la langue française : sonorités et doubles sens"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "En 1900, dans son essai Le Rire, Henri Bergson proposait une définition restée célèbre : le comique naîtrait « du mécanique plaqué sur du vivant ». Nous rions lorsqu'un être humain, censé être souple et adaptable, se comporte soudain comme une machine — le distrait qui répète un geste hors de propos, le bureaucrate qui applique une règle jusqu'à l'absurde. Mais Bergson ajoutait une dimension moins confortable : le rire serait aussi une sanction sociale, une manière pour le groupe de corriger celui qui s'écarte de la norme. Rire ensemble, c'est créer du lien ; rire de quelqu'un, c'est parfois l'exclure. Toute la question des limites de l'humour est déjà contenue dans cette ambivalence.",
+          texte_pt: "Em 1900, em seu ensaio O Riso, Henri Bergson propunha uma definição que ficou célebre: o cômico nasceria « do mecânico aplicado sobre o vivo ». Rimos quando um ser humano, supostamente flexível e adaptável, se comporta de repente como uma máquina — o distraído que repete um gesto fora de propósito, o burocrata que aplica uma regra até o absurdo. Mas Bergson acrescentava uma dimensão menos confortável: o riso seria também uma sanção social, uma maneira de o grupo corrigir quem se afasta da norma. Rir junto é criar laço; rir de alguém é, às vezes, excluí-lo. Toda a questão dos limites do humor já está contida nessa ambivalência.",
+          link: {url:"https://fr.wikipedia.org/wiki/Le_Rire_(Bergson)", label:"Le Rire de Bergson — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Selon Bergson, d'où naît le comique ?", options:["Du mécanique plaqué sur du vivant","De la tristesse partagée","De la surprise uniquement"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Quelle fonction moins confortable Bergson attribue-t-il au rire ?", options:["Une fonction médicale","Une sanction sociale qui corrige celui qui s'écarte de la norme","Une fonction purement esthétique"], correct:1},
+            {niveau:"expert", type:"qcm", q:"En quoi cette ambivalence éclaire-t-elle le débat sur les limites de l'humour ?", options:["Elle prouve que l'humour n'a aucune limite","Elle montre que seul l'humour politique pose problème","Elle montre que le même rire peut unir un groupe ou exclure un individu"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), avec au moins une hypothèse au passé (« si... avait..., ... aurait... ») : le rire rassemble-t-il plus qu'il n'exclut ? Confronte Bergson à Romain Gary et reconnais explicitement au moins un contre-argument.",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), com pelo menos uma hipótese no passado (« si... avait..., ... aurait... »): o riso une mais do que exclui? Confronte Bergson com Romain Gary e reconheça explicitamente pelo menos um contra-argumento."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : « Comprendre une blague dans une langue étrangère, c'est la preuve ultime qu'on la maîtrise. » Discute cette affirmation dans un registre soutenu, avec au moins une figure de style (antithèse, métaphore…).",
+          consigne_pt: "Grave-se (cerca de 2 min): « Entender uma piada numa língua estrangeira é a prova definitiva de que a dominamos. » Discuta essa afirmação num registro elevado, com pelo menos uma figura de linguagem (antítese, metáfora…)."
+        }
+      }
+    }
+  },
+  /* ===================== THÈME 12 → 18 octobre 2026 : Un mois de liberté... et après ? =====================
+     date_debut = 2026-10-12 : invisible pour les élèves avant lundi, visible tout de suite côté professeure. */
+  {
+    id: "liberte-2026-10-12",
+    date_debut: "2026-10-12",
+    periode: "12 → 18 octobre 2026",
+    titre_fr: "Un mois de liberté... et après ?",
+    titre_pt: "Um mês de liberdade... e depois?",
+    sub_fr: "Un thème pour parler de tes envies, de ton temps libre et de ton rapport au travail, à faire en 15 à 30 minutes, à ton rythme.",
+    sub_pt: "Um tema para falar dos seus desejos, do seu tempo livre e da sua relação com o trabalho, para fazer em 15 a 30 minutos, no seu ritmo.",
+    niveaux: {
+      A1: {
+        duree: "≈ 15 min",
+        co: {
+          titre_fr: "Compréhension orale — Musique", titre_pt: "Compreensão oral — Música", dur: "5 min",
+          consigne_fr: "Écoute cette chanson très célèbre (avec les sous-titres en français). Repère les mots que tu connais déjà.",
+          consigne_pt: "Ouça esta canção muito famosa (com legendas em francês). Identifique as palavras que você já conhece.",
+          media: {type:"video", id:"9Hv6R2fEdfA", label:"Georges Moustaki — Ma liberté (sous-titres en français)"},
+          exos: [
+            {type:"qcm", q:"Quel mot revient tout le temps dans la chanson ?", options:["Voyage","Liberté","Argent"], correct:1},
+            {type:"qcm", q:"La chanson parle surtout…", options:["De la liberté et de l'amour","Du football","De la cuisine"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "4 min",
+          texte_fr: "Imagine : un mois sans travail. Le matin, tu dors tard. L'après-midi, tu lis ou tu marches dans la ville. Le soir, tu vois tes amis. Tu fais ce que tu veux, quand tu veux !",
+          texte_pt: "Imagine: um mês sem trabalho. De manhã, você dorme até tarde. À tarde, você lê ou caminha pela cidade. À noite, você vê seus amigos. Você faz o que quer, quando quer!",
+          exos: [
+            {type:"qcm", q:"Le matin, qu'est-ce qu'on fait ?", options:["On travaille","On dort tard","On fait du sport"], correct:1},
+            {type:"qcm", q:"Le soir, on voit…", options:["Ses amis","Son patron","Le médecin"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "3 min",
+          consigne_fr: "Écris 3 phrases : avec un mois libre, qu'est-ce que tu voudrais faire ? Utilise « Je voudrais... ».",
+          consigne_pt: "Escreva 3 frases: com um mês livre, o que você gostaria de fazer? Use « Je voudrais... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "3 min",
+          consigne_fr: "Enregistre-toi : dis à voix haute 3 choses que tu aimes faire pendant ton temps libre (« J'aime... »).",
+          consigne_pt: "Grave-se: diga em voz alta 3 coisas que você gosta de fazer no seu tempo livre (« J'aime... »)."
+        }
+      },
+      A2: {
+        duree: "≈ 20 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "5 min",
+          consigne_fr: "Regarde cette courte vidéo sur le congé sabbatique en France. Note la durée possible du congé.",
+          consigne_pt: "Assista a este vídeo curto sobre a licença sabática na França. Anote a duração possível da licença.",
+          media: {type:"video", id:"wK7OS9okTj4", label:"La Minute de vos Droits — Le congé sabbatique (CFDT)"},
+          exos: [
+            {type:"qcm", q:"Qui répond aux questions dans la vidéo ?", options:["Camille","Léo","Abdel"], correct:2},
+            {type:"qcm", q:"Le congé sabbatique, c'est…", options:["Une pause dans sa carrière, sans perdre son contrat","Des vacances payées par l'État","Un nouveau travail"], correct:0},
+            {type:"qcm", q:"Pendant le congé sabbatique, le salarié…", options:["Reçoit son salaire normal","N'est pas payé par son entreprise","Reçoit un double salaire"], correct:1}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "5 min",
+          texte_fr: "Un mois de liberté totale : au début, c'est un rêve. On dort tard, on flâne, on reprend des projets oubliés. Mais quelques semaines plus tard, une question arrive : et après ? Sans programme, certaines personnes s'ennuient. D'autres découvrent une nouvelle version d'elles-mêmes.",
+          texte_pt: "Um mês de liberdade total: no começo, é um sonho. Dorme-se até tarde, passeia-se sem pressa, retomam-se projetos esquecidos. Mas algumas semanas depois, chega uma pergunta: e depois? Sem programa, algumas pessoas se entediam. Outras descobrem uma nova versão de si mesmas.",
+          exos: [
+            {type:"qcm", q:"Que veut dire « flâner » ?", options:["Travailler beaucoup","Se promener sans se presser","Dormir toute la journée"], correct:1},
+            {type:"qcm", q:"Selon le texte, sans programme, certaines personnes…", options:["S'ennuient","Gagnent plus d'argent","Déménagent"], correct:0}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "5 min",
+          consigne_fr: "Écris un petit texte (5-6 phrases) au conditionnel présent : « Si j'avais un mois libre, je voyagerais / je lirais / je dormirais... ».",
+          consigne_pt: "Escreva um pequeno texto (5-6 frases) no condicional presente: « Si j'avais un mois libre, je voyagerais / je lirais / je dormirais... »."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "5 min",
+          consigne_fr: "Enregistre-toi : présente ton « mois parfait » en 4-5 phrases (« La première semaine, je me reposerais... ensuite, je... »).",
+          consigne_pt: "Grave-se: apresente seu « mês perfeito » em 4-5 frases (« La première semaine, je me reposerais... ensuite, je... »)."
+        }
+      },
+      B1: {
+        duree: "≈ 25 min",
+        co: {
+          titre_fr: "Compréhension orale — Musique", titre_pt: "Compreensão oral — Música", dur: "7 min",
+          consigne_fr: "Écoute « Ma liberté » de Georges Moustaki (1969). Suis l'histoire racontée par le chanteur : ce que la liberté lui a apporté… et ce qui se passe à la fin.",
+          consigne_pt: "Ouça « Ma liberté » de Georges Moustaki (1969). Acompanhe a história contada pelo cantor: o que a liberdade lhe trouxe… e o que acontece no final.",
+          media: {type:"video", id:"9Hv6R2fEdfA", label:"Georges Moustaki — Ma liberté (sous-titres en français)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"À qui le chanteur s'adresse-t-il dans la chanson ?", options:["À sa mère","À sa liberté, comme si c'était une personne","À son patron"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"Qu'est-ce que la liberté lui a permis de faire ?", options:["Partir, voyager, suivre ses envies","Devenir riche","Devenir célèbre"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"À la fin, pourquoi abandonne-t-il sa liberté ?", options:["Parce qu'il est malade","Parce qu'il doit travailler","Par amour pour une femme"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "6 min",
+          texte_fr: "« Je sais ce que vous pensez : ne rien faire pendant un mois, c'est le rêve. Mais soyons honnêtes. Sans travail, sans projet, sans but précis… qu'est-ce qu'on devient ? Le travail, ce n'est pas juste un salaire. C'est une structure, une identité, un lien avec les autres. Moi, j'ai essayé. Et j'ai compris une chose : la liberté sans projet, c'est juste… du vide. »",
+          texte_pt: "« Eu sei o que vocês estão pensando: não fazer nada durante um mês é o sonho. Mas sejamos honestos. Sem trabalho, sem projeto, sem objetivo preciso… o que a gente se torna? O trabalho não é só um salário. É uma estrutura, uma identidade, um vínculo com os outros. Eu tentei. E entendi uma coisa: a liberdade sem projeto é só… vazio. »",
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Pour cette personne, le travail, c'est…", options:["Seulement un salaire","Une structure, une identité et un lien avec les autres","Une perte de temps"], correct:1},
+            {niveau:"moyen", type:"qcm", q:"La personne parle-t-elle par expérience ?", options:["Oui, elle a essayé de ne rien faire","Non, elle imagine seulement","Non, elle répète ce que dit son patron"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Que veut dire « la liberté sans projet, c'est juste du vide » ?", options:["Qu'il faut toujours travailler le week-end","Que la liberté est dangereuse","Que le temps libre n'a de valeur que si on en fait quelque chose"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "6 min",
+          consigne_fr: "Écris ton « mois parfait » semaine par semaine (6-8 phrases), au conditionnel présent, avec une vraie logique entre les semaines (repos, projets, voyage, retour…).",
+          consigne_pt: "Escreva seu « mês perfeito » semana por semana (6-8 frases), no condicional presente, com uma lógica real entre as semanas (descanso, projetos, viagem, volta…)."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (1 min) : réponds au personnage du texte, qui dit que la liberté sans projet, c'est du vide. Es-tu d'accord ? Utilise « Je pense que... / Au contraire... / Mais si on réfléchit... ».",
+          consigne_pt: "Grave-se (1 min): responda ao personagem do texto, que diz que a liberdade sem projeto é vazio. Você concorda? Use « Je pense que... / Au contraire... / Mais si on réfléchit... »."
+        }
+      },
+      B2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale", titre_pt: "Compreensão oral", dur: "6 min",
+          consigne_fr: "Regarde cette vidéo d'information juridique sur le congé sabbatique. Note les trois éléments clés : qui y a droit, combien de temps, à quelles conditions.",
+          consigne_pt: "Assista a este vídeo de informação jurídica sobre a licença sabática. Anote os três elementos-chave: quem tem direito, quanto tempo, em que condições.",
+          media: {type:"video", id:"wK7OS9okTj4", label:"La Minute de vos Droits — Le congé sabbatique (CFDT)"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Combien de temps peut durer un congé sabbatique ?", options:["Une semaine maximum","Exactement deux ans","Entre 6 et 11 mois"], correct:2},
+            {niveau:"moyen", type:"qcm", q:"Quelle condition faut-il en général remplir pour y avoir droit ?", options:["Une ancienneté suffisante dans l'entreprise","Avoir plus de 50 ans","Être cadre"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Pendant le congé, que devient le contrat de travail ?", options:["Il est rompu définitivement","Il est suspendu, mais pas rompu","Il est transformé en CDD"], correct:1}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "8 min",
+          texte_fr: "Le 20 juin 1936, le gouvernement du Front populaire, dirigé par Léon Blum, promulgue une loi qui accorde quinze jours de congés payés à tous les salariés. Pour beaucoup d'ouvriers, c'est la première fois qu'ils voient la mer. Les congés s'allongent ensuite progressivement, jusqu'à la cinquième semaine, accordée en 1982. Ce qui paraît aujourd'hui évident était alors révolutionnaire : l'idée qu'un travailleur a droit à du temps libre payé, non comme une récompense, mais comme une condition de sa dignité.",
+          texte_pt: "Em 20 de junho de 1936, o governo da Frente Popular, dirigido por Léon Blum, promulga uma lei que concede quinze dias de férias remuneradas a todos os assalariados. Para muitos operários, é a primeira vez que veem o mar. As férias se alongam depois progressivamente, até a quinta semana, concedida em 1982. O que hoje parece evidente era então revolucionário: a ideia de que um trabalhador tem direito a tempo livre remunerado, não como recompensa, mas como condição de sua dignidade.",
+          link: {url:"https://fr.wikipedia.org/wiki/Cong%C3%A9s_pay%C3%A9s_en_France", label:"Les congés payés en France — Wikipédia"},
+          exos: [
+            {niveau:"facile", type:"qcm", q:"Combien de jours de congés payés la loi de 1936 accorde-t-elle ?", options:["Quinze jours","Cinq semaines","Un mois"], correct:0},
+            {niveau:"moyen", type:"qcm", q:"Quand la cinquième semaine de congés payés a-t-elle été accordée ?", options:["En 1936","En 1968","En 1982"], correct:2},
+            {niveau:"difficile", type:"qcm", q:"Selon le texte, qu'est-ce qui était révolutionnaire en 1936 ?", options:["Le fait de partir à l'étranger","L'idée que le temps libre payé est un droit lié à la dignité, et non une récompense","La création des 35 heures"], correct:1}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "8 min",
+          consigne_fr: "Rédige un texte argumentatif (8-10 phrases) : « Les vacances, c'est bien parce que ça ne dure pas toujours. » Es-tu d'accord ? Utilise le conditionnel présent pour imaginer une vie sans fin de vacances.",
+          consigne_pt: "Redija um texto argumentativo (8-10 frases): « As férias são boas porque não duram para sempre. » Você concorda? Use o condicional presente para imaginar uma vida de férias sem fim."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "8 min",
+          consigne_fr: "Enregistre-toi (1-2 min) : défends ou nuance cette idée — « S'ennuyer est nécessaire pour être créatif. » Utilise les expressions « lâcher prise » et « prendre du recul ».",
+          consigne_pt: "Grave-se (1-2 min): defenda ou nuance esta ideia — « Entediar-se é necessário para ser criativo. » Use as expressões « lâcher prise » e « prendre du recul »."
+        }
+      },
+      C1: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse", titre_pt: "Compreensão oral — análise", dur: "8 min",
+          consigne_fr: "Réécoute « Ma liberté » de Moustaki (avec les sous-titres), mais cette fois analyse la manière dont la liberté est représentée et l'opposition qui structure la chanson.",
+          consigne_pt: "Ouça novamente « Ma liberté » de Moustaki (com as legendas), mas desta vez analise a forma como a liberdade é representada e a oposição que estrutura a canção.",
+          media: {type:"video", id:"9Hv6R2fEdfA", label:"Georges Moustaki — Ma liberté (sous-titres en français)"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Comment la liberté est-elle présentée dans la chanson ?", options:["Comme un concept juridique","Comme une compagne personnifiée, à qui l'on parle","Comme un objet qu'on achète"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Quelle opposition structure la chanson ?", options:["La liberté et l'amour, l'amour étant vu comme un enfermement accepté","La ville et la campagne","La richesse et la pauvreté"], correct:0},
+            {niveau:"très difficile", type:"qcm", q:"Quel regard le chanteur porte-t-il sur son choix final ?", options:["Il le regrette amèrement","Il affirme qu'on l'y a forcé","Il l'accepte avec tendresse, sans amertume"], correct:2}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "« L'homme est condamné à être libre », écrit Jean-Paul Sartre dans L'Être et le Néant (1943). La formule surprend : comment la liberté pourrait-elle être une condamnation ? Pour Sartre, l'être humain n'a pas de nature fixée à l'avance : « l'existence précède l'essence ». Nous ne choisissons pas d'être libres, mais une fois au monde, nous ne pouvons pas ne pas choisir — même refuser de choisir est encore un choix. D'où l'angoisse : sans excuse ni modèle imposé, nous sommes entièrement responsables de ce que nous faisons de notre vie. Un mois sans contrainte n'offrirait donc pas seulement du repos : il nous confronterait, sans filet, à cette responsabilité.",
+          texte_pt: "« O homem está condenado a ser livre », escreve Jean-Paul Sartre em O Ser e o Nada (1943). A fórmula surpreende: como a liberdade poderia ser uma condenação? Para Sartre, o ser humano não tem uma natureza fixada de antemão: « a existência precede a essência ». Não escolhemos ser livres, mas uma vez no mundo, não podemos deixar de escolher — até recusar-se a escolher ainda é uma escolha. Daí a angústia: sem desculpa nem modelo imposto, somos inteiramente responsáveis pelo que fazemos da nossa vida. Um mês sem obrigações não ofereceria, portanto, apenas descanso: ele nos confrontaria, sem rede de proteção, com essa responsabilidade.",
+          link: {url:"https://fr.wikipedia.org/wiki/L%27%C3%8Atre_et_le_N%C3%A9ant", label:"L'Être et le Néant — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Que signifie « l'existence précède l'essence » ?", options:["Que l'être humain n'a pas de nature fixée à l'avance et se définit par ses choix","Que la vie n'a aucune importance","Que tout est décidé dès la naissance"], correct:0},
+            {niveau:"difficile", type:"qcm", q:"Pourquoi Sartre parle-t-il de « condamnation » ?", options:["Parce que la liberté est interdite par la loi","Parce que nous ne choisissons pas d'être libres et ne pouvons pas échapper au choix","Parce que la liberté rend paresseux"], correct:1},
+            {niveau:"très difficile", type:"qcm", q:"Selon la conclusion du texte, que révélerait un mois sans contrainte ?", options:["Que le repos est inutile","Que le travail est toujours préférable","Notre pleine responsabilité face à l'usage de notre liberté"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), en utilisant le subjonctif quand c'est pertinent (« il faut que... », « bien que... », « à condition que... ») : les contraintes sont-elles un obstacle à la liberté, ou au contraire une condition pour la vivre pleinement ?",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), usando o subjuntivo quando pertinente (« il faut que... », « bien que... », « à condition que... »): as restrições são um obstáculo à liberdade, ou ao contrário uma condição para vivê-la plenamente?"
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : parmi l'argent, les horaires, le regard des autres, les factures, les traditions et les croyances limitantes, quels sont les 3 obstacles qui t'empêchent le plus d'être libre ? Classe-les et argumente, avec au moins une structure au subjonctif.",
+          consigne_pt: "Grave-se (cerca de 2 min): entre o dinheiro, os horários, o olhar dos outros, as contas, as tradições e as crenças limitantes, quais são os 3 obstáculos que mais te impedem de ser livre? Classifique-os e argumente, com pelo menos uma estrutura no subjuntivo."
+        }
+      },
+      C2: {
+        duree: "≈ 30 min",
+        co: {
+          titre_fr: "Compréhension orale — analyse fine", titre_pt: "Compreensão oral — análise fina", dur: "8 min",
+          consigne_fr: "Réécoute « Ma liberté » en portant attention aux procédés poétiques (personnification, images, paradoxes) et mets la chanson en regard de la formule de Sartre.",
+          consigne_pt: "Ouça novamente « Ma liberté » prestando atenção aos recursos poéticos (personificação, imagens, paradoxos) e coloque a canção em diálogo com a fórmula de Sartre.",
+          media: {type:"video", id:"9Hv6R2fEdfA", label:"Georges Moustaki — Ma liberté (sous-titres en français)"},
+          exos: [
+            {niveau:"difficile", type:"qcm", q:"La liberté est personnifiée tout au long de la chanson. Quel effet cela produit-il ?", options:["Le texte devient un manifeste politique","La séparation d'avec la liberté se lit comme une rupture amoureuse","La chanson devient humoristique"], correct:1},
+            {niveau:"très difficile", type:"qcm", q:"L'image d'un enfermement choisi par amour repose sur quelle figure ?", options:["Une litote","Une anaphore","Un paradoxe proche de l'oxymore : la captivité désirée"], correct:2},
+            {niveau:"expert", type:"qcm", q:"Mise en regard de Sartre, que suggère la fin de la chanson ?", options:["Que renoncer à sa liberté reste encore un acte libre","Que la liberté n'existe pas","Que l'amour est toujours une erreur"], correct:0}
+          ]
+        },
+        ce: {
+          titre_fr: "Compréhension écrite", titre_pt: "Compreensão escrita", dur: "9 min",
+          texte_fr: "Au XVIIe siècle, Pascal affirmait que tout le malheur des hommes vient d'une seule chose : ne pas savoir demeurer en repos dans une chambre. Deux siècles plus tard, en 1880, Paul Lafargue publiait Le Droit à la paresse, pamphlet qui dénonçait l'« amour du travail » comme une folie collective. Les deux auteurs semblent s'opposer : l'un voit dans l'incapacité au repos une fuite devant soi-même, l'autre dans le travail sans fin une aliénation. Pourtant, ils se rejoignent sur un point : l'oisiveté n'est ni un vice ni une vertu en soi ; tout dépend de ce qu'elle révèle de nous. Un mois de liberté ne serait alors pas une parenthèse, mais un miroir.",
+          texte_pt: "No século XVII, Pascal afirmava que toda a infelicidade dos homens vem de uma só coisa: não saber ficar em repouso num quarto. Dois séculos mais tarde, em 1880, Paul Lafargue publicava O Direito à Preguiça, panfleto que denunciava o « amor ao trabalho » como uma loucura coletiva. Os dois autores parecem se opor: um vê na incapacidade de repousar uma fuga de si mesmo, o outro vê no trabalho sem fim uma alienação. No entanto, eles se encontram num ponto: a ociosidade não é nem vício nem virtude em si; tudo depende do que ela revela sobre nós. Um mês de liberdade não seria então um parêntese, mas um espelho.",
+          link: {url:"https://fr.wikipedia.org/wiki/Le_Droit_%C3%A0_la_paresse", label:"Le Droit à la paresse — Wikipédia"},
+          exos: [
+            {niveau:"moyen", type:"qcm", q:"Selon Pascal, d'où vient le malheur des hommes ?", options:["Du manque d'argent","De l'incapacité à rester en repos","De la paresse"], correct:1},
+            {niveau:"difficile", type:"qcm", q:"Que dénonce Lafargue dans Le Droit à la paresse ?", options:["L'amour du travail comme folie collective","Les vacances trop longues","L'oisiveté des aristocrates uniquement"], correct:0},
+            {niveau:"expert", type:"qcm", q:"Que signifie la formule finale « non une parenthèse, mais un miroir » ?", options:["Que les vacances doivent être photographiées","Qu'un mois libre ne sert à rien","Qu'un temps libre ne suspend pas notre vie : il révèle qui nous sommes"], correct:2}
+          ]
+        },
+        ee: {
+          titre_fr: "Expression écrite", titre_pt: "Expressão escrita", dur: "7 min",
+          consigne_fr: "Rédige un texte argumentatif (10-12 phrases), avec au moins une hypothèse au passé (« si l'on m'avait offert..., j'aurais... ») : « L'oisiveté est la mère de tous les vices » — ce proverbe a-t-il encore un sens aujourd'hui ? Confronte Pascal et Lafargue et reconnais explicitement un contre-argument.",
+          consigne_pt: "Redija um texto argumentativo (10-12 frases), com pelo menos uma hipótese no passado (« si l'on m'avait offert..., j'aurais... »): « A ociosidade é a mãe de todos os vícios » — esse provérbio ainda faz sentido hoje? Confronte Pascal e Lafargue e reconheça explicitamente um contra-argumento."
+        },
+        eo: {
+          titre_fr: "Expression orale", titre_pt: "Expressão oral", dur: "6 min",
+          consigne_fr: "Enregistre-toi (environ 2 min) : « L'homme est condamné à être libre. » La liberté est-elle un privilège ou un fardeau ? Réponds dans un registre soutenu, avec au moins une figure de style (antithèse, métaphore, chiasme…).",
+          consigne_pt: "Grave-se (cerca de 2 min): « O homem está condenado a ser livre. » A liberdade é um privilégio ou um fardo? Responda num registro elevado, com pelo menos uma figura de linguagem (antítese, metáfora, quiasmo…)."
+        }
+      }
+    }
+  }
