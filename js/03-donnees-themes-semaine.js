@@ -1,4 +1,3 @@
-/* ======================= DONNÉES : THÈME DE LA SEMAINE ======================= */
 /* ======================= DONNÉES : THÈMES DE LA SEMAINE (historique cumulatif) ======================= */
 /* Chaque thème a un id stable et unique. Pour ajouter un nouveau thème, ajoute un objet à la fin
    du tableau — les thèmes précédents restent accessibles aux élèves et à la professeure. */
@@ -682,489 +681,8 @@ const temasSemanas = [
         }
       }
     }
-  }
-];
-
-function getTema(id){
-  return temasSemanas.find(t => t.id === id) || temasSemanas[temasSemanas.length - 1];
-}
-function temaMostRecentId(){
-  return temasSemanas[temasSemanas.length - 1].id;
-}
-
-/* Un thème avec "date_debut" (format "AAAA-MM-JJ") ne doit apparaître côté élève qu'à
-   partir de cette date (permet de préparer un thème à l'avance sans qu'il soit visible
-   trop tôt). Sans "date_debut", le thème est visible immédiatement — comportement
-   historique conservé pour tous les thèmes déjà publiés. Côté professeure, aucun
-   filtre n'est appliqué : elle voit et peut préparer tous les thèmes, y compris ceux
-   pas encore publiés aux élèves. */
-function temaEstVisibleEleve(t){
-  if(!t.date_debut) return true;
-  const aujourdhui = new Date().toISOString().slice(0,10);
-  return aujourdhui >= t.date_debut;
-}
-function temasSemanasVisiveisEleve(){
-  const visiveis = temasSemanas.filter(temaEstVisibleEleve);
-  return visiveis.length ? visiveis : [temasSemanas[0]]; // filet de sécurité, ne devrait jamais arriver
-}
-function temaMostRecentVisibleId(){
-  const visiveis = temasSemanasVisiveisEleve();
-  return visiveis[visiveis.length - 1].id;
-}
-
-let temaSelectedId = null;      // thème actuellement affiché côté élève
-let teacherTemaSelectedId = null; // thème actuellement affiché côté professeure
-
-/* Niveau effectif utilisé pour le thème : celui attribué par la professeure.
-   L'élève n'a pas de sélecteur de niveau — C1/C2 utilisent le contenu B2 (niveau le plus proche). */
-function temaNiveauEffectif(){
-  const tema = getTema(temaSelectedId);
-  if(tema.niveaux[niveau]) return niveau;
-  if(niveau==='C1' || niveau==='C2') return 'B2';
-  return 'A1';
-}
-
-function temaExoHTML(exo, uid, skill){
-  if(!exo) return '';
-  const opts = exo.options.map((o,i)=>`<button class="exo-opt" onclick="temaAnswerQCM('${uid}',${i},${exo.correct},'${skill}')">${o}</button>`).join('');
-  const niveauBadge = exo.niveau ? `<span class="niveau-badge niveau-${exo.niveau}">${exo.niveau}</span>` : '';
-  return `<div class="exo-box">
-    ${niveauBadge}
-    <p class="exo-consigne"><span class="label-fr">Consigne —</span> Choisis la bonne réponse.</p>
-    <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
-    <p class="exo-question">${exo.q}</p>
-    <div class="exo-options" id="opts-${uid}">${opts}</div>
-    <p class="exo-feedback" id="fb-${uid}"></p>
-  </div>`;
-}
-/* Plusieurs questions pour une même compétence (CO ou CE) — les thèmes plus
-   anciens n'ont qu'un seul "exo" (voir temaExoHTML ci-dessus, toujours
-   utilisée pour eux) ; les thèmes plus récents et plus exigeants peuvent
-   fournir un tableau "exos" à la place, un sous-uid par question. La
-   complétion (temaSaveField) reste suivie au niveau de la compétence dans
-   son ensemble, comme avant — répondre à n'importe laquelle des questions
-   met à jour le même statut. */
-function temaExoListHTML(exos, uid, skill){
-  if(!Array.isArray(exos) || !exos.length) return '';
-  return exos.map((exo,i)=> temaExoHTML(exo, `${uid}_${i}`, skill)).join('');
-}
-async function temaAnswerQCM(uid, chosen, correct, skill){
-  const container = document.getElementById('opts-'+uid);
-  const buttons = container.querySelectorAll('.exo-opt');
-  buttons.forEach((b,i)=>{
-    b.disabled = true;
-    if(i===correct) b.classList.add('correct');
-    if(i===chosen && chosen!==correct) b.classList.add('wrong');
-  });
-  const ok = chosen===correct;
-  const fb = document.getElementById('fb-'+uid);
-  if(ok){ fb.textContent = '✔ Correct ! / Correto!'; fb.className = 'exo-feedback ok'; }
-  else{ fb.textContent = '✘ La bonne réponse est en vert. / A resposta certa está em verde.'; fb.className = 'exo-feedback bad'; }
-  await temaSaveField(skill, {done:true, correct:ok});
-  renderTemaStatusBar();
-}
-
-async function temaSaveField(skill, data){
-  const temaId = temaSelectedId;
-  student.temas = student.temas || {};
-  student.temas[temaId] = student.temas[temaId] || {};
-  student.temas[temaId][skill] = { ...(student.temas[temaId][skill]||{}), ...data, ts: new Date().toISOString() };
-  if(!student.uid) return;
-  try{
-    await db.collection('eleves').doc(student.uid).update({
-      [`temas.${temaId}.${skill}`]: { ...data, ts: firebase.firestore.FieldValue.serverTimestamp() }
-    });
-  }catch(e){ /* non bloquant — reste enregistré localement pour cette session */ }
-}
-
-async function temaSaveEE(uid){
-  const ta = document.getElementById(uid);
-  const status = document.getElementById('eestatus-'+uid);
-  const text = ta.value.trim();
-  if(!text){ status.textContent = "Écris quelque chose avant d'envoyer. / Escreva algo antes de enviar."; status.className = 'ee-note'; return; }
-  status.textContent = 'Envoi en cours…'; status.className = 'ee-note';
-  const tema = getTema(temaSelectedId);
-  try{
-    const fileName = `${niveau}_${slug(student.prenom)}-${slug(student.nom)}_THEME-${slug(tema.titre_fr)}-expression-ecrite_${Date.now()}.txt`;
-    const blob = new Blob([text], {type:'text/plain'});
-    const b64 = await blobToBase64(blob);
-    const result = await callDriveScript({ action:'upload', fileName, mimeType:'text/plain', base64: b64 });
-    if(!result || !result.ok) throw new Error(result && result.error || 'échec Drive');
-    await temaSaveField('ee', {done:true, text, driveUrl: result.viewUrl, driveFileId: result.fileId});
-    status.textContent = '✅ Envoyé et enregistré sur le Drive de ta professeure ! / Enviado e salvo no Drive da professora!';
-    status.className = 'rec-status ok';
-  }catch(e){
-    await temaSaveField('ee', {done:true, text});
-    status.textContent = "✅ Envoyé à ta professeure (copie Drive indisponible pour le moment).";
-    status.className = 'rec-status ok';
-  }
-  renderTemaStatusBar();
-}
-
-const temaRecorders = {};
-async function temaToggleRec(uid){
-  const btn = document.getElementById('btn-'+uid);
-  const status = document.getElementById('status-'+uid);
-  if(!temaRecorders[uid] || !temaRecorders[uid].active){
-    try{
-      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-      const mr = new MediaRecorder(stream);
-      const chunks = [];
-      mr.ondataavailable = e=>chunks.push(e.data);
-      mr.onstop = async ()=>{
-        const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
-        const url = URL.createObjectURL(blob);
-        const player = document.getElementById('player-'+uid);
-        const ext = (blob.type||'').includes('mp4') ? 'm4a' : 'webm';
-        player.innerHTML = `<audio class="rec-audio" controls src="${url}"></audio><br>
-          <a class="rec-dl" href="${url}" download="${uid}-secours.${ext}">⬇ Copie locale (secours) / Cópia local</a>`;
-        stream.getTracks().forEach(t=>t.stop());
-        clearInterval(temaRecorders[uid].timer);
-        status.textContent = 'Envoi en cours…';
-        status.className = 'rec-status';
-        const tema = getTema(temaSelectedId);
-        try{
-          const fileName = `${niveau}_${slug(student.prenom)}-${slug(student.nom)}_THEME-${slug(tema.titre_fr)}_${Date.now()}.${ext}`;
-          const b64 = await blobToBase64(blob);
-          const result = await callDriveScript({ action:'upload', fileName, mimeType: blob.type || 'audio/webm', base64: b64 });
-          if(!result || !result.ok) throw new Error(result && result.error || 'échec Drive');
-          await temaSaveField('eo', {done:true, driveUrl: result.viewUrl, driveFileId: result.fileId});
-          try{
-            await db.collection('enregistrements').add({
-              uid: student.uid, prenom: student.prenom, nom: student.nom, email: student.email, telephone: student.telephone,
-              niveau: niveau, dossier: "Thème de la semaine",
-              semaine: tema.titre_fr, jour: "Expression orale", activite: tema.titre_fr,
-              driveUrl: result.viewUrl, driveFileId: result.fileId,
-              type: 'tema', temaId: tema.id,
-              ts: firebase.firestore.FieldValue.serverTimestamp()
-            });
-          }catch(e2){ /* non bloquant */ }
-          status.textContent = '✅ Enregistrement envoyé à ta professeure.'; status.className = 'rec-status ok';
-          renderTemaStatusBar();
-        }catch(e){
-          status.textContent = "⚠ Échec de l'envoi — utilise la copie locale ci-dessus.";
-          status.className = 'rec-status bad';
-        }
-      };
-      mr.start();
-      let seconds = 0;
-      const timeEl = document.getElementById('time-'+uid);
-      const timer = setInterval(()=>{
-        seconds++;
-        const m = String(Math.floor(seconds/60)).padStart(2,'0');
-        const s = String(seconds%60).padStart(2,'0');
-        timeEl.textContent = `${m}:${s}`;
-      }, 1000);
-      temaRecorders[uid] = {mr, active:true, timer};
-      btn.textContent = '■ Arrêter';
-      btn.classList.add('recording');
-      status.textContent = 'Enregistrement en cours…';
-      status.className = 'rec-status';
-    }catch(err){
-      status.textContent = "Micro non disponible : autorise l'accès au micro dans ton navigateur.";
-      status.className = 'rec-status bad';
-    }
-  } else {
-    temaRecorders[uid].mr.stop();
-    temaRecorders[uid].active = false;
-    btn.textContent = '● Enregistrer';
-    btn.classList.remove('recording');
-  }
-}
-
-function temaAllDone(temaId){
-  const id = temaId || temaSelectedId;
-  const t = (student.temas && student.temas[id]) || {};
-  return !!(t.co && t.co.done && t.ce && t.ce.done && t.ee && t.ee.done && t.eo && t.eo.done);
-}
-function renderTemaStatusBar(){
-  const bar = document.getElementById('tema-status-bar');
-  if(!bar) return;
-  const t = (student.temas && student.temas[temaSelectedId]) || {};
-  const items = [
-    {k:'co', label:'Compréhension orale'},
-    {k:'ce', label:'Compréhension écrite'},
-    {k:'ee', label:'Expression écrite'},
-    {k:'eo', label:'Expression orale'},
-  ];
-  bar.innerHTML = items.map(it=>{
-    const done = t[it.k] && t[it.k].done;
-    return `<span class="tema-chip ${done?'done':''}">${done?'✅':'⬜'} ${it.label}</span>`;
-  }).join('');
-  const certZone = document.getElementById('tema-cert-zone');
-  if(certZone){
-    certZone.innerHTML = temaAllDone() ? certificateBlockHTML() : `
-      <div class="tema-cert-locked">
-        <p>🔒 Ton certificat souvenir se débloque quand tu as terminé les 4 activités du thème.</p>
-        <p class="pt">🇧🇷 Seu certificado de lembrança é desbloqueado quando você terminar as 4 atividades do tema.</p>
-      </div>`;
-  }
-}
-function certificateBlockHTML(){
-  const tema = getTema(temaSelectedId);
-  const t = (student.temas && student.temas[temaSelectedId]) || {};
-  const grade = t.review;
-  return `
-    <div class="tema-cert-unlocked">
-      <p>🎉 Bravo, tu as terminé le thème « ${tema.titre_fr} » !</p>
-      <p class="pt">🇧🇷 Parabéns, você terminou o tema "${tema.titre_fr}"!</p>
-      ${grade && typeof grade.note !== 'undefined' && grade.note !== null ? `<p class="tema-grade">📝 Note de ta professeure : <b>${grade.note}</b>${grade.comment ? ' — ' + grade.comment : ''}</p>` : ''}
-      <button class="primary-btn" style="width:auto; padding:12px 22px;" onclick="downloadCertificate()">🏆 Télécharger mon certificat</button>
-    </div>
-  `;
-}
-function downloadCertificate(){
-  const tema = getTema(temaSelectedId);
-  const cv = document.createElement('canvas');
-  cv.width = 1200; cv.height = 850;
-  const ctx = cv.getContext('2d');
-  const grad = ctx.createLinearGradient(0,0,1200,850);
-  grad.addColorStop(0,'#182a6b'); grad.addColorStop(1,'#0f1c4d');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,1200,850);
-  ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 6;
-  ctx.strokeRect(30,30,1140,790);
-  ctx.strokeStyle = 'rgba(255,183,3,.5)'; ctx.lineWidth = 2;
-  ctx.strokeRect(46,46,1108,758);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffe08a';
-  ctx.font = '600 20px Georgia, serif';
-  ctx.fillText('CERTIFICAT DE RÉUSSITE — FLE', 600, 150);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 46px Georgia, serif';
-  ctx.fillText(tema.titre_fr, 600, 235);
-  ctx.font = '20px Georgia, serif';
-  ctx.fillStyle = '#c9d3e6';
-  ctx.fillText(tema.periode, 600, 280);
-  ctx.font = '22px Georgia, serif';
-  ctx.fillStyle = '#dbe3f2';
-  ctx.fillText('décerné à', 600, 360);
-  ctx.font = '700 46px Georgia, serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`${student.prenom} ${student.nom}`, 600, 425);
-  ctx.font = '18px Georgia, serif';
-  ctx.fillStyle = '#c9d3e6';
-  ctx.fillText(`Niveau ${niveau} — a terminé les 4 activités de la semaine`, 600, 470);
-  ctx.fillText('(compréhension orale, compréhension écrite, expression écrite, expression orale)', 600, 498);
-  const t = (student.temas && student.temas[temaSelectedId]) || {};
-  if(t.review && typeof t.review.note !== 'undefined' && t.review.note !== null){
-    ctx.font = '700 26px Georgia, serif';
-    ctx.fillStyle = '#ffb703';
-    ctx.fillText(`Note : ${t.review.note}`, 600, 560);
-  }
-  ctx.font = 'italic 16px Georgia, serif';
-  ctx.fillStyle = '#a9b6d2';
-  ctx.fillText(`Prof Melissa Radde · FLE · ${new Date().toLocaleDateString('fr-FR')}`, 600, 760);
-  const link = document.createElement('a');
-  link.download = `certificat_${slug(student.prenom)}-${slug(student.nom)}_${slug(tema.titre_fr)}.png`;
-  link.href = cv.toDataURL('image/png');
-  link.click();
-}
-
-function goTemaWeek(id){
-  temaSelectedId = id;
-  renderTemas();
-}
-
-function renderTemas(){
-  const c = document.getElementById('content');
-  if(!temaSelectedId){ temaSelectedId = temaMostRecentVisibleId(); }
-  // Si l'id sélectionné correspond à un thème pas encore publié (ex: ancien lien, ou
-  // date système qui a reculé), on retombe sur le dernier thème visible.
-  if(!temaEstVisibleEleve(getTema(temaSelectedId))){ temaSelectedId = temaMostRecentVisibleId(); }
-  const tema = getTema(temaSelectedId);
-  const effNiveau = temaNiveauEffectif();
-  const data = tema.niveaux[effNiveau];
-  student.temas = student.temas || {};
-
-  // Sélecteur de semaines — plus récent en premier (seulement les thèmes déjà publiés)
-  const weeksHTML = [...temasSemanasVisiveisEleve()].reverse().map(t=>{
-    const done = temaAllDone(t.id);
-    const active = t.id === temaSelectedId;
-    return `<button class="tema-week-tab ${active?'active':''}" onclick="goTemaWeek('${t.id}')">
-      ${done ? '✅ ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
-    </button>`;
-  }).join('');
-
-  c.innerHTML = `
-    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
-    <div class="tema-header">
-      <p class="tema-period">📅 ${tema.periode}</p>
-      <h1>🍅 ${tema.titre_fr}</h1>
-      <p class="tema-sub">${tema.sub_fr} · 🇧🇷 ${tema.titre_pt} — ${tema.sub_pt}</p>
-    </div>
-    <div class="tema-week-tabs">${weeksHTML}</div>
-    <p class="section-label" style="margin:0 0 6px; font-size:12.5px; text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink);">Niveau ${effNiveau} (attribué par ta professeure) · ⏱️ Durée totale estimée : ${data.duree}</p>
-    <div class="tema-status-bar" id="tema-status-bar"></div>
-    <div id="tema-cert-zone" style="margin-bottom:20px;"></div>
-    <div class="tema-skill-grid" id="tema-skill-grid"></div>
-  `;
-
-  const grid = document.getElementById('tema-skill-grid');
-
-  // Compréhension orale
-  const coUid = `tema_${tema.id}_${effNiveau}_co`;
-  const co = data.co;
-  let coMedia = '';
-  if(co.media && co.media.type==='video'){
-    coMedia = `<div class="media-block"><p class="section-label">▶ Regarder / Écouter — Assistir / Ouvir</p><iframe src="https://www.youtube.com/embed/${co.media.id}" loading="lazy" allowfullscreen></iframe><p class="source-link" style="margin-top:4px;">🎵 ${co.media.label}</p></div>`;
-  }
-  grid.innerHTML += `
-    <div class="tema-skill-card">
-      <div class="tema-skill-top"><span class="tema-skill-icon">🎧</span><h3 class="tema-skill-name">${co.titre_fr}</h3><span class="tema-skill-dur">${co.dur}</span></div>
-      <p class="tema-skill-name-pt">🇧🇷 ${co.titre_pt}</p>
-      <p class="tema-consigne">${co.consigne_fr}</p>
-      <p class="tema-consigne-pt">🇧🇷 ${co.consigne_pt}</p>
-      ${coMedia}
-      ${temaExoHTML(co.exo, coUid, 'co')}
-      ${temaExoListHTML(co.exos, coUid, 'co')}
-    </div>
-  `;
-
-  // Compréhension écrite
-  const ceUid = `tema_${tema.id}_${effNiveau}_ce`;
-  const ce = data.ce;
-  const ceLink = ce.link ? `<a class="source-link" href="${ce.link.url}" target="_blank" rel="noopener">🔗 ${ce.link.label}</a>` : '';
-  grid.innerHTML += `
-    <div class="tema-skill-card">
-      <div class="tema-skill-top"><span class="tema-skill-icon">📖</span><h3 class="tema-skill-name">${ce.titre_fr}</h3><span class="tema-skill-dur">${ce.dur}</span></div>
-      <p class="tema-skill-name-pt">🇧🇷 ${ce.titre_pt}</p>
-      <div class="media-block" style="background:var(--cream); border-radius:8px; padding:14px 16px; margin:8px 0;">
-        <p style="margin:0; font-size:14.5px; line-height:1.6;">${ce.texte_fr}</p>
-      </div>
-      ${ceLink}
-      ${temaExoHTML(ce.exo, ceUid, 'ce')}
-      ${temaExoListHTML(ce.exos, ceUid, 'ce')}
-    </div>
-  `;
-
-  // Expression écrite
-  const eeUid = `tema_${tema.id}_${effNiveau}_ee`;
-  const ee = data.ee;
-  const savedEE = (student.temas[tema.id] && student.temas[tema.id].ee && student.temas[tema.id].ee.text) || '';
-  grid.innerHTML += `
-    <div class="tema-skill-card">
-      <div class="tema-skill-top"><span class="tema-skill-icon">✍️</span><h3 class="tema-skill-name">${ee.titre_fr}</h3><span class="tema-skill-dur">${ee.dur}</span></div>
-      <p class="tema-skill-name-pt">🇧🇷 ${ee.titre_pt}</p>
-      <p class="tema-consigne">${ee.consigne_fr}</p>
-      <p class="tema-consigne-pt">🇧🇷 ${ee.consigne_pt}</p>
-      <textarea class="ee-textarea" id="${eeUid}" placeholder="Écris ta réponse ici... / Escreva sua resposta aqui...">${savedEE}</textarea>
-      <div style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
-        <button class="rec-btn" onclick="temaSaveEE('${eeUid}')">📤 Envoyer à ma professeure</button>
-        <p class="ee-note" id="eestatus-${eeUid}" style="margin:0;">${savedEE ? '✅ Déjà envoyé — tu peux le modifier et renvoyer.' : ''}</p>
-      </div>
-    </div>
-  `;
-
-  // Expression orale
-  const eoUid = `tema_${tema.id}_${effNiveau}_eo`;
-  const eo = data.eo;
-  const savedEO = student.temas[tema.id] && student.temas[tema.id].eo;
-  grid.innerHTML += `
-    <div class="tema-skill-card">
-      <div class="tema-skill-top"><span class="tema-skill-icon">🗣️</span><h3 class="tema-skill-name">${eo.titre_fr}</h3><span class="tema-skill-dur">${eo.dur}</span></div>
-      <p class="tema-skill-name-pt">🇧🇷 ${eo.titre_pt}</p>
-      <div class="rec-box">
-        <p class="rec-consigne">${eo.consigne_fr}</p>
-        <p class="rec-consigne-pt">🇧🇷 ${eo.consigne_pt}</p>
-        <div class="rec-controls">
-          <button class="rec-btn" id="btn-${eoUid}" onclick="temaToggleRec('${eoUid}')">● Enregistrer</button>
-          <span class="rec-time" id="time-${eoUid}">00:00</span>
-        </div>
-        <div id="player-${eoUid}">${savedEO && savedEO.driveUrl ? `<audio class="rec-audio" controls src="${savedEO.driveUrl}"></audio>` : ''}</div>
-        <p class="rec-status ${savedEO && savedEO.done ? 'ok' : ''}" id="status-${eoUid}">${savedEO && savedEO.done ? '✅ Déjà envoyé à ta professeure.' : "Ton enregistrement sera envoyé automatiquement à ta professeure."}</p>
-      </div>
-    </div>
-  `;
-
-  renderTemaStatusBar();
-}
-
-/* ---- Onglet professeure : Thème de la semaine ---- */
-let openTemaReviewId = null;
-function loadTeacherTemas(){
-  if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
-  if(studentsData.length===0){ loadTeacherStudents().then(renderTeacherTemas); }
-  else renderTeacherTemas();
-}
-function setTeacherTemaWeek(id){
-  teacherTemaSelectedId = id;
-  openTemaReviewId = null;
-  renderTeacherTemas();
-}
-function toggleTemaReview(id){
-  openTemaReviewId = (openTemaReviewId === id) ? null : id;
-  renderTeacherTemas();
-}
-function temaReviewEditorHTML(s){
-  const t = (s.temas && s.temas[teacherTemaSelectedId]) || {};
-  const review = t.review || {};
-  const ee = t.ee || {};
-  const eo = t.eo || {};
-  return `<div class="rec-box" style="margin-top:10px;">
-    <p class="rec-consigne" style="font-weight:700;">🍅 ${getTema(teacherTemaSelectedId).titre_fr} — ${s.prenom} ${s.nom} · Niveau ${s.niveau || '—'}</p>
-    <p style="font-size:13px; margin:6px 0;"><b>Compréhension orale :</b> ${t.co && t.co.done ? (t.co.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
-    <p style="font-size:13px; margin:6px 0;"><b>Compréhension écrite :</b> ${t.ce && t.ce.done ? (t.ce.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
-    <p style="font-size:13px; margin:10px 0 4px;"><b>Expression écrite :</b></p>
-    ${ee.text ? `<div style="background:var(--cream); border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap;">${ee.text}</div>${ee.driveUrl ? `<a class="source-link" href="${ee.driveUrl}" target="_blank" rel="noopener">🔗 Ouvrir le fichier sur le Drive</a>` : ''}` : '<p style="font-size:13px; color:var(--grey);">⬜ Pas encore envoyé.</p>'}
-    <p style="font-size:13px; margin:10px 0 4px;"><b>Expression orale :</b></p>
-    ${eo.driveUrl ? `<audio class="rec-audio" controls src="${eo.driveUrl}"></audio>` : '<p style="font-size:13px; color:var(--grey);">⬜ Pas encore envoyé.</p>'}
-    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">
-      <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Note
-        <input type="text" id="temanote-${s.id}" value="${review.note != null ? review.note : ''}" placeholder="ex: 8/10" style="width:80px; margin-left:6px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px;">
-      </label>
-    </div>
-    <textarea id="temacomment-${s.id}" placeholder="Commentaire pour l'élève (optionnel)" style="width:100%; min-height:60px; margin-top:8px; padding:8px; border:1px solid var(--line); border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px;">${review.comment || ''}</textarea>
-    <div class="teacher-entry-actions" style="margin-top:8px;">
-      <button onclick="saveTemaReview('${s.id}')">Enregistrer la note</button>
-      <button onclick="toggleTemaReview('${s.id}')" style="background:none; color:var(--grey);">Fermer</button>
-    </div>
-  </div>`;
-}
-async function saveTemaReview(id){
-  const noteVal = document.getElementById(`temanote-${id}`).value.trim();
-  const comment = document.getElementById(`temacomment-${id}`).value.trim();
-  try{
-    await db.collection('eleves').doc(id).update({
-      [`temas.${teacherTemaSelectedId}.review`]: { note: noteVal || null, comment, ts: new Date().toISOString() }
-    });
-    openTemaReviewId = null;
-  }catch(e){ alert("Impossible d'enregistrer la note pour le moment."); }
-  await loadTeacherStudents();
-  renderTeacherTemas();
-}
-function renderTeacherTemas(){
-  const body = document.getElementById('teacher-body');
-  if(!body) return;
-  if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
-  const tema = getTema(teacherTemaSelectedId);
-  const weeksHTML = [...temasSemanas].reverse().map(t=>{
-    const active = t.id === teacherTemaSelectedId;
-    return `<button class="tema-week-tab ${active?'active':''}" onclick="setTeacherTemaWeek('${t.id}')">
-      ${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
-    </button>`;
-  }).join('');
-  if(studentsData.length===0){
-    body.innerHTML = `<div class="tema-week-tabs">${weeksHTML}</div><p class="teacher-empty">Aucun élève inscrit pour le moment.</p>`;
-    return;
-  }
-  body.innerHTML = `<div class="tema-week-tabs">${weeksHTML}</div>
-    <div class="storage-note">🍅 Thème affiché : <b>${tema.titre_fr}</b> (${tema.periode}). Le niveau utilisé pour chaque élève est celui attribué dans l'onglet « Élèves & niveaux ».</div>` +
-    studentsData.map(s=>{
-      const t = (s.temas && s.temas[teacherTemaSelectedId]) || {};
-      const doneCount = ['co','ce','ee','eo'].filter(k=> t[k] && t[k].done).length;
-      const allDone = doneCount===4;
-      const review = t.review;
-      return `<div class="teacher-entry">
-        <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
-        <div class="meta">Progression thème : <b style="color:${allDone?'var(--ok)':'var(--navy)'}">${doneCount}/4</b> ${allDone ? '· 🏆 certificat débloqué' : ''} ${review && review.note != null ? `· 📝 Note donnée : <b>${review.note}</b>` : ''}</div>
-        <div class="teacher-entry-actions">
-          <button onclick="toggleTemaReview('${s.id}')">${openTemaReviewId===s.id ? 'Fermer' : '👁️ Voir & noter'}</button>
-        </div>
-        ${openTemaReviewId === s.id ? temaReviewEditorHTML(s) : ''}
-      </div>`;
-    }).join('');
-}
-/* ===================== THÈME 05 → 11 octobre 2026 : C'est une blague ? ===================== */
+  },
+  /* ===================== THÈME 05 → 11 octobre 2026 : C'est une blague ? ===================== */
   {
     id: "blague-2026-10-05",
     date_debut: "2026-10-05",
@@ -1597,3 +1115,492 @@ function renderTeacherTemas(){
       }
     }
   }
+];
+
+function getTema(id){
+  return temasSemanas.find(t => t.id === id) || temasSemanas[temasSemanas.length - 1];
+}
+function temaMostRecentId(){
+  return temasSemanas[temasSemanas.length - 1].id;
+}
+
+/* Un thème avec "date_debut" (format "AAAA-MM-JJ") ne doit apparaître côté élève qu'à
+   partir de cette date (permet de préparer un thème à l'avance sans qu'il soit visible
+   trop tôt). Sans "date_debut", le thème est visible immédiatement — comportement
+   historique conservé pour tous les thèmes déjà publiés. Côté professeure, aucun
+   filtre n'est appliqué : elle voit et peut préparer tous les thèmes, y compris ceux
+   pas encore publiés aux élèves. */
+function temaEstVisibleEleve(t){
+  if(!t.date_debut) return true;
+  const aujourdhui = new Date().toISOString().slice(0,10);
+  return aujourdhui >= t.date_debut;
+}
+function temasSemanasVisiveisEleve(){
+  const visiveis = temasSemanas.filter(temaEstVisibleEleve);
+  return visiveis.length ? visiveis : [temasSemanas[0]]; // filet de sécurité, ne devrait jamais arriver
+}
+function temaMostRecentVisibleId(){
+  const visiveis = temasSemanasVisiveisEleve();
+  return visiveis[visiveis.length - 1].id;
+}
+
+let temaSelectedId = null;      // thème actuellement affiché côté élève
+let teacherTemaSelectedId = null; // thème actuellement affiché côté professeure
+
+/* Niveau effectif utilisé pour le thème : celui attribué par la professeure.
+   L'élève n'a pas de sélecteur de niveau — C1/C2 utilisent le contenu B2 (niveau le plus proche). */
+function temaNiveauEffectif(){
+  const tema = getTema(temaSelectedId);
+  if(tema.niveaux[niveau]) return niveau;
+  if(niveau==='C1' || niveau==='C2') return 'B2';
+  return 'A1';
+}
+
+function temaExoHTML(exo, uid, skill){
+  if(!exo) return '';
+  const opts = exo.options.map((o,i)=>`<button class="exo-opt" onclick="temaAnswerQCM('${uid}',${i},${exo.correct},'${skill}')">${o}</button>`).join('');
+  const niveauBadge = exo.niveau ? `<span class="niveau-badge niveau-${exo.niveau}">${exo.niveau}</span>` : '';
+  return `<div class="exo-box">
+    ${niveauBadge}
+    <p class="exo-consigne"><span class="label-fr">Consigne —</span> Choisis la bonne réponse.</p>
+    <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
+    <p class="exo-question">${exo.q}</p>
+    <div class="exo-options" id="opts-${uid}">${opts}</div>
+    <p class="exo-feedback" id="fb-${uid}"></p>
+  </div>`;
+}
+/* Plusieurs questions pour une même compétence (CO ou CE) — les thèmes plus
+   anciens n'ont qu'un seul "exo" (voir temaExoHTML ci-dessus, toujours
+   utilisée pour eux) ; les thèmes plus récents et plus exigeants peuvent
+   fournir un tableau "exos" à la place, un sous-uid par question. La
+   complétion (temaSaveField) reste suivie au niveau de la compétence dans
+   son ensemble, comme avant — répondre à n'importe laquelle des questions
+   met à jour le même statut. */
+function temaExoListHTML(exos, uid, skill){
+  if(!Array.isArray(exos) || !exos.length) return '';
+  return exos.map((exo,i)=> temaExoHTML(exo, `${uid}_${i}`, skill)).join('');
+}
+async function temaAnswerQCM(uid, chosen, correct, skill){
+  const container = document.getElementById('opts-'+uid);
+  const buttons = container.querySelectorAll('.exo-opt');
+  buttons.forEach((b,i)=>{
+    b.disabled = true;
+    if(i===correct) b.classList.add('correct');
+    if(i===chosen && chosen!==correct) b.classList.add('wrong');
+  });
+  const ok = chosen===correct;
+  const fb = document.getElementById('fb-'+uid);
+  if(ok){ fb.textContent = '✔ Correct ! / Correto!'; fb.className = 'exo-feedback ok'; }
+  else{ fb.textContent = '✘ La bonne réponse est en vert. / A resposta certa está em verde.'; fb.className = 'exo-feedback bad'; }
+  await temaSaveField(skill, {done:true, correct:ok});
+  renderTemaStatusBar();
+}
+
+async function temaSaveField(skill, data){
+  const temaId = temaSelectedId;
+  student.temas = student.temas || {};
+  student.temas[temaId] = student.temas[temaId] || {};
+  student.temas[temaId][skill] = { ...(student.temas[temaId][skill]||{}), ...data, ts: new Date().toISOString() };
+  if(!student.uid) return;
+  try{
+    await db.collection('eleves').doc(student.uid).update({
+      [`temas.${temaId}.${skill}`]: { ...data, ts: firebase.firestore.FieldValue.serverTimestamp() }
+    });
+  }catch(e){ /* non bloquant — reste enregistré localement pour cette session */ }
+}
+
+async function temaSaveEE(uid){
+  const ta = document.getElementById(uid);
+  const status = document.getElementById('eestatus-'+uid);
+  const text = ta.value.trim();
+  if(!text){ status.textContent = "Écris quelque chose avant d'envoyer. / Escreva algo antes de enviar."; status.className = 'ee-note'; return; }
+  status.textContent = 'Envoi en cours…'; status.className = 'ee-note';
+  const tema = getTema(temaSelectedId);
+  try{
+    const fileName = `${niveau}_${slug(student.prenom)}-${slug(student.nom)}_THEME-${slug(tema.titre_fr)}-expression-ecrite_${Date.now()}.txt`;
+    const blob = new Blob([text], {type:'text/plain'});
+    const b64 = await blobToBase64(blob);
+    const result = await callDriveScript({ action:'upload', fileName, mimeType:'text/plain', base64: b64 });
+    if(!result || !result.ok) throw new Error(result && result.error || 'échec Drive');
+    await temaSaveField('ee', {done:true, text, driveUrl: result.viewUrl, driveFileId: result.fileId});
+    status.textContent = '✅ Envoyé et enregistré sur le Drive de ta professeure ! / Enviado e salvo no Drive da professora!';
+    status.className = 'rec-status ok';
+  }catch(e){
+    await temaSaveField('ee', {done:true, text});
+    status.textContent = "✅ Envoyé à ta professeure (copie Drive indisponible pour le moment).";
+    status.className = 'rec-status ok';
+  }
+  renderTemaStatusBar();
+}
+
+const temaRecorders = {};
+async function temaToggleRec(uid){
+  const btn = document.getElementById('btn-'+uid);
+  const status = document.getElementById('status-'+uid);
+  if(!temaRecorders[uid] || !temaRecorders[uid].active){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr = new MediaRecorder(stream);
+      const chunks = [];
+      mr.ondataavailable = e=>chunks.push(e.data);
+      mr.onstop = async ()=>{
+        const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+        const url = URL.createObjectURL(blob);
+        const player = document.getElementById('player-'+uid);
+        const ext = (blob.type||'').includes('mp4') ? 'm4a' : 'webm';
+        player.innerHTML = `<audio class="rec-audio" controls src="${url}"></audio><br>
+          <a class="rec-dl" href="${url}" download="${uid}-secours.${ext}">⬇ Copie locale (secours) / Cópia local</a>`;
+        stream.getTracks().forEach(t=>t.stop());
+        clearInterval(temaRecorders[uid].timer);
+        status.textContent = 'Envoi en cours…';
+        status.className = 'rec-status';
+        const tema = getTema(temaSelectedId);
+        try{
+          const fileName = `${niveau}_${slug(student.prenom)}-${slug(student.nom)}_THEME-${slug(tema.titre_fr)}_${Date.now()}.${ext}`;
+          const b64 = await blobToBase64(blob);
+          const result = await callDriveScript({ action:'upload', fileName, mimeType: blob.type || 'audio/webm', base64: b64 });
+          if(!result || !result.ok) throw new Error(result && result.error || 'échec Drive');
+          await temaSaveField('eo', {done:true, driveUrl: result.viewUrl, driveFileId: result.fileId});
+          try{
+            await db.collection('enregistrements').add({
+              uid: student.uid, prenom: student.prenom, nom: student.nom, email: student.email, telephone: student.telephone,
+              niveau: niveau, dossier: "Thème de la semaine",
+              semaine: tema.titre_fr, jour: "Expression orale", activite: tema.titre_fr,
+              driveUrl: result.viewUrl, driveFileId: result.fileId,
+              type: 'tema', temaId: tema.id,
+              ts: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }catch(e2){ /* non bloquant */ }
+          status.textContent = '✅ Enregistrement envoyé à ta professeure.'; status.className = 'rec-status ok';
+          renderTemaStatusBar();
+        }catch(e){
+          status.textContent = "⚠ Échec de l'envoi — utilise la copie locale ci-dessus.";
+          status.className = 'rec-status bad';
+        }
+      };
+      mr.start();
+      let seconds = 0;
+      const timeEl = document.getElementById('time-'+uid);
+      const timer = setInterval(()=>{
+        seconds++;
+        const m = String(Math.floor(seconds/60)).padStart(2,'0');
+        const s = String(seconds%60).padStart(2,'0');
+        timeEl.textContent = `${m}:${s}`;
+      }, 1000);
+      temaRecorders[uid] = {mr, active:true, timer};
+      btn.textContent = '■ Arrêter';
+      btn.classList.add('recording');
+      status.textContent = 'Enregistrement en cours…';
+      status.className = 'rec-status';
+    }catch(err){
+      status.textContent = "Micro non disponible : autorise l'accès au micro dans ton navigateur.";
+      status.className = 'rec-status bad';
+    }
+  } else {
+    temaRecorders[uid].mr.stop();
+    temaRecorders[uid].active = false;
+    btn.textContent = '● Enregistrer';
+    btn.classList.remove('recording');
+  }
+}
+
+function temaAllDone(temaId){
+  const id = temaId || temaSelectedId;
+  const t = (student.temas && student.temas[id]) || {};
+  return !!(t.co && t.co.done && t.ce && t.ce.done && t.ee && t.ee.done && t.eo && t.eo.done);
+}
+function renderTemaStatusBar(){
+  const bar = document.getElementById('tema-status-bar');
+  if(!bar) return;
+  const t = (student.temas && student.temas[temaSelectedId]) || {};
+  const items = [
+    {k:'co', label:'Compréhension orale'},
+    {k:'ce', label:'Compréhension écrite'},
+    {k:'ee', label:'Expression écrite'},
+    {k:'eo', label:'Expression orale'},
+  ];
+  bar.innerHTML = items.map(it=>{
+    const done = t[it.k] && t[it.k].done;
+    return `<span class="tema-chip ${done?'done':''}">${done?'✅':'⬜'} ${it.label}</span>`;
+  }).join('');
+  const certZone = document.getElementById('tema-cert-zone');
+  if(certZone){
+    certZone.innerHTML = temaAllDone() ? certificateBlockHTML() : `
+      <div class="tema-cert-locked">
+        <p>🔒 Ton certificat souvenir se débloque quand tu as terminé les 4 activités du thème.</p>
+        <p class="pt">🇧🇷 Seu certificado de lembrança é desbloqueado quando você terminar as 4 atividades do tema.</p>
+      </div>`;
+  }
+}
+function certificateBlockHTML(){
+  const tema = getTema(temaSelectedId);
+  const t = (student.temas && student.temas[temaSelectedId]) || {};
+  const grade = t.review;
+  return `
+    <div class="tema-cert-unlocked">
+      <p>🎉 Bravo, tu as terminé le thème « ${tema.titre_fr} » !</p>
+      <p class="pt">🇧🇷 Parabéns, você terminou o tema "${tema.titre_fr}"!</p>
+      ${grade && typeof grade.note !== 'undefined' && grade.note !== null ? `<p class="tema-grade">📝 Note de ta professeure : <b>${grade.note}</b>${grade.comment ? ' — ' + grade.comment : ''}</p>` : ''}
+      <button class="primary-btn" style="width:auto; padding:12px 22px;" onclick="downloadCertificate()">🏆 Télécharger mon certificat</button>
+    </div>
+  `;
+}
+function downloadCertificate(){
+  const tema = getTema(temaSelectedId);
+  const cv = document.createElement('canvas');
+  cv.width = 1200; cv.height = 850;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,1200,850);
+  grad.addColorStop(0,'#182a6b'); grad.addColorStop(1,'#0f1c4d');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,1200,850);
+  ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 6;
+  ctx.strokeRect(30,30,1140,790);
+  ctx.strokeStyle = 'rgba(255,183,3,.5)'; ctx.lineWidth = 2;
+  ctx.strokeRect(46,46,1108,758);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffe08a';
+  ctx.font = '600 20px Georgia, serif';
+  ctx.fillText('CERTIFICAT DE RÉUSSITE — FLE', 600, 150);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 46px Georgia, serif';
+  ctx.fillText(tema.titre_fr, 600, 235);
+  ctx.font = '20px Georgia, serif';
+  ctx.fillStyle = '#c9d3e6';
+  ctx.fillText(tema.periode, 600, 280);
+  ctx.font = '22px Georgia, serif';
+  ctx.fillStyle = '#dbe3f2';
+  ctx.fillText('décerné à', 600, 360);
+  ctx.font = '700 46px Georgia, serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`${student.prenom} ${student.nom}`, 600, 425);
+  ctx.font = '18px Georgia, serif';
+  ctx.fillStyle = '#c9d3e6';
+  ctx.fillText(`Niveau ${niveau} — a terminé les 4 activités de la semaine`, 600, 470);
+  ctx.fillText('(compréhension orale, compréhension écrite, expression écrite, expression orale)', 600, 498);
+  const t = (student.temas && student.temas[temaSelectedId]) || {};
+  if(t.review && typeof t.review.note !== 'undefined' && t.review.note !== null){
+    ctx.font = '700 26px Georgia, serif';
+    ctx.fillStyle = '#ffb703';
+    ctx.fillText(`Note : ${t.review.note}`, 600, 560);
+  }
+  ctx.font = 'italic 16px Georgia, serif';
+  ctx.fillStyle = '#a9b6d2';
+  ctx.fillText(`Prof Melissa Radde · FLE · ${new Date().toLocaleDateString('fr-FR')}`, 600, 760);
+  const link = document.createElement('a');
+  link.download = `certificat_${slug(student.prenom)}-${slug(student.nom)}_${slug(tema.titre_fr)}.png`;
+  link.href = cv.toDataURL('image/png');
+  link.click();
+}
+
+function goTemaWeek(id){
+  temaSelectedId = id;
+  renderTemas();
+}
+
+function renderTemas(){
+  const c = document.getElementById('content');
+  if(!temaSelectedId){ temaSelectedId = temaMostRecentVisibleId(); }
+  // Si l'id sélectionné correspond à un thème pas encore publié (ex: ancien lien, ou
+  // date système qui a reculé), on retombe sur le dernier thème visible.
+  if(!temaEstVisibleEleve(getTema(temaSelectedId))){ temaSelectedId = temaMostRecentVisibleId(); }
+  const tema = getTema(temaSelectedId);
+  const effNiveau = temaNiveauEffectif();
+  const data = tema.niveaux[effNiveau];
+  student.temas = student.temas || {};
+
+  // Sélecteur de semaines — plus récent en premier (seulement les thèmes déjà publiés)
+  const weeksHTML = [...temasSemanasVisiveisEleve()].reverse().map(t=>{
+    const done = temaAllDone(t.id);
+    const active = t.id === temaSelectedId;
+    return `<button class="tema-week-tab ${active?'active':''}" onclick="goTemaWeek('${t.id}')">
+      ${done ? '✅ ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
+    </button>`;
+  }).join('');
+
+  c.innerHTML = `
+    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
+    <div class="tema-header">
+      <p class="tema-period">📅 ${tema.periode}</p>
+      <h1>🍅 ${tema.titre_fr}</h1>
+      <p class="tema-sub">${tema.sub_fr} · 🇧🇷 ${tema.titre_pt} — ${tema.sub_pt}</p>
+    </div>
+    <div class="tema-week-tabs">${weeksHTML}</div>
+    <p class="section-label" style="margin:0 0 6px; font-size:12.5px; text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink);">Niveau ${effNiveau} (attribué par ta professeure) · ⏱️ Durée totale estimée : ${data.duree}</p>
+    <div class="tema-status-bar" id="tema-status-bar"></div>
+    <div id="tema-cert-zone" style="margin-bottom:20px;"></div>
+    <div class="tema-skill-grid" id="tema-skill-grid"></div>
+  `;
+
+  const grid = document.getElementById('tema-skill-grid');
+
+  // Compréhension orale
+  const coUid = `tema_${tema.id}_${effNiveau}_co`;
+  const co = data.co;
+  let coMedia = '';
+  if(co.media && co.media.type==='video'){
+    coMedia = `<div class="media-block"><p class="section-label">▶ Regarder / Écouter — Assistir / Ouvir</p><iframe src="https://www.youtube.com/embed/${co.media.id}" loading="lazy" allowfullscreen></iframe><p class="source-link" style="margin-top:4px;">🎵 ${co.media.label}</p></div>`;
+  }
+  grid.innerHTML += `
+    <div class="tema-skill-card">
+      <div class="tema-skill-top"><span class="tema-skill-icon">🎧</span><h3 class="tema-skill-name">${co.titre_fr}</h3><span class="tema-skill-dur">${co.dur}</span></div>
+      <p class="tema-skill-name-pt">🇧🇷 ${co.titre_pt}</p>
+      <p class="tema-consigne">${co.consigne_fr}</p>
+      <p class="tema-consigne-pt">🇧🇷 ${co.consigne_pt}</p>
+      ${coMedia}
+      ${temaExoHTML(co.exo, coUid, 'co')}
+      ${temaExoListHTML(co.exos, coUid, 'co')}
+    </div>
+  `;
+
+  // Compréhension écrite
+  const ceUid = `tema_${tema.id}_${effNiveau}_ce`;
+  const ce = data.ce;
+  const ceLink = ce.link ? `<a class="source-link" href="${ce.link.url}" target="_blank" rel="noopener">🔗 ${ce.link.label}</a>` : '';
+  grid.innerHTML += `
+    <div class="tema-skill-card">
+      <div class="tema-skill-top"><span class="tema-skill-icon">📖</span><h3 class="tema-skill-name">${ce.titre_fr}</h3><span class="tema-skill-dur">${ce.dur}</span></div>
+      <p class="tema-skill-name-pt">🇧🇷 ${ce.titre_pt}</p>
+      <div class="media-block" style="background:var(--cream); border-radius:8px; padding:14px 16px; margin:8px 0;">
+        <p style="margin:0; font-size:14.5px; line-height:1.6;">${ce.texte_fr}</p>
+      </div>
+      ${ceLink}
+      ${temaExoHTML(ce.exo, ceUid, 'ce')}
+      ${temaExoListHTML(ce.exos, ceUid, 'ce')}
+    </div>
+  `;
+
+  // Expression écrite
+  const eeUid = `tema_${tema.id}_${effNiveau}_ee`;
+  const ee = data.ee;
+  const savedEE = (student.temas[tema.id] && student.temas[tema.id].ee && student.temas[tema.id].ee.text) || '';
+  grid.innerHTML += `
+    <div class="tema-skill-card">
+      <div class="tema-skill-top"><span class="tema-skill-icon">✍️</span><h3 class="tema-skill-name">${ee.titre_fr}</h3><span class="tema-skill-dur">${ee.dur}</span></div>
+      <p class="tema-skill-name-pt">🇧🇷 ${ee.titre_pt}</p>
+      <p class="tema-consigne">${ee.consigne_fr}</p>
+      <p class="tema-consigne-pt">🇧🇷 ${ee.consigne_pt}</p>
+      <textarea class="ee-textarea" id="${eeUid}" placeholder="Écris ta réponse ici... / Escreva sua resposta aqui...">${savedEE}</textarea>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
+        <button class="rec-btn" onclick="temaSaveEE('${eeUid}')">📤 Envoyer à ma professeure</button>
+        <p class="ee-note" id="eestatus-${eeUid}" style="margin:0;">${savedEE ? '✅ Déjà envoyé — tu peux le modifier et renvoyer.' : ''}</p>
+      </div>
+    </div>
+  `;
+
+  // Expression orale
+  const eoUid = `tema_${tema.id}_${effNiveau}_eo`;
+  const eo = data.eo;
+  const savedEO = student.temas[tema.id] && student.temas[tema.id].eo;
+  grid.innerHTML += `
+    <div class="tema-skill-card">
+      <div class="tema-skill-top"><span class="tema-skill-icon">🗣️</span><h3 class="tema-skill-name">${eo.titre_fr}</h3><span class="tema-skill-dur">${eo.dur}</span></div>
+      <p class="tema-skill-name-pt">🇧🇷 ${eo.titre_pt}</p>
+      <div class="rec-box">
+        <p class="rec-consigne">${eo.consigne_fr}</p>
+        <p class="rec-consigne-pt">🇧🇷 ${eo.consigne_pt}</p>
+        <div class="rec-controls">
+          <button class="rec-btn" id="btn-${eoUid}" onclick="temaToggleRec('${eoUid}')">● Enregistrer</button>
+          <span class="rec-time" id="time-${eoUid}">00:00</span>
+        </div>
+        <div id="player-${eoUid}">${savedEO && savedEO.driveUrl ? `<audio class="rec-audio" controls src="${savedEO.driveUrl}"></audio>` : ''}</div>
+        <p class="rec-status ${savedEO && savedEO.done ? 'ok' : ''}" id="status-${eoUid}">${savedEO && savedEO.done ? '✅ Déjà envoyé à ta professeure.' : "Ton enregistrement sera envoyé automatiquement à ta professeure."}</p>
+      </div>
+    </div>
+  `;
+
+  renderTemaStatusBar();
+}
+
+/* ---- Onglet professeure : Thème de la semaine ---- */
+let openTemaReviewId = null;
+/* Version robuste : si le chargement des élèves échoue, l'erreur s'affiche
+   au lieu de laisser l'onglet bloqué sur « Chargement… ». */
+async function loadTeacherTemas(){
+  const body = document.getElementById('teacher-body');
+  try{
+    if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
+    if(studentsData.length===0){ await loadTeacherStudents(); }
+    renderTeacherTemas();
+  }catch(e){
+    console.error('Thème de la semaine :', e);
+    if(body) body.innerHTML = `<p class="teacher-empty">⚠️ Erreur de chargement : ${e.message}</p>`;
+  }
+}
+function setTeacherTemaWeek(id){
+  teacherTemaSelectedId = id;
+  openTemaReviewId = null;
+  renderTeacherTemas();
+}
+function toggleTemaReview(id){
+  openTemaReviewId = (openTemaReviewId === id) ? null : id;
+  renderTeacherTemas();
+}
+function temaReviewEditorHTML(s){
+  const t = (s.temas && s.temas[teacherTemaSelectedId]) || {};
+  const review = t.review || {};
+  const ee = t.ee || {};
+  const eo = t.eo || {};
+  return `<div class="rec-box" style="margin-top:10px;">
+    <p class="rec-consigne" style="font-weight:700;">🍅 ${getTema(teacherTemaSelectedId).titre_fr} — ${s.prenom} ${s.nom} · Niveau ${s.niveau || '—'}</p>
+    <p style="font-size:13px; margin:6px 0;"><b>Compréhension orale :</b> ${t.co && t.co.done ? (t.co.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
+    <p style="font-size:13px; margin:6px 0;"><b>Compréhension écrite :</b> ${t.ce && t.ce.done ? (t.ce.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
+    <p style="font-size:13px; margin:10px 0 4px;"><b>Expression écrite :</b></p>
+    ${ee.text ? `<div style="background:var(--cream); border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap;">${ee.text}</div>${ee.driveUrl ? `<a class="source-link" href="${ee.driveUrl}" target="_blank" rel="noopener">🔗 Ouvrir le fichier sur le Drive</a>` : ''}` : '<p style="font-size:13px; color:var(--grey);">⬜ Pas encore envoyé.</p>'}
+    <p style="font-size:13px; margin:10px 0 4px;"><b>Expression orale :</b></p>
+    ${eo.driveUrl ? `<audio class="rec-audio" controls src="${eo.driveUrl}"></audio>` : '<p style="font-size:13px; color:var(--grey);">⬜ Pas encore envoyé.</p>'}
+    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">
+      <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Note
+        <input type="text" id="temanote-${s.id}" value="${review.note != null ? review.note : ''}" placeholder="ex: 8/10" style="width:80px; margin-left:6px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px;">
+      </label>
+    </div>
+    <textarea id="temacomment-${s.id}" placeholder="Commentaire pour l'élève (optionnel)" style="width:100%; min-height:60px; margin-top:8px; padding:8px; border:1px solid var(--line); border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px;">${review.comment || ''}</textarea>
+    <div class="teacher-entry-actions" style="margin-top:8px;">
+      <button onclick="saveTemaReview('${s.id}')">Enregistrer la note</button>
+      <button onclick="toggleTemaReview('${s.id}')" style="background:none; color:var(--grey);">Fermer</button>
+    </div>
+  </div>`;
+}
+async function saveTemaReview(id){
+  const noteVal = document.getElementById(`temanote-${id}`).value.trim();
+  const comment = document.getElementById(`temacomment-${id}`).value.trim();
+  try{
+    await db.collection('eleves').doc(id).update({
+      [`temas.${teacherTemaSelectedId}.review`]: { note: noteVal || null, comment, ts: new Date().toISOString() }
+    });
+    openTemaReviewId = null;
+  }catch(e){ alert("Impossible d'enregistrer la note pour le moment."); }
+  await loadTeacherStudents();
+  renderTeacherTemas();
+}
+function renderTeacherTemas(){
+  const body = document.getElementById('teacher-body');
+  if(!body) return;
+  if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
+  const tema = getTema(teacherTemaSelectedId);
+  const weeksHTML = [...temasSemanas].reverse().map(t=>{
+    const active = t.id === teacherTemaSelectedId;
+    return `<button class="tema-week-tab ${active?'active':''}" onclick="setTeacherTemaWeek('${t.id}')">
+      ${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
+    </button>`;
+  }).join('');
+  if(studentsData.length===0){
+    body.innerHTML = `<div class="tema-week-tabs">${weeksHTML}</div><p class="teacher-empty">Aucun élève inscrit pour le moment.</p>`;
+    return;
+  }
+  body.innerHTML = `<div class="tema-week-tabs">${weeksHTML}</div>
+    <div class="storage-note">🍅 Thème affiché : <b>${tema.titre_fr}</b> (${tema.periode}). Le niveau utilisé pour chaque élève est celui attribué dans l'onglet « Élèves & niveaux ».</div>` +
+    studentsData.map(s=>{
+      const t = (s.temas && s.temas[teacherTemaSelectedId]) || {};
+      const doneCount = ['co','ce','ee','eo'].filter(k=> t[k] && t[k].done).length;
+      const allDone = doneCount===4;
+      const review = t.review;
+      return `<div class="teacher-entry">
+        <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
+        <div class="meta">Progression thème : <b style="color:${allDone?'var(--ok)':'var(--navy)'}">${doneCount}/4</b> ${allDone ? '· 🏆 certificat débloqué' : ''} ${review && review.note != null ? `· 📝 Note donnée : <b>${review.note}</b>` : ''}</div>
+        <div class="teacher-entry-actions">
+          <button onclick="toggleTemaReview('${s.id}')">${openTemaReviewId===s.id ? 'Fermer' : '👁️ Voir & noter'}</button>
+        </div>
+        ${openTemaReviewId === s.id ? temaReviewEditorHTML(s) : ''}
+      </div>`;
+    }).join('');
+}
