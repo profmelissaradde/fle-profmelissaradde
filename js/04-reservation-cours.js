@@ -119,6 +119,30 @@ async function ensureZoomMeeting(slotId, dateISO, duree, studentName, sessionNum
   }catch(e){ console.warn('createZoomMeeting a échoué.', e); return false; }
 }
 
+
+async function syncRescheduledCourse(slotId, oldDateISO, newDateISO, duree, studentName, previousZoomJoinUrl){
+  const topic = `Cours de français avec ${studentName || ''}`;
+  try{
+    const result = await callDriveScript({
+      action: 'syncRescheduledCourse',
+      slotId,
+      oldDate: oldDateISO || null,
+      newDate: newDateISO || null,
+      duration: duree || 45,
+      topic,
+      previousZoomJoinUrl: previousZoomJoinUrl || null
+    });
+    if(result && result.ok){
+      return result;
+    }
+    console.warn('syncRescheduledCourse: réponse invalide.', result);
+    return {ok:false, error:(result && result.error) || 'Erreur inconnue'};
+  }catch(e){
+    console.warn('syncRescheduledCourse a échoué.', e);
+    return {ok:false, error:e && e.message ? e.message : String(e)};
+  }
+}
+
 /* ---- Mini-calendrier réutilisable ---- */
 function toDateKey(d){
   const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
@@ -504,7 +528,17 @@ async function acceptStudentAvailability(id, proposedDate){
     return;
   }
 
-  await ensureZoomMeeting(id, proposedDate, slot.duree || 45, slot.reservedName);
+  const sync = await syncRescheduledCourse(
+    id,
+    slot.date,
+    proposedDate,
+    slot.duree || 45,
+    slot.reservedName,
+    slot.zoomJoinUrl
+  );
+  if(!sync.ok){
+    alert("Le cours a été déplacé, mais la synchronisation Zoom / e-mail a échoué : " + (sync.error || "erreur inconnue"));
+  }
   await loadAdminDispo();
 }
 
@@ -528,7 +562,17 @@ async function confirmTeacherProposal(id){
       date: newDate, duree: newDuree, rescheduleRequest: null, anomalie: false, anomalieHandled: true, zoomJoinUrl: null
     });
   }catch(e){ alert("Impossible de confirmer pour le moment."); return; }
-  await ensureZoomMeeting(id, newDate, newDuree, `${student.prenom} ${student.nom}`);
+  const sync = await syncRescheduledCourse(
+    id,
+    slot.date,
+    newDate,
+    newDuree,
+    `${student.prenom} ${student.nom}`,
+    slot.zoomJoinUrl
+  );
+  if(!sync.ok){
+    alert("Le cours a bien été déplacé, mais la synchronisation Zoom / e-mail a échoué. Préviens Melissa.");
+  }
   await loadDispoEleve();
   if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
