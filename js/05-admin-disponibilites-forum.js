@@ -509,19 +509,20 @@ async function directRescheduleAdmin(id){
     alert("Impossible de changer la date pour le moment.");
     return;
   }
-  const zoomOk = await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
-  if(slot.reservedEmail){
-    try{
-      await callDriveScript({
-        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
-        oldDate: oldDateStr, newDate: fmtSlotDate(newDate)
-      });
-    }catch(e){ /* non bloquant */ }
-  }
+  const sync = await syncRescheduledCourse(
+    id,
+    slot.date,
+    newDate,
+    slot.duree,
+    slot.reservedName,
+    slot.zoomJoinUrl
+  );
   adminRescheduleFormOpenId = null;
   alert(
     `Cours déplacé au ${fmtSlotDate(newDate)}.` +
-    (zoomOk ? ' Nouveau lien Zoom généré avec succès.' : " ⚠️ Le lien Zoom n'a pas pu être régénéré automatiquement — utilise « Régénérer les liens Zoom manquants » avant le cours.")
+    (sync.ok
+      ? (sync.movedExisting ? " Réunion Zoom déplacée et confirmation envoyée à l'élève." : " Réunion Zoom recréée au bon horaire et confirmation envoyée à l'élève.")
+      : " ⚠️ Le cours est déplacé dans la plateforme, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"))
   );
   await loadAdminDispo();
 }
@@ -2017,19 +2018,20 @@ async function directRescheduleExperimental(id){
     alert("Impossible de changer la date pour le moment.");
     return;
   }
-  const zoomOk = await ensureZoomMeeting(id, newDate, slot.duree, slot.reservedName);
-  if(slot.reservedEmail){
-    try{
-      await callDriveScript({
-        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
-        oldDate: oldDateStr, newDate: fmtSlotDate(newDate)
-      });
-    }catch(e){ /* non bloquant */ }
-  }
+  const sync = await syncRescheduledCourse(
+    id,
+    slot.date,
+    newDate,
+    slot.duree,
+    slot.reservedName,
+    slot.zoomJoinUrl
+  );
   rescheduleFormOpenId = null;
   alert(
     `Cours déplacé au ${fmtSlotDate(newDate)}.` +
-    (zoomOk ? ' Nouveau lien Zoom généré avec succès.' : " ⚠️ Le lien Zoom n'a pas pu être régénéré automatiquement — utilise « Régénérer les liens Zoom manquants » dans l'onglet Disponibilités avant le cours.")
+    (sync.ok
+      ? (sync.movedExisting ? " Réunion Zoom déplacée et confirmation envoyée à l'élève." : " Réunion Zoom recréée au bon horaire et confirmation envoyée à l'élève.")
+      : " ⚠️ Le cours est déplacé dans la plateforme, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"))
   );
   await loadExperimentalAdmin();
 }
@@ -2079,12 +2081,18 @@ async function acceptStudentReschedule(id){
     return;
   }
 
-  await ensureZoomMeeting(
+  const sync = await syncRescheduledCourse(
     id,
+    slot.date,
     newDate,
     slot.duree,
-    slot.reservedName
+    slot.reservedName,
+    slot.zoomJoinUrl
   );
+
+  if(!sync.ok){
+    alert("Le cours a été déplacé, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"));
+  }
 
   await postSystemMessage(
     slot.reservedBy,
