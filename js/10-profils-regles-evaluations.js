@@ -10,9 +10,9 @@
     if(!sb||!student||!student.prenom||screen==='login')return;
     const wrap=document.createElement('div');
     wrap.innerHTML=`<div class="nav-sep"></div>
-      ${!isTeacher?`<button class="nav-btn ${screen==='profil'?'active':''}" style="--tag-color:#3a6df0" onclick="goProfil()"><span class="tag">👤</span> Mon profil</button>`:''}
-      ${isTeacher?`<button class="nav-btn ${screen==='admin-cours'?'active':''}" style="--tag-color:#ffb703" onclick="goAdminCours()"><span class="tag">📚</span> Vue des cours</button>`:''}
-      <button class="nav-btn ${screen==='regles'?'active':''}" style="--tag-color:#b8790a" onclick="goRegles()"><span class="tag">ℹ️</span> Règles & fonctionnement</button>`;
+      ${!isTeacher?`<button class="nav-btn ${screen==='profil'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goProfil()"><span class="tag">👤</span> Mon profil</button>`:''}
+      ${isTeacher?`<button class="nav-btn ${screen==='admin-cours'?'active':''}" style="--tag-color:var(--c-rose)" onclick="goAdminCours()"><span class="tag">📚</span> Vue des cours</button>`:''}
+      <button class="nav-btn ${screen==='regles'?'active':''}" style="--tag-color:var(--c-rose-ink)" onclick="goRegles()"><span class="tag">ℹ️</span> Règles & fonctionnement</button>`;
     while(wrap.firstChild)sb.appendChild(wrap.firstChild);
   };
   window.goProfil=()=>{if(!isTeacher){screen='profil';render();}};
@@ -174,5 +174,5 @@
 
   await loadTeacherStudents();adminOpenStudentId=id;adminStudentSection='forfait';renderTeacherStudentsList();
 };
-  window.previewStudent=id=>{const s=studentsData.find(x=>x.id===id);if(!s)return;const body=document.getElementById('teacher-body'),p=s.pack||{},r=Math.max(0,(p.total||0)-(p.used||0));body.innerHTML=`<button class="tab-btn" onclick="openAdminStudent('${s.id}')">← Retour à la fiche</button><div class="objectif-box" style="margin-top:14px;"><p class="fr" style="margin:0;"><b>Aperçu élève</b> — cette vue est en lecture seule.</p></div><p class="eyebrow">Mon espace</p><h2 class="page-title" style="font-family:'Fraunces',serif;color:var(--navy);">Mon profil</h2><div class="teacher-entry"><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div><div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${r} restante${r>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div><h2 class="section-title">Mes dossiers</h2>${dossierRowsHTML(s,false)}`;};
+  window.previewStudent=id=>{const s=studentsData.find(x=>x.id===id);if(!s)return;const body=document.getElementById('teacher-body'),p=s.pack||{},r=Math.max(0,(p.total||0)-(p.used||0));body.innerHTML=`<button class="tab-btn" onclick="openAdminStudent('${s.id}')">← Retour à la fiche</button><div class="objectif-box" style="margin-top:14px;"><p class="fr" style="margin:0;"><b>Aperçu élève</b> — cette vue est en lecture seule.</p></div><p class="eyebrow">Mon espace</p><h2 class="page-title" style="color:var(--navy);">Mon profil</h2><div class="teacher-entry"><div class="who">${esc(s.prenom)} ${esc(s.nom)}</div><div class="meta">${esc(s.email||'')}</div></div><div class="teacher-entry"><div class="who">Organisation des cours</div><div class="meta" style="margin-top:6px;">${s.frequence?`${s.frequence} séance${s.frequence>1?'s':''} par semaine`:'Rythme à définir'} · ${p.total?`${r} restante${r>1?'s':''} sur ${p.total}`:'Aucun forfait défini'}</div></div><h2 class="section-title">Mes dossiers</h2>${dossierRowsHTML(s,false)}`;};
 })();

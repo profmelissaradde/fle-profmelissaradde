@@ -180,7 +180,7 @@ async function refreshNiveau(){
 /* ======================= ÉCRAN : PHRASES DE SURVIE ======================= */
 const survieCategories = [
   {
-    titre: "🏫 En classe", couleur:"#3a6df0",
+    titre: "🏫 En classe", couleur:"var(--c-primary)",
     phrases: [
       ["Je ne comprends pas.", "Não entendo."],
       ["Vous pouvez répéter, s'il vous plaît ?", "Pode repetir, por favor?"],
@@ -191,7 +191,7 @@ const survieCategories = [
     ]
   },
   {
-    titre: "🚨 Urgences", couleur:"#ef476f",
+    titre: "🚨 Urgences", couleur:"var(--c-danger)",
     phrases: [
       ["Au secours !", "Socorro!"],
       ["Appelez une ambulance, s'il vous plaît.", "Chame uma ambulância, por favor."],
@@ -202,7 +202,7 @@ const survieCategories = [
     ]
   },
   {
-    titre: "🧭 Se déplacer", couleur:"#06a77d",
+    titre: "🧭 Se déplacer", couleur:"var(--c-success)",
     phrases: [
       ["Où sont les toilettes ?", "Onde fica o banheiro?"],
       ["Comment aller à la gare ?", "Como chego à estação?"],
@@ -213,7 +213,7 @@ const survieCategories = [
     ]
   },
   {
-    titre: "🍽️ Manger & acheter", couleur:"#e8590c",
+    titre: "🍽️ Manger & acheter", couleur:"var(--c-warning)",
     phrases: [
       ["L'addition, s'il vous plaît.", "A conta, por favor."],
       ["Combien ça coûte ?", "Quanto custa?"],
@@ -224,7 +224,7 @@ const survieCategories = [
     ]
   },
   {
-    titre: "🤝 Demander de l'aide", couleur:"#8338ec",
+    titre: "🤝 Demander de l'aide", couleur:"var(--c-primary)",
     phrases: [
       ["Pouvez-vous m'aider, s'il vous plaît ?", "Pode me ajudar, por favor?"],
       ["Je ne parle pas bien français.", "Não falo bem francês."],

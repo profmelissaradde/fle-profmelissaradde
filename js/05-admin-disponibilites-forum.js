@@ -106,7 +106,7 @@ async function loadNextCourseBanner(){
 
         ${timezoneLineHTML(displayDate)}
         ${pendingFromTeacher ? `
-          <div class="storage-note" style="background:#FCF3CF;">
+          <div class="storage-note" style="background:var(--c-warning-bg);">
             📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.
             <div style="margin-top:6px;">
               <button class="rec-btn" onclick="confirmTeacherProposal('${s.id}')">✅ Confirmer</button>
@@ -114,7 +114,7 @@ async function loadNextCourseBanner(){
             </div>
           </div>` : ''}
         ${pendingFromMe ? `
-          <div class="storage-note" style="background:#F4ECF7;">
+          <div class="storage-note" style="background:var(--c-info-bg);">
             ⏳ Ta demande de replanification est en attente de validation par ta professeure.
             ${s.rescheduleRequest.availability1 ? `
               <div style="margin-top:6px; font-size:12.5px;">
@@ -163,7 +163,7 @@ function renderAnnouncementBanner(){
   if(!el) return;
   if(!hasUnseenAnnouncement()){ el.innerHTML = ''; return; }
   el.innerHTML = `
-    <div class="storage-note" style="background:#E8F0FE; margin-bottom:18px;">
+    <div class="storage-note" style="background:var(--c-info-bg); margin-bottom:18px;">
       📣 <b>Message de ta professeure</b>
       <p style="margin:6px 0 0; font-size:13.5px; white-space:pre-wrap;">${esc(latestAnnouncement.text)}</p>
       <button onclick="dismissAnnouncement()" style="margin-top:8px; background:none; color:var(--navy);">J'ai vu, fermer</button>
@@ -216,7 +216,7 @@ function renderPackPaymentBanner(){
     return;
   }
   el.innerHTML = `
-    <div class="storage-note" style="background:#FFF7E6; margin-bottom:18px;">
+    <div class="storage-note" style="background:var(--c-warning-bg); margin-bottom:18px;">
       💳 <b>Ton forfait est prêt !</b> Choisis ton mode de paiement pour l'activer :
       ${flow}
       <div style="margin-top:10px;">
@@ -907,7 +907,7 @@ function renderAdminDispo(){
 
   upcoming.forEach(s=>{
     markers[toDateKey(new Date(s.date))] = {
-      color: s.reservedBy ? '#e08a1e' : '#06a77d'
+      color: s.reservedBy ? 'var(--c-primary)' : 'var(--c-success)'
     };
   });
 
@@ -968,7 +968,7 @@ function renderAdminDispo(){
   const pendingHTML =
     pendingFromStudents.length
       ? `
-        <div class="rec-box" style="border-color:#8338ec;">
+        <div class="rec-box" style="border-color:var(--c-primary);">
           <p class="rec-consigne" style="font-weight:700;">
             📅 Demandes de replanification des élèves
           </p>
@@ -1310,7 +1310,7 @@ function renderAdminDispo(){
           ? `
             <button
               onclick="selectAdminDay('${adminSelectedDay}')"
-              style="background:none; color:#e08a1e; font-size:12px; font-weight:700; vertical-align:middle;"
+              style="background:none; color:var(--c-primary); font-size:12px; font-weight:700; vertical-align:middle;"
             >
               ✕ voir tous les jours
             </button>
@@ -2868,7 +2868,7 @@ function messageBubbleHTML(
   if(m.isSystemMessage){
     return `
       <div style="text-align:center; margin:10px 0;">
-        <span style="display:inline-block; background:#eef1f5; color:var(--grey); font-size:12px; padding:6px 12px; border-radius:100px;">
+        <span style="display:inline-block; background:var(--c-surface-2); color:var(--grey); font-size:12px; padding:6px 12px; border-radius:100px;">
           ${esc(m.text)}
         </span>
       </div>
@@ -2965,7 +2965,7 @@ function messageBubbleHTML(
       data-msg-id="${m.id}"
     >
       <span
-        style="display:inline-block; background:${mine?'var(--brand-blue)':'#eee'}; color:${mine?'#fff':'#20232b'}; padding:8px 12px; border-radius:12px; max-width:78%; font-size:13.5px; text-align:left;"
+        style="display:inline-block; background:${mine?'var(--brand-blue)':'var(--c-surface-2)'}; color:${mine?'#fff':'var(--c-text)'}; padding:8px 12px; border-radius:12px; max-width:78%; font-size:13.5px; text-align:left;"
       >
         ${m.text ? esc(m.text) : ''}
         ${attachmentHtml}
@@ -3396,7 +3396,7 @@ function renderMessages(){
 
     <div
       id="thread-messages"
-      style="max-height:440px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;"
+      style="max-height:440px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--c-surface-2);"
     ></div>
 
     <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
@@ -3817,7 +3817,7 @@ function renderTeacherMessages(){
 
       <div
         id="thread-messages"
-        style="max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:#fafafa;"
+        style="max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:12px; background:var(--c-surface-2);"
       >
         ${
           msgs.length
@@ -4225,7 +4225,7 @@ function renderForumBody(){
               : `
                 <button
                   onclick="toggleForumReply('${q.id}')"
-                  style="background:none; color:var(--accent-2, #6f42c1); font-weight:700; margin-top:6px;"
+                  style="background:none; color:var(--accent-2, var(--c-primary)); font-weight:700; margin-top:6px;"
                 >
                   ↩ Répondre
                 </button>
