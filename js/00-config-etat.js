@@ -119,7 +119,8 @@ window.addEventListener('load', () => {
       pack:record.pack || {}, evaluations:record.evaluations || [],
       experimentalLesson:record.experimentalLesson === true,
       registrationSource:record.registrationSource || null, status:record.status || null,
-      lastAnnouncementSeenId: record.lastAnnouncementSeenId || null
+      lastAnnouncementSeenId: record.lastAnnouncementSeenId || null,
+      niveauTheme: record.niveauTheme || null /* niveau de « Thème de la semaine » forcé par la professeure (ex. A0) */
     };
     startStudentMessagesListener();
     loadLatestAnnouncement(); /* pour le badge de notification — non bloquant */
