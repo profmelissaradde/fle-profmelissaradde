@@ -38,3 +38,23 @@ Si `config/temas` n'est pas lisible, l'application utilise le statut écrit dans
 ## Types d'exercices
 `qcm` · `court` (accept) · `trous` (`___` + blancs) · `association` (paires) · `ordre` (unites) · `mixte` (accept + modele : auto si identique, sinon correction prof) · `choix_justif` · `ouverte` (min_mots, `avis: true` pour une question d'opinion) · `oral`.
 `accents: "strict"` refuse une réponse juste à un accent près (conjugaison) ; sinon elle est acceptée avec un rappel.
+
+## Archivage automatique (lecture seule)
+- **Thème en cours** = le plus récent thème publié dont la date de début est passée (même règle que l'affichage). Il est le seul interactif.
+- **Thèmes archivés** = tous les thèmes publiés précédents : consultables (contenu, vidéos, anciennes réponses, corrections, progression, certificat), mais plus aucune réponse ne peut être donnée, modifiée, recommencée ou soumise. Bandeau « 🗄️ Thème archivé — Consultation uniquement ».
+- Bascule : à minuit UTC du jour `date_debut` du thème suivant (lundi 2 h à Paris, dimanche 21 h à Brasília). Un thème en brouillon ou à venir ne déclenche rien.
+- Rien n'est supprimé : réponses, notes et corrections restent en place ; la professeure peut toujours corriger et noter un thème archivé.
+- **Réouverture** : Admin › Suivi thème › fiche élève › « 🔓 Rouvrir exceptionnellement » (écrit `eleves/{uid}.temasRouverts.{temaId} = true`) ; « 🔒 Refermer » l'annule.
+
+### Blocage côté serveur
+L'application ne suffit pas : les règles de `docs/firestore-regles-themes.rules` refusent toute écriture d'élève sur un thème qui n'est ni en cours ni rouvert, toute modification de `temasRouverts` / `niveauTheme` par l'élève et toute modification des corrections de la professeure.
+Pour cela, l'application de la professeure publie automatiquement `config/temasCalendrier` (période de chaque thème) à chaque connexion, publication et création de thème. Chaque sauvegarde d'élève déclare le thème concerné dans le champ `temaEcriture`.
+
+**Important** : si tu ajoutes un thème directement dans le code, connecte-toi une fois avec ton compte professeure après la mise en ligne pour que le calendrier soit republié ; sinon les règles continueront de considérer l'ancien thème comme « en cours ».
+
+### Mise en place des règles (Firebase Console › Firestore Database › Règles)
+1. Colle les fonctions de `docs/firestore-regles-themes.rules` dans le bloc `match /databases/{database}/documents`.
+2. Ajoute `&& ecritureThemesAutorisee() && champsThemesReservesIntacts()` à la condition `update` de l'élève dans `match /eleves/{uid}` (et `'temaEcriture'` à la liste des champs autorisés si tu en as une).
+3. Ajoute les deux `match /config/...` indiqués.
+4. Publie, puis connecte-toi en professeure (publication du calendrier).
+5. Vérifie avec l'onglet « Terrain de jeu des règles » (Rules Playground) : une mise à jour de `eleves/<uid élève>` qui modifie `temas.<ancien thème>` doit être refusée.
