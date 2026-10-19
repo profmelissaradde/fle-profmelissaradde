@@ -17,15 +17,9 @@ function render(){
 
   renderSidebar();
   const contentEl = document.getElementById('content');
-  let accent = "#3a6df0";
-  if(screen==='week'){ const w = weeks.find(x=>x.id===current); if(w) accent = w.color; }
-  else if(screen==='bilan'){ accent = BILAN_COLOR; }
-  else if(screen==='survie'){ accent = "#ef476f"; }
-  else if(screen==='temas'){ accent = "#e08a1e"; }
-  else if(screen==='reserver'){ accent = "#06a77d"; }
-  else if(screen==='forum'){ accent = "#6f42c1"; }
-  else if(screen==='messages'){ accent = "#0d9488"; }
-  else if(screen==='historique'){ accent = "#8338ec"; }
+  /* Une seule couleur d'accent pour toute l'application (design system : css/design-system.css).
+     Les anciennes couleurs vives par section ont été retirées pour une interface homogène. */
+  const accent = "var(--c-primary)";
   contentEl.style.setProperty('--accent', accent);
   if(screen==='login') renderLogin();
   else if(screen==='verify') renderVerify();

@@ -92,7 +92,7 @@ function experimentalSlotLink(slot){
 function renderExperimentalSlotsHTML(){
   if(!experimentalSlots.length) return '<p class="teacher-empty">Aucun cours expérimental créé pour le moment.</p>';
   const now = Date.now();
-  const badgeStyle = { free:'background:var(--ok-bg);color:var(--ok);', reserved:'background:#eaf0ff;color:var(--brand-blue);', cancelled:'background:var(--bad-bg);color:var(--bad);' };
+  const badgeStyle = { free:'background:var(--ok-bg);color:var(--ok);', reserved:'background:var(--c-info-bg);color:var(--brand-blue);', cancelled:'background:var(--bad-bg);color:var(--bad);' };
   const badgeLabel = { free:'Libre', reserved:'Réservé', cancelled:'Annulé' };
   return experimentalSlots.map(slot=>{
     const status = experimentalSlotStatus(slot);
@@ -127,9 +127,9 @@ function renderExperimentalSlotsHTML(){
       const pendingFromStudent = slot.rescheduleRequest && slot.rescheduleRequest.by==='student' && slot.rescheduleRequest.status==='pending';
       let pendingHTML = '';
       if(pendingFromTeacher){
-        pendingHTML = `<div class="storage-note" style="background:#FCF3CF;margin-top:8px;">📅 Proposition envoyée : <b>${fmtSlotDate(slot.rescheduleRequest.proposedDate)}</b> — en attente de confirmation par l'élève.</div>`;
+        pendingHTML = `<div class="storage-note" style="background:var(--c-warning-bg);margin-top:8px;">📅 Proposition envoyée : <b>${fmtSlotDate(slot.rescheduleRequest.proposedDate)}</b> — en attente de confirmation par l'élève.</div>`;
       } else if(pendingFromStudent){
-        pendingHTML = `<div class="storage-note" style="background:#F4ECF7;margin-top:8px;">⏳ L'élève propose 3 disponibilités :
+        pendingHTML = `<div class="storage-note" style="background:var(--c-info-bg);margin-top:8px;">⏳ L'élève propose 3 disponibilités :
           <div style="margin-top:4px;font-size:12.5px;">
             1. ${fmtSlotDate(slot.rescheduleRequest.availability1)}<br>
             2. ${fmtSlotDate(slot.rescheduleRequest.availability2)}<br>
@@ -206,7 +206,7 @@ function renderExperimentalAdmin(){
       <div class="meta" style="margin:-4px 0 16px;">Durée du cours expérimental : 45 minutes.</div>
       <button class="primary-btn" style="width:auto;padding:11px 18px;" onclick="createExperimentalCourse()">Créer le cours expérimental</button>
       <div id="experimental-error" class="login-err" style="margin-top:10px;"></div>
-      <div id="experimental-result" style="display:none;margin-top:18px;background:#f3f6ff;border:1px solid #dbe4ff;border-radius:10px;padding:16px;">
+      <div id="experimental-result" style="display:none;margin-top:18px;background:var(--c-info-bg);border:1px solid var(--c-info-bg);border-radius:10px;padding:16px;">
         <div style="font-weight:700;color:var(--navy);margin-bottom:8px;">Lien élève créé</div>
         <div id="experimental-link" style="font-size:13px;word-break:break-all;margin-bottom:12px;"></div>
         <button class="rec-btn" onclick="copyExperimentalLink()">Copier le lien</button>

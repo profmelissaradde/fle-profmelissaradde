@@ -313,7 +313,7 @@ function paymentOptionsHTML(s){
   const flow = paymentFlowHTML(s.id, paymentLinks);
   if(!flow) return '';
   return `
-    <div class="storage-note" style="background:#FFF7E6; margin-top:10px;">
+    <div class="storage-note" style="background:var(--c-warning-bg); margin-top:10px;">
       💳 <b>Paiement du cours</b> — choisis ton mode de paiement :
       ${flow}
       <div style="margin-top:10px;">
@@ -602,8 +602,8 @@ function renderReserverBody(){
   let dispo = dispoData.filter(s => !s.reservedBy && !s.isExperimental && new Date(s.date).getTime() >= now);
 
   const markers = {};
-  dispo.forEach(s=>{ markers[toDateKey(new Date(s.date))] = {color:'#06a77d'}; });
-  mine.forEach(s=>{ markers[toDateKey(new Date(s.date))] = {color:'#2E86C1'}; });
+  dispo.forEach(s=>{ markers[toDateKey(new Date(s.date))] = {color:'var(--c-success)'}; });
+  mine.forEach(s=>{ markers[toDateKey(new Date(s.date))] = {color:'var(--c-info)'}; });
 
   if(reserverSelectedDay){ dispo = dispo.filter(s => toDateKey(new Date(s.date)) === reserverSelectedDay); }
 
@@ -619,7 +619,7 @@ function renderReserverBody(){
         <div class="slot-date">📌 ${fmtSlotDate(s.date)} <span class="slot-dur">(${s.duree} min)</span></div>
         ${timezoneLineHTML(s.date)}
         ${pendingFromTeacher ? `
-          <div class="storage-note" style="background:#FCF3CF;">
+          <div class="storage-note" style="background:var(--c-warning-bg);">
             📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.
             <div style="margin-top:6px;">
               <button class="rec-btn" onclick="confirmTeacherProposal('${s.id}')">✅ Confirmer</button>
@@ -627,7 +627,7 @@ function renderReserverBody(){
             </div>
           </div>` : ''}
         ${pendingFromMe ? `
-          <div class="storage-note" style="background:#F4ECF7;">
+          <div class="storage-note" style="background:var(--c-info-bg);">
             ⏳ Ta demande de replanification est en attente de validation par ta professeure.
             ${s.rescheduleRequest.availability1 ? `
               <div style="margin-top:6px; font-size:12.5px;">
@@ -651,7 +651,7 @@ function renderReserverBody(){
     <p style="font-size:12.5px; color:var(--grey); margin:-6px 0 10px;">🟢 créneau libre · 🔵 ton cours réservé — clique sur un jour pour filtrer</p>`;
   html += buildCalendarHTML(reserverCalDate.getFullYear(), reserverCalDate.getMonth(), markers, reserverSelectedDay, 'selectReserverDay');
 
-  html += `<h2 class="section-title">Créneaux disponibles ${reserverSelectedDay ? `<button onclick="selectReserverDay('${reserverSelectedDay}')" style="background:none; color:var(--accent-2,#06a77d); font-size:12px; font-weight:700; vertical-align:middle;">✕ voir tous les jours</button>` : ''}</h2>`;
+  html += `<h2 class="section-title">Créneaux disponibles ${reserverSelectedDay ? `<button onclick="selectReserverDay('${reserverSelectedDay}')" style="background:none; color:var(--accent-2,var(--c-success)); font-size:12px; font-weight:700; vertical-align:middle;">✕ voir tous les jours</button>` : ''}</h2>`;
   if(dispo.length===0){
     html += `<p class="teacher-empty">${reserverSelectedDay ? 'Aucun créneau disponible ce jour-là.' : "Aucun créneau disponible pour le moment — reviens un peu plus tard, ta professeure en ajoute régulièrement."}</p>`;
   } else {

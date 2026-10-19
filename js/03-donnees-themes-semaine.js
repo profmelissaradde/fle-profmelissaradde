@@ -1408,30 +1408,30 @@ function downloadCertificate(){
   cv.width = 1200; cv.height = 850;
   const ctx = cv.getContext('2d');
   const grad = ctx.createLinearGradient(0,0,1200,850);
-  grad.addColorStop(0,'#182a6b'); grad.addColorStop(1,'#0f1c4d');
+  grad.addColorStop(0,'#F8F7F4'); grad.addColorStop(1,'#E7EDE8');
   ctx.fillStyle = grad; ctx.fillRect(0,0,1200,850);
-  ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 6;
+  ctx.strokeStyle = '#55786C'; ctx.lineWidth = 6;
   ctx.strokeRect(30,30,1140,790);
-  ctx.strokeStyle = 'rgba(255,183,3,.5)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(217,189,177,.9)'; ctx.lineWidth = 2;
   ctx.strokeRect(46,46,1108,758);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffe08a';
+  ctx.fillStyle = '#8C5A4B';
   ctx.font = '600 20px Georgia, serif';
   ctx.fillText('CERTIFICAT DE RÉUSSITE — FLE', 600, 150);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#303B38';
   ctx.font = '700 46px Georgia, serif';
   ctx.fillText(tema.titre_fr, 600, 235);
   ctx.font = '20px Georgia, serif';
-  ctx.fillStyle = '#c9d3e6';
+  ctx.fillStyle = '#5F6B67';
   ctx.fillText(tema.periode, 600, 280);
   ctx.font = '22px Georgia, serif';
-  ctx.fillStyle = '#dbe3f2';
+  ctx.fillStyle = '#5F6B67';
   ctx.fillText('décerné à', 600, 360);
   ctx.font = '700 46px Georgia, serif';
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#303B38';
   ctx.fillText(`${student.prenom} ${student.nom}`, 600, 425);
   ctx.font = '18px Georgia, serif';
-  ctx.fillStyle = '#c9d3e6';
+  ctx.fillStyle = '#5F6B67';
   if(typeof tpIsV2 === 'function' && tpIsV2(tema)){
     const lvlUsed = (student.temas && student.temas[tema.id] && student.temas[tema.id].v2 && student.temas[tema.id].v2.niveau) || niveau;
     ctx.fillText(`Parcours ${lvlUsed} — a terminé toutes les activités du thème de la semaine`, 600, 470);
@@ -1443,11 +1443,11 @@ function downloadCertificate(){
   const t = (student.temas && student.temas[temaSelectedId]) || {};
   if(t.review && typeof t.review.note !== 'undefined' && t.review.note !== null){
     ctx.font = '700 26px Georgia, serif';
-    ctx.fillStyle = '#ffb703';
+    ctx.fillStyle = '#55786C';
     ctx.fillText(`Note : ${t.review.note}`, 600, 560);
   }
   ctx.font = 'italic 16px Georgia, serif';
-  ctx.fillStyle = '#a9b6d2';
+  ctx.fillStyle = '#5F6B67';
   ctx.fillText(`Prof Melissa Radde · FLE · ${new Date().toLocaleDateString('fr-FR')}`, 600, 760);
   const link = document.createElement('a');
   link.download = `certificat_${slug(student.prenom)}-${slug(student.nom)}_${slug(tema.titre_fr)}.png`;

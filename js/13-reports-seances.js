@@ -101,7 +101,7 @@ function rptCompteurs(slots, now){
 }
 function rptCompteursHTML(c){
   return `📆 <b>${c.effectuees}</b> séance${c.effectuees>1?'s':''} effectuée${c.effectuees>1?'s':''} · <b>${c.aVenir}</b> à venir · <b style="color:${c.anomalies ? 'var(--bad)' : 'inherit'}">${c.anomalies}</b> anomalie${c.anomalies>1?'s':''} en attente`
-    + (c.zoomAttente ? ` · <b style="color:#a65f00">${c.zoomAttente} synchro Zoom en attente</b>` : '');
+    + (c.zoomAttente ? ` · <b style="color:var(--c-warning)">${c.zoomAttente} synchro Zoom en attente</b>` : '');
 }
 
 /* Badge pour les listes de l'espace enseignante. */

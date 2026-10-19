@@ -362,7 +362,7 @@ function tpDraw(){
     ${header}
     ${ctx.lectureSeule ? temaArchiveBannerHTML() : ''}
     <p class="section-label tp-meta">Niveau ${tpEsc(lvl)}${ctx.preview ? '' : (student.niveauTheme ? ' (choisi par ta professeure pour ce thème)' : ' (attribué par ta professeure)')} · ⏱️ Travail estimé : ${duree} · ${acts.length} activités</p>
-    <div class="tp-progress" aria-label="Progression"><div class="tp-progress-bar" style="width:${pct}%"></div></div>
+    <div class="tp-progress" role="progressbar" aria-label="Progression du parcours" aria-valuemin="0" aria-valuemax="${acts.length}" aria-valuenow="${nbDone}"><div class="tp-progress-bar" style="width:${pct}%"></div></div>
     <p class="tp-progress-label">${nbDone} / ${acts.length} activités terminées (${pct} %)</p>
     <div class="tema-status-bar tp-sommaire">${chips}</div>
     <div class="tp-legend">⬜ à faire · ✏️ commencée · ✅ terminée (corrigée automatiquement) · 🕓 envoyée, en attente de correction · 🟢 validée par ta professeure</div>
@@ -496,7 +496,7 @@ function tpItemHTML(it, num){
         const v = (val||[])[i] || '';
         let cls = '';
         if(answered && r.det){ cls = r.det[i]===0 ? 'bad' : 'ok'; }
-        return `${p}<input type="text" class="tp-input tp-blank ${cls}" id="tpf-${it.id}-${i}" value="${tpEsc(v)}" ${dis} oninput="tpDraft('${it.id}')" autocomplete="off" autocapitalize="off" spellcheck="false" size="${Math.max(6, Math.min(18, ((it.blancs[i]||[''])[0]||'').length+2))}">`;
+        return `${p}<input type="text" class="tp-input tp-blank ${cls}" id="tpf-${it.id}-${i}" aria-label="Réponse ${i+1}${parts.length>2 ? ' sur ' + (parts.length-1) : ''}" value="${tpEsc(v)}" ${dis} oninput="tpDraft('${it.id}')" autocomplete="off" autocapitalize="off" spellcheck="false" size="${Math.max(6, Math.min(18, ((it.blancs[i]||[''])[0]||'').length+2))}">`;
       }).join('')}</p>`;
       break;
     }
@@ -507,7 +507,7 @@ function tpItemHTML(it, num){
         const v = (val||[])[i];
         let cls = ''; if(answered && r.det) cls = r.det[i] ? 'ok' : 'bad';
         return `<div class="tp-assoc-row ${cls}"><span class="tp-assoc-left">${p[0]}</span><span class="tp-assoc-arrow">→</span>
-          <select class="tp-input" id="tpf-${it.id}-${i}" ${dis} onchange="tpDraft('${it.id}')"><option value="-1">— choisir —</option>
+          <select class="tp-input" id="tpf-${it.id}-${i}" aria-label="Associer : ${tpEsc(String(p[0]).replace(/<[^>]+>/g,''))}" ${dis} onchange="tpDraft('${it.id}')"><option value="-1">— choisir —</option>
           ${ordre.map(j=>`<option value="${j}" ${v===j?'selected':''}>${tpEsc(it.paires[j][1])}</option>`).join('')}</select></div>`;
       }).join('')}</div>`;
       break;

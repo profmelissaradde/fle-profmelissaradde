@@ -24,7 +24,7 @@ const dossiersMenu = [
 /* ======================= DONNÉES : SEMAINES (Dossier 0) ======================= */
 const weeksD0 = [
   {
-    id:1, tag:"S1", color:"#3a6df0",
+    id:1, tag:"S1", color:"var(--c-primary)",
     title_fr:"La phonétique complète du français",
     title_pt:"A fonética completa do francês",
     objectif_fr:"Poser des bases solides de prononciation (alphabet, voyelles orales et nasales, consonnes difficiles, accentuation, liaison) avant d'aborder le vocabulaire et la grammaire.",
@@ -79,7 +79,7 @@ const weeksD0 = [
     ]
   },
   {
-    id:2, tag:"S2", color:"#06a77d",
+    id:2, tag:"S2", color:"var(--c-success)",
     title_fr:"Se présenter et faire connaissance",
     title_pt:"Se apresentar e conhecer alguém",
     objectif_fr:"Saluer, dire son nom et prénom, épeler son identité, utiliser les verbes être et s'appeler, accorder les adjectifs de nationalité au masculin/féminin, choisir entre tu et vous, et connaître quelques prénoms et noms de famille typiquement français.",
@@ -136,7 +136,7 @@ const weeksD0 = [
     ]
   },
   {
-    id:3, tag:"S3", color:"#ef476f",
+    id:3, tag:"S3", color:"var(--c-danger)",
     title_fr:"Nationalités, pays et langues",
     title_pt:"Nacionalidades, países e línguas",
     objectif_fr:"Nommer des pays et nationalités (accord masculin/féminin), utiliser les articles définis et le genre des noms de pays, dire quelle(s) langue(s) on parle, et situer la France dans le monde francophone et lusophone.",
@@ -191,7 +191,7 @@ const weeksD0 = [
     ]
   },
   {
-    id:4, tag:"S4", color:"#e8590c",
+    id:4, tag:"S4", color:"var(--c-warning)",
     title_fr:"Compter de 0 à 69",
     title_pt:"Contar de 0 a 69",
     objectif_fr:"Comprendre et dire les nombres de 0 à 69, noter un nombre entendu, donner et comprendre un numéro de téléphone, et appliquer la règle de formation des nombres composés (« et » / tiret).",
@@ -251,7 +251,7 @@ const weeksD0 = [
     ]
   },
   {
-    id:5, tag:"S5", color:"#8338ec",
+    id:5, tag:"S5", color:"var(--c-primary)",
     title_fr:"Personnalités, classe et bilan",
     title_pt:"Personalidades, sala de aula e balanço",
     objectif_fr:"Identifier des personnalités françaises connues dans différents domaines, reconnaître des mots français « transparents », utiliser des formules pour communiquer en classe, consolider l'ensemble du module à l'oral.",
@@ -309,7 +309,7 @@ const weeksD0 = [
 
 const weeksD1 = [
   {
-    id:1, tag:"S1", color:"#3a6df0",
+    id:1, tag:"S1", color:"var(--c-primary)",
     title_fr:"Saluer et prendre congé",
     title_pt:"Cumprimentar e se despedir",
     objectif_fr:"Saluer et prendre congé selon le moment de la journée et le type de relation (formelle/informelle), choisir entre tu et vous, distinguer les sons [y] et [u], et reconnaître l'intonation montante (question) et descendante (affirmation).",
@@ -485,7 +485,7 @@ const weeksD1 = [
     ]
   },
   {
-    id:2, tag:"S2", color:"#06a77d",
+    id:2, tag:"S2", color:"var(--c-success)",
     title_fr:"Se présenter sur un réseau social",
     title_pt:"Se apresentar em uma rede social",
     objectif_fr:"Utiliser le verbe avoir au présent, la négation ne... pas, les adjectifs possessifs et les jours de la semaine, dire son âge en faisant la liaison, comprendre un profil d'utilisateur en ligne, et demander poliment des informations.",
@@ -540,7 +540,7 @@ const weeksD1 = [
     ]
   },
   {
-    id:3, tag:"S3", color:"#ef476f",
+    id:3, tag:"S3", color:"var(--c-danger)",
     title_fr:"Questionner sur l'identité et donner ses coordonnées",
     title_pt:"Perguntar sobre a identidade e dar seus dados de contato",
     objectif_fr:"Comprendre un formulaire d'inscription, utiliser l'adjectif interrogatif « quel », dire les mois de l'année et sa date d'anniversaire, compter de 70 à 99, comprendre les numéros de téléphone français et donner une adresse électronique.",
@@ -594,7 +594,7 @@ const weeksD1 = [
     ]
   },
   {
-    id:4, tag:"S4", color:"#e8590c",
+    id:4, tag:"S4", color:"var(--c-warning)",
     title_fr:"Parler de soi : pays, passions et rêves",
     title_pt:"Falar de si: países, paixões e sonhos",
     objectif_fr:"Utiliser les prépositions devant les noms de pays (en/au/aux), situer la France dans la Francophonie, exprimer une passion et un rêve, conjuguer les verbes en -er au présent, et distinguer les sons [s] et [z].",
@@ -654,7 +654,7 @@ const weeksD1 = [
     ]
   },
   {
-    id:5, tag:"S5", color:"#8338ec",
+    id:5, tag:"S5", color:"var(--c-primary)",
     title_fr:"Carnet de voyage : la France en Europe, et bilan",
     title_pt:"Diário de viagem: a França na Europa, e balanço",
     objectif_fr:"Situer la France en Europe et nommer ses pays voisins, reconnaître quelques symboles européens, connaître quelques chiffres-clés sur la France, s'entraîner sur des activités type DELF A1, et consolider l'ensemble du dossier à l'oral.",
@@ -864,15 +864,15 @@ function renderSidebar(){
       </div>`;
   }
   if(student.prenom && niveau && screen!=='login' && !isStudentExperimental()){
-    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:#e08a1e" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? ` <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span>` : ''}</button>`;
-    html += `<button class="nav-btn ${screen==='survie'?'active':''}" style="--tag-color:#ef476f" onclick="goSurvie()"><span class="tag">🆘</span> Phrases de survie</button>`;
+    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? ` <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span>` : ''}</button>`;
+    html += `<button class="nav-btn ${screen==='survie'?'active':''}" style="--tag-color:var(--c-danger)" onclick="goSurvie()"><span class="tag">🆘</span> Phrases de survie</button>`;
   }
   if(student.prenom && screen!=='login'){
-    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='reserver'?'active':''}" style="--tag-color:#06a77d" onclick="goReserver()"><span class="tag">📅</span> ${isTeacher ? 'Disponibilités' : 'Réserver un cours'}</button>`;
-    html += `<button class="nav-btn ${screen==='forum'?'active':''}" style="--tag-color:#6f42c1" onclick="goForum()"><span class="tag">💬</span> Forum</button>`;
+    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='reserver'?'active':''}" style="--tag-color:var(--c-success)" onclick="goReserver()"><span class="tag">📅</span> ${isTeacher ? 'Disponibilités' : 'Réserver un cours'}</button>`;
+    html += `<button class="nav-btn ${screen==='forum'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goForum()"><span class="tag">💬</span> Forum</button>`;
     if(!isTeacher){
-      html += `<button class="nav-btn ${screen==='messages'?'active':''}" style="--tag-color:#0d9488" onclick="goMessages()"><span class="tag">✉️</span> Message à Melissa${studentUnreadCount>0?` <span class="admin-pill" style="background:var(--bad); color:#fff;">${studentUnreadCount}</span>`:''}</button>`;
-      html += `<button class="nav-btn ${screen==='historique'?'active':''}" style="--tag-color:#8338ec" onclick="goHistorique()"><span class="tag">📚</span> Historique de mes cours</button>`;
+      html += `<button class="nav-btn ${screen==='messages'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goMessages()"><span class="tag">✉️</span> Message à Melissa${studentUnreadCount>0?` <span class="admin-pill" style="background:var(--bad); color:#fff;">${studentUnreadCount}</span>`:''}</button>`;
+      html += `<button class="nav-btn ${screen==='historique'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goHistorique()"><span class="tag">📚</span> Historique de mes cours</button>`;
     }
   }
   if(isTeacher && screen!=='login'){

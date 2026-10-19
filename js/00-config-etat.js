@@ -48,7 +48,7 @@ let student = {prenom:"", nom:"", email:"", telephone:"", uid:"", uniteCourante:
 let current = 1;
 let teacherTab = "eleves";
 let isTeacher = false;
-const BILAN_COLOR = "#d98c00";
+const BILAN_COLOR = "var(--c-warning)";
 
 /* ======================= CORRECTIF AUTH COURS EXPÉRIMENTAL ======================= */
 window.addEventListener('load', () => {
