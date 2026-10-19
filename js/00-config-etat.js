@@ -71,7 +71,10 @@ window.addEventListener('load', () => {
           niveau = niveau || 'A1'; current = null;
           student = {prenom:'Melissa', nom:'Radde', email:cred.user.email || email, telephone:'', uid:cred.user.uid, uniteCourante:{}, frequence:null, temas:{}};
           teacherTab = 'eleves'; screen = 'teacher';
-          startTeacherPresenceHeartbeat(); startTeacherMessagesListener(); render(); return;
+          startTeacherPresenceHeartbeat(); startTeacherMessagesListener(); render();
+          /* Republie le calendrier d'archivage des thèmes (lu par les règles Firestore). */
+          if(typeof tpLoadConfig === 'function') tpLoadConfig().then(()=>tpSyncCalendrier());
+          return;
         }
         const doc = await db.collection('eleves').doc(cred.user.uid).get();
         if(!doc.exists){ showAuthErr("Ce compte n'a pas de profil élève associé."); return; }
@@ -120,7 +123,8 @@ window.addEventListener('load', () => {
       experimentalLesson:record.experimentalLesson === true,
       registrationSource:record.registrationSource || null, status:record.status || null,
       lastAnnouncementSeenId: record.lastAnnouncementSeenId || null,
-      niveauTheme: record.niveauTheme || null /* niveau de « Thème de la semaine » forcé par la professeure (ex. A0) */
+      niveauTheme: record.niveauTheme || null, /* niveau de « Thème de la semaine » forcé par la professeure (ex. A0) */
+      temasRouverts: record.temasRouverts || {} /* thèmes archivés rouverts exceptionnellement par la professeure */
     };
     startStudentMessagesListener();
     loadLatestAnnouncement(); /* pour le badge de notification — non bloquant */

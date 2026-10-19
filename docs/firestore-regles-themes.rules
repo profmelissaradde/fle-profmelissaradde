@@ -1,0 +1,66 @@
+// =====================================================================================
+//  Thème de la semaine — règles Firestore pour l'ARCHIVAGE (lecture seule côté serveur)
+//  À intégrer dans tes règles existantes (Firebase Console › Firestore › Règles).
+//  Voir docs/THEME-PARCOURS.md, section « Archivage », pour la marche à suivre.
+// =====================================================================================
+
+// --- 1. Fonctions : à coller DANS le bloc  match /databases/{database}/documents { ... }
+
+function estProfesseure() {
+  return request.auth != null && request.auth.uid == "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
+}
+
+// Période d'activité d'un thème, publiée automatiquement par l'application de la
+// professeure dans config/temasCalendrier : { periodes: { <temaId>: {debut, fin|null} } }.
+function themeOuvertPourEleve(temaId) {
+  let rouverts = resource.data.get('temasRouverts', {});
+  let p = get(/databases/$(database)/documents/config/temasCalendrier).data.periodes.get(temaId, null);
+  return rouverts.get(temaId, false) == true
+    || (p != null && request.time >= p.debut && (p.fin == null || request.time < p.fin));
+}
+
+// Les corrections et la note de la professeure ne peuvent pas être modifiées par l'élève.
+function correctionsIntactes(temaId) {
+  let avant = resource.data.get('temas', {}).get(temaId, {});
+  let apres = request.resource.data.get('temas', {}).get(temaId, {});
+  return apres.get('review', null) == avant.get('review', null)
+    && apres.get('v2', {}).get('fb', null) == avant.get('v2', {}).get('fb', null);
+}
+
+// Une écriture d'élève ne peut toucher QU'UN thème : celui qu'elle déclare dans
+// "temaEcriture" (l'application l'envoie à chaque sauvegarde), et ce thème doit être
+// en cours ou rouvert pour cet élève. Une mise à jour qui ne touche pas "temas"
+// (profil, annonces, réservations…) n'est pas concernée.
+function ecritureThemesAutorisee() {
+  let modifies = request.resource.data.get('temas', {})
+                   .diff(resource.data.get('temas', {})).affectedKeys();
+  let declare = request.resource.data.get('temaEcriture', '');
+  return modifies.size() == 0
+    || (modifies.hasOnly([declare]) && themeOuvertPourEleve(declare) && correctionsIntactes(declare));
+}
+
+// Champs réservés à la professeure sur la fiche élève.
+function champsThemesReservesIntacts() {
+  return !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['temasRouverts', 'niveauTheme']);
+}
+
+// --- 2. Fiche élève : ajoute les deux conditions à la règle « update » de l'ÉLÈVE.
+//  Exemple (adapte à ta règle actuelle, ne remplace pas tes autres conditions) :
+//
+//  match /eleves/{uid} {
+//    allow update: if estProfesseure()
+//                  || (request.auth != null && request.auth.uid == uid
+//                      && /* … tes conditions actuelles … */
+//                      && ecritureThemesAutorisee()
+//                      && champsThemesReservesIntacts());
+//  }
+//
+//  Si ta règle actuelle limite les champs modifiables par l'élève (hasOnly([...])),
+//  ajoute 'temaEcriture' à cette liste ('temas' doit déjà y être).
+
+// --- 3. Configuration des thèmes : lecture par tout utilisateur connecté, écriture
+//        par la professeure seulement.
+//
+//  match /config/temas           { allow read: if request.auth != null; allow write: if estProfesseure(); }
+//  match /config/temasCalendrier { allow read: if request.auth != null; allow write: if estProfesseure(); }

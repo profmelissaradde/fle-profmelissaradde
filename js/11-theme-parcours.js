@@ -69,6 +69,7 @@ async function tpLoadConfig(force){
       }catch(e){ console.warn('Thème créé illisible :', id, e); }
     });
     tpConfig.loaded = true; tpConfig.loading = null;
+    if(typeof isTeacher !== 'undefined' && isTeacher) tpSyncCalendrier();
     return tpConfig;
   })();
   return tpConfig.loading;
@@ -280,6 +281,7 @@ function tpTemaAllDoneFor(temaId, temasObj, niveauEleve, niveauForce){
    rien n'est écrit. */
 async function tpPersist(updates){
   if(!tpCtx || tpCtx.preview || isTeacher || !student.uid || !db) return true;
+  if(tpRO()) return false;
   const temaId = tpCtx.tema.id;
   const payload = {};
   Object.keys(updates).forEach(k => {
@@ -288,6 +290,7 @@ async function tpPersist(updates){
       ? {...val, ts: firebase.firestore.FieldValue.serverTimestamp()} : val;
   });
   payload[`temas.${temaId}.v2.niveau`] = tpCtx.lvl;
+  payload.temaEcriture = temaId; /* thème déclaré : les règles Firestore vérifient qu'il est ouvert */
   try{ await db.collection('eleves').doc(student.uid).update(payload); return true; }
   catch(e){ console.error('Sauvegarde du thème impossible :', e); tpToast("⚠️ Sauvegarde impossible pour le moment (connexion ?). Tes réponses restent affichées : réessaie dans un instant."); return false; }
 }
@@ -311,8 +314,8 @@ function tpRenderStudent(container, tema, weeksHTML){
   let lvlUsed = lvl;
   if(!isTeacher && state.niveau && state.niveau !== lvl && !student.niveauTheme && tpLevelData(tema, state.niveau)) lvlUsed = state.niveau;
   tpCtx = {tema, lvl:lvlUsed, data: lvlUsed===lvl ? data : tpLevelData(tema, lvlUsed), preview:isTeacher, showKeys:false,
-           state, container, weeksHTML, mode:'eleve'};
-  tpCtx.actIdx = tpActIdxMemo[`${tema.id}_${lvlUsed}`] != null ? tpActIdxMemo[`${tema.id}_${lvlUsed}`] : tpFirstOpenAct(tpCtx.data, state);
+           state, container, weeksHTML, mode:'eleve', lectureSeule: temaEstArchive(tema.id)};
+  tpCtx.actIdx = tpActIdxMemo[`${tema.id}_${lvlUsed}`] != null ? tpActIdxMemo[`${tema.id}_${lvlUsed}`] : (tpCtx.lectureSeule ? 0 : tpFirstOpenAct(tpCtx.data, state));
   tpDraw();
 }
 function tpPreviewState(temaId, lvl){
@@ -357,6 +360,7 @@ function tpDraw(){
   ctx.container.innerHTML = `
     ${previewBanner}
     ${header}
+    ${ctx.lectureSeule ? temaArchiveBannerHTML() : ''}
     <p class="section-label tp-meta">Niveau ${tpEsc(lvl)}${ctx.preview ? '' : (student.niveauTheme ? ' (choisi par ta professeure pour ce thème)' : ' (attribué par ta professeure)')} · ⏱️ Travail estimé : ${duree} · ${acts.length} activités</p>
     <div class="tp-progress" aria-label="Progression"><div class="tp-progress-bar" style="width:${pct}%"></div></div>
     <p class="tp-progress-label">${nbDone} / ${acts.length} activités terminées (${pct} %)</p>
@@ -408,7 +412,9 @@ function tpActHTML(act, idx){
   const autoItems = items.filter(it => { const r = state.r[it.id]; return r && r.st === 'auto'; });
   const lockedAuto = autoItems.length > 0;
   let actions = '';
-  if(!hasItems){
+  if(ctx.lectureSeule){
+    actions = `<p class="ee-note" style="margin:0;">🗄️ Consultation uniquement — ${hasItems ? (allAnswered ? 'tes réponses et tes corrections sont affichées ci-dessus.' : 'les exercices non faits ne peuvent plus être complétés.') : 'tu peux relire cette page.'}</p>`;
+  } else if(!hasItems){
     const done = state.a[act.id] && state.a[act.id].done;
     actions = `<button class="rec-btn" onclick="tpMarkRead('${act.id}')">${done ? '✅ C\'est noté — continuer' : 'J\'ai lu, je commence →'}</button>`;
   } else {
@@ -455,7 +461,8 @@ function tpVideoHTML(v){
 function tpItemHTML(it, num){
   const ctx = tpCtx, r = ctx.state.r[it.id], fb = ctx.state.fb[it.id];
   const answered = r && r.st && r.st !== 'brouillon';
-  const locked = answered && r.st === 'auto';
+  const ro = !!ctx.lectureSeule;
+  const locked = (answered && r.st === 'auto') || ro;
   const typeLabel = {qcm:'Choix multiple', court:'Réponse courte', trous:'Phrases à trous', association:'Associer', ordre:'Remettre dans l\'ordre',
     mixte:({transformation:'Transformer', reformulation:'Reformuler', correction:'Corriger l\'erreur', connecteurs:'Relier', reecriture:'Réécrire'}[it.sous_type] || 'Transformer'),
     choix_justif:'Choisir et justifier', ouverte: it.avis ? 'Ton avis' : 'Réponse rédigée', oral:'Enregistrement'}[it.type] || '';
@@ -468,7 +475,7 @@ function tpItemHTML(it, num){
     case 'qcm': {
       body = `<div class="exo-options">${it.options.map((o,i)=>{
         let cls = '';
-        if(locked){ if(i===it.correct) cls='correct'; else if(i===val) cls='wrong'; }
+        if(answered && r.st==='auto'){ if(i===it.correct) cls='correct'; else if(i===val) cls='wrong'; }
         else if(val===i) cls = 'tp-selected';
         return `<button class="exo-opt ${cls}" ${dis} onclick="tpPick('${it.id}',${i})">${o}</button>`;
       }).join('')}</div>`;
@@ -488,7 +495,7 @@ function tpItemHTML(it, num){
         if(i===parts.length-1) return p;
         const v = (val||[])[i] || '';
         let cls = '';
-        if(locked && r.det){ cls = r.det[i]===0 ? 'bad' : 'ok'; }
+        if(answered && r.det){ cls = r.det[i]===0 ? 'bad' : 'ok'; }
         return `${p}<input type="text" class="tp-input tp-blank ${cls}" id="tpf-${it.id}-${i}" value="${tpEsc(v)}" ${dis} oninput="tpDraft('${it.id}')" autocomplete="off" autocapitalize="off" spellcheck="false" size="${Math.max(6, Math.min(18, ((it.blancs[i]||[''])[0]||'').length+2))}">`;
       }).join('')}</p>`;
       break;
@@ -498,7 +505,7 @@ function tpItemHTML(it, num){
       const ordre = tpShuffleStable(droites.map(d=>d.i), it.id);
       body = `<div class="tp-assoc">${(it.paires||[]).map((p,i)=>{
         const v = (val||[])[i];
-        let cls = ''; if(locked && r.det) cls = r.det[i] ? 'ok' : 'bad';
+        let cls = ''; if(answered && r.det) cls = r.det[i] ? 'ok' : 'bad';
         return `<div class="tp-assoc-row ${cls}"><span class="tp-assoc-left">${p[0]}</span><span class="tp-assoc-arrow">→</span>
           <select class="tp-input" id="tpf-${it.id}-${i}" ${dis} onchange="tpDraft('${it.id}')"><option value="-1">— choisir —</option>
           ${ordre.map(j=>`<option value="${j}" ${v===j?'selected':''}>${tpEsc(it.paires[j][1])}</option>`).join('')}</select></div>`;
@@ -509,7 +516,7 @@ function tpItemHTML(it, num){
       const ordreIdx = tpShuffleStable(it.unites.map((_,i)=>i), it.id);
       const choisis = ctx._ordre && ctx._ordre[it.id] ? ctx._ordre[it.id] : null;
       if(locked){
-        body = `<p class="tp-ordre-result">${tpEsc(val)}</p>`;
+        body = `<p class="tp-ordre-result">${val ? tpEsc(val) : '<span class="tp-dim">—</span>'}</p>`;
       } else {
         const sel = choisis || [];
         body = `<div class="tp-ordre-built" id="tpo-built-${it.id}">${sel.length ? sel.map(i=>`<span class="tp-token on">${tpEsc(it.unites[i])}</span>`).join(' ') : (val ? `<span class="tp-dim">Réponse enregistrée : ${tpEsc(val)}</span>` : '<span class="tp-dim">Clique sur les éléments dans le bon ordre…</span>')}</div>
@@ -520,24 +527,24 @@ function tpItemHTML(it, num){
     }
     case 'choix_justif': {
       const v = (r && r._modif) ? r._modif : (val || {});
-      body = `<div class="exo-options">${it.options.map((o,i)=>`<button class="exo-opt ${v.choix===i?'tp-selected':''}" onclick="tpPickChoix('${it.id}',${i})">${o}</button>`).join('')}</div>
+      body = `<div class="exo-options">${it.options.map((o,i)=>`<button class="exo-opt ${v.choix===i?'tp-selected':''}" ${ro?'disabled':''} onclick="tpPickChoix('${it.id}',${i})">${o}</button>`).join('')}</div>
         <p class="tp-sub">Justifie ton choix :</p>
-        <textarea class="ee-textarea tp-input" id="tpf-${it.id}" rows="2" oninput="tpDraft('${it.id}')" placeholder="Parce que… / Porque…">${tpEsc(v.justif||'')}</textarea>`;
+        <textarea class="ee-textarea tp-input" id="tpf-${it.id}" rows="2" ${ro?'disabled':''} oninput="tpDraft('${it.id}')" placeholder="Parce que… / Porque…">${tpEsc(v.justif||'')}</textarea>`;
       break;
     }
     case 'ouverte': {
       const n = tpMots(val);
-      body = `<textarea class="ee-textarea tp-input" id="tpf-${it.id}" rows="${it.lignes||5}" oninput="tpDraft('${it.id}'); tpCount('${it.id}',${it.min_mots||0})" placeholder="Écris ta réponse ici… / Escreva sua resposta aqui…">${tpEsc(val||'')}</textarea>
+      body = `<textarea class="ee-textarea tp-input" id="tpf-${it.id}" rows="${it.lignes||5}" ${ro?'disabled':''} oninput="tpDraft('${it.id}'); tpCount('${it.id}',${it.min_mots||0})" placeholder="Écris ta réponse ici… / Escreva sua resposta aqui…">${tpEsc(val||'')}</textarea>
         ${it.min_mots ? `<p class="tp-dim" id="tpc-${it.id}">${n} mot(s) — objectif : au moins ${it.min_mots} mots</p>` : ''}`;
       break;
     }
     case 'oral': {
       const v = val || {};
-      body = `<div class="rec-box"><div class="rec-controls">
+      body = `<div class="rec-box">${ro ? '' : `<div class="rec-controls">
           <button class="rec-btn" id="tprec-btn-${it.id}" onclick="tpToggleRec('${it.id}')">● Enregistrer</button>
-          <span class="rec-time" id="tprec-time-${it.id}">00:00</span></div>
+          <span class="rec-time" id="tprec-time-${it.id}">00:00</span></div>`}
           <div id="tprec-player-${it.id}">${v.url ? `<audio class="rec-audio" controls src="${tpEsc(v.url)}"></audio>` : ''}</div>
-          <p class="rec-status ${v.url?'ok':''}" id="tprec-status-${it.id}">${v.url ? '✅ Enregistrement envoyé à ta professeure. Tu peux t\'enregistrer à nouveau si tu veux.' : 'Ton enregistrement sera envoyé à ta professeure.'}</p></div>`;
+          ${ro ? '' : `<p class="rec-status ${v.url?'ok':''}" id="tprec-status-${it.id}">${v.url ? '✅ Enregistrement envoyé à ta professeure. Tu peux t\'enregistrer à nouveau si tu veux.' : 'Ton enregistrement sera envoyé à ta professeure.'}</p>`}</div>`;
       break;
     }
   }
@@ -557,8 +564,11 @@ function tpItemHTML(it, num){
       feedback = `<p class="exo-feedback ok">✅ Merci ! Réponse enregistrée.</p>`;
     }
   }
+  if(ro && !answered){
+    feedback = `<p class="exo-feedback tp-dim">${r && r.st==='brouillon' && !tpReponseVide(it, r.v) ? '✏️ Brouillon jamais soumis avant l\'archivage.' : '— Non fait avant l\'archivage.'}</p>`;
+  }
   if(fb && (fb.c || fb.verdict)){
-    feedback += `<div class="tp-fb ${fb.verdict==='valide'?'ok':'revoir'}">👩‍🏫 <b>${fb.verdict==='valide' ? 'Validé par ta professeure' : 'À retravailler'}</b>${fb.c ? ` — ${tpEsc(fb.c)}` : ''}${fb.verdict==='a_revoir' ? '<br><span class="tp-dim">Corrige ta réponse puis clique sur « Renvoyer ».</span>' : ''}</div>`;
+    feedback += `<div class="tp-fb ${fb.verdict==='valide'?'ok':'revoir'}">👩‍🏫 <b>${fb.verdict==='valide' ? 'Validé par ta professeure' : 'À retravailler'}</b>${fb.c ? ` — ${tpEsc(fb.c)}` : ''}${fb.verdict==='a_revoir' && !ro ? '<br><span class="tp-dim">Corrige ta réponse puis clique sur « Renvoyer ».</span>' : ''}</div>`;
   }
   const keys = (ctx.showKeys && !answered) ? `<p class="tp-key">🔑 ${tpSolutionHTML(it, true)}${it.explication ? ` — ${it.explication}` : ''}</p>` : '';
   return `<div class="exo-box tp-item ${it.avis ? 'tp-item-avis' : ''}" id="tpi-${it.id}">
@@ -595,7 +605,10 @@ function tpFindItem(itemId){
   for(const a of (tpCtx.data.activites||[])) for(const it of tpItemsOf(a)) if(it.id===itemId) return {act:a, item:it};
   return null;
 }
+/* Lecture seule : thème archivé (et non rouvert) pour l'élève. */
+function tpRO(){ return !!(tpCtx && tpCtx.lectureSeule); }
 function tpPick(itemId, i){
+  if(tpRO()) return;
   const r = tpCtx.state.r[itemId];
   if(r && r.st === 'auto') return;
   tpCtx.state.r[itemId] = {v:i, st:'brouillon', n:(r && r.n) || 0};
@@ -603,6 +616,7 @@ function tpPick(itemId, i){
   tpRedrawItem(itemId);
 }
 function tpPickChoix(itemId, i){
+  if(tpRO()) return;
   const f = tpFindItem(itemId); if(!f) return;
   const cur = tpCollect(f.item) || {};
   const r = tpCtx.state.r[itemId];
@@ -612,6 +626,7 @@ function tpPickChoix(itemId, i){
   tpRedrawItem(itemId);
 }
 function tpOrdreAdd(itemId, i){
+  if(tpRO()) return;
   tpCtx._ordre = tpCtx._ordre || {};
   const sel = tpCtx._ordre[itemId] = tpCtx._ordre[itemId] || [];
   if(!sel.includes(i)) sel.push(i);
@@ -624,6 +639,7 @@ function tpOrdreAdd(itemId, i){
   tpRedrawItem(itemId);
 }
 function tpOrdreReset(itemId){
+  if(tpRO()) return;
   tpCtx._ordre = tpCtx._ordre || {};
   tpCtx._ordre[itemId] = [];
   const r = tpCtx.state.r[itemId];
@@ -659,6 +675,7 @@ function tpCollect(it){
    (au plus une écriture toutes les 2 s par item) tant que l'activité n'est pas validée. */
 const tpDraftTimers = {};
 function tpDraft(itemId){
+  if(tpRO()) return;
   const f = tpFindItem(itemId); if(!f) return;
   const v = tpCollect(f.item);
   const r = tpCtx.state.r[itemId];
@@ -671,7 +688,7 @@ function tpDraft(itemId){
   tpQueueDraft(itemId);
 }
 function tpQueueDraft(itemId){
-  if(!tpCtx || tpCtx.preview) return;
+  if(!tpCtx || tpCtx.preview || tpRO()) return;
   clearTimeout(tpDraftTimers[itemId]);
   tpDraftTimers[itemId] = setTimeout(()=>{
     const r = tpCtx && tpCtx.state.r[itemId];
@@ -680,6 +697,7 @@ function tpQueueDraft(itemId){
 }
 
 async function tpValider(actId){
+  if(tpRO()) return;
   const act = (tpCtx.data.activites||[]).find(a=>a.id===actId); if(!act) return;
   const items = tpItemsOf(act);
   const updates = {};
@@ -712,6 +730,7 @@ async function tpValider(actId){
   if(manquants.length){ const el = document.getElementById('tpi-'+manquants[0].id); if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'center'}); }
 }
 async function tpRefaire(actId){
+  if(tpRO()) return;
   const act = (tpCtx.data.activites||[]).find(a=>a.id===actId); if(!act) return;
   if(!confirm('Refaire les exercices corrigés automatiquement de cette activité ? Tes réponses actuelles seront effacées (ta professeure garde le nombre d\'essais).')) return;
   const updates = {};
@@ -724,6 +743,7 @@ async function tpRefaire(actId){
   tpDraw();
 }
 async function tpMarkRead(actId){
+  if(tpRO()){ tpGoAct(tpCtx.actIdx + 1); return; }
   if(!(tpCtx.state.a[actId] && tpCtx.state.a[actId].done)){
     tpCtx.state.a[actId] = {done:true};
     await tpPersist({[`a.${actId}`]: {done:true}});
@@ -734,6 +754,7 @@ async function tpMarkRead(actId){
 /* ---- Enregistrement audio (même circuit Drive que l'ancien thème) ---- */
 const tpRecorders = {};
 async function tpToggleRec(itemId){
+  if(tpRO()) return;
   const btn = document.getElementById('tprec-btn-'+itemId), status = document.getElementById('tprec-status-'+itemId);
   if(!tpRecorders[itemId] || !tpRecorders[itemId].active){
     try{
@@ -831,7 +852,7 @@ function tpTeacherWeeksHTML(){
     const active = t.id === teacherTemaSelectedId;
     const brouillon = tpStatut(t) === 'brouillon';
     return `<button class="tema-week-tab ${active?'active':''}" onclick="setTeacherTemaWeek('${t.id}')">
-      ${brouillon ? '📝 ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}${brouillon ? ' · brouillon' : ''}${tpIsV2(t) ? ' · parcours' : ''}</span></button>`;
+      ${brouillon ? '📝 ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode} · ${tpEtatLabel(tpEtatTheme(t)).replace(/ \(.*\)/,'')}${tpIsV2(t) ? ' · parcours' : ''}</span></button>`;
   }).join('');
 }
 
@@ -898,6 +919,8 @@ function tpRenderTeacher(body, tema){
       ${statut==='publie'
         ? `<button class="tp-mini-btn" onclick="tpSetPublie('${tema.id}', false)">Repasser en brouillon</button>`
         : `<button class="rec-btn" onclick="tpSetPublie('${tema.id}', true)">📢 Publier ce thème</button>`}</p>
+    <p style="margin:0 0 8px;">Situation aujourd'hui : <b>${tpEtatLabel(tpEtatTheme(tema))}</b> — un seul thème est interactif à la fois ; les précédents passent automatiquement en lecture seule.</p>
+    ${tpCalendrierSync.etat==='erreur' ? `<p class="tp-warn">⚠️ Le calendrier d'archivage n'a pas pu être publié dans config/temasCalendrier (${tpEsc(tpCalendrierSync.erreur)}). Sans lui, les règles Firestore refuseront les réponses des élèves : vérifie les règles (docs/THEME-PARCOURS.md).</p>` : ''}
     ${!toutesVideosOk && statut!=='publie' ? '<p class="tp-warn">⚠️ Au moins une vidéo n\'est pas marquée « vérifiée ». Regarde-la, complète si besoin les questions (éditeur ci-dessous) et coche « vérifiée » avant de publier.</p>' : ''}
     ${tpConfig.error ? `<p class="tp-warn">⚠️ Lecture de config/temas impossible (${tpEsc(tpConfig.error)}). Le statut et les modifications enregistrés dans l'application ne peuvent pas être pris en compte : vérifie les règles Firestore (voir le README du module).</p>` : ''}
     <p class="tp-rappel-title">✅ Contrôle avant publication</p>${checks}
@@ -918,7 +941,7 @@ function tpRenderTeacher(body, tema){
     const aCorriger = sc.attente - sc.valides - sc.aRevoir;
     const review = (s.temas && s.temas[tema.id] && s.temas[tema.id].review) || null;
     return `<div class="teacher-entry">
-      <div class="who">${tpEsc(s.prenom)} ${tpEsc(s.nom)} · <span style="color:var(--ok)">Parcours ${lvl}</span>${s.niveauTheme ? ' <span class="tp-dim">(forcé)</span>' : ''}${s.niveau ? ` <span class="tp-dim">— niveau attribué ${tpEsc(s.niveau)}</span>` : ''}</div>
+      <div class="who">${tpEsc(s.prenom)} ${tpEsc(s.nom)} · <span style="color:var(--ok)">Parcours ${lvl}</span>${s.niveauTheme ? ' <span class="tp-dim">(forcé)</span>' : ''}${s.niveau ? ` <span class="tp-dim">— niveau attribué ${tpEsc(s.niveau)}</span>` : ''}${temaRouvertPour(tema.id, s) ? ' · <b style="color:var(--ok)">🔓 rouvert</b>' : ''}</div>
       <div class="meta">Progression : <b>${nb}/${acts.length}</b> activités · auto : ${sc.ok}/${sc.total} ${aCorriger>0 ? `· <b style="color:var(--bad)">🕓 ${aCorriger} réponse(s) à corriger</b>` : ''} ${review && review.note ? `· 📝 ${tpEsc(review.note)}` : ''}</div>
       <div class="teacher-entry-actions"><button onclick="toggleTemaReview('${s.id}')">${openTemaReviewId===s.id ? 'Fermer' : '👁️ Voir, corriger & noter'}</button></div>
       ${openTemaReviewId === s.id ? tpTeacherReviewHTML(s, tema, lvl, d, st) : ''}
@@ -990,6 +1013,7 @@ function tpTeacherReviewHTML(s, tema, lvl, d, st){
         ${TP_NIVEAUX.map(l=>`<option value="${l}" ${s.niveauTheme===l?'selected':''}>${l}</option>`).join('')}
       </select></label>
     <p class="tp-dim">Forcer un niveau (ex. A0) s'applique à tous les thèmes « parcours ». Les réponses déjà données restent attachées au niveau où elles ont été faites.</p>
+    ${tpReouvertureHTML(s, tema.id)}
     ${acts}
     <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">
       <label style="font-size:12.5px; font-weight:700; color:var(--navy);">Note globale
@@ -1048,6 +1072,7 @@ async function tpSetPublie(temaId, publie){
   try{
     await tpWriteConfig({themes:{[temaId]:{publie, majPublie: new Date().toISOString()}}});
     tpConfig.themes[temaId] = {...tpThemeCfg(temaId), publie};
+    await tpSyncCalendrier();
     renderTeacherTemas();
   }catch(e){ alert("Impossible d'enregistrer la publication (règles Firestore de config/temas ?) : " + (e && e.message ? e.message : e)); }
 }
@@ -1177,8 +1202,82 @@ async function tpCreateTheme(fromId){
     await tpWriteConfig({nouveaux:{[id]: str}, themes:{[id]:{publie:false}}});
     tpConfig.nouveaux[id] = str; tpConfig.themes[id] = {publie:false};
     temasSemanas.push(t);
+    await tpSyncCalendrier();
     teacherTemaSelectedId = id; tpEditorLvl = null; tpTeacherPreviewLvl = null;
     renderTeacherTemas();
     alert('Brouillon créé. Modifie maintenant chaque niveau avec l\'éditeur (le contenu copié est un modèle à remplacer).');
   }catch(e){ alert("Impossible de créer le thème : " + (e && e.message ? e.message : e)); }
+}
+
+
+/* ---------------------------------------------------------------------------------------------
+   6. ARCHIVAGE : CALENDRIER POUR LES RÈGLES FIRESTORE + RÉOUVERTURE PAR LA PROFESSEURE
+   --------------------------------------------------------------------------------------------- */
+/* Les règles Firestore ne peuvent pas lire le code de l'application : la professeure publie
+   donc dans config/temasCalendrier, pour chaque thème publié, sa période d'activité
+   {debut, fin} (horodatages). Un thème est « en cours » de son début jusqu'au début du thème
+   publié suivant (même règle que temaCourantId). Le calendrier est recalculé et republié
+   automatiquement à chaque connexion de la professeure, à chaque publication et à chaque
+   création de thème : un thème préparé à l'avance (date_debut future) prend donc le relais
+   tout seul à minuit UTC de sa date de début, même si personne ne se connecte. */
+function tpDebutMs(t){ return t.date_debut ? Date.parse(t.date_debut + 'T00:00:00Z') : 0; }
+function tpCalendrier(){
+  const pub = temasSemanas.filter(t => tpStatut(t) !== 'brouillon');
+  const periodes = {};
+  pub.forEach((t, i) => {
+    const debut = tpDebutMs(t);
+    const suivants = pub.slice(i + 1).map(tpDebutMs);
+    const fin = suivants.length ? Math.min(...suivants) : null;
+    periodes[t.id] = {debut, fin};
+  });
+  return periodes;
+}
+let tpCalendrierSync = {etat:'inconnu', erreur:null};
+async function tpSyncCalendrier(){
+  if(!db || !isTeacher) return;
+  const periodes = tpCalendrier();
+  const signature = JSON.stringify(periodes);
+  try{
+    const ref = db.collection('config').doc('temasCalendrier');
+    const doc = await ref.get();
+    if(doc.exists && doc.data().signature === signature){ tpCalendrierSync = {etat:'ok', erreur:null}; return; }
+    const TS = firebase.firestore.Timestamp;
+    const data = {};
+    Object.keys(periodes).forEach(id => {
+      data[id] = {debut: TS.fromDate(new Date(periodes[id].debut)), fin: periodes[id].fin == null ? null : TS.fromDate(new Date(periodes[id].fin))};
+    });
+    await ref.set({periodes: data, signature, maj: new Date().toISOString()});
+    tpCalendrierSync = {etat:'ok', erreur:null};
+  }catch(e){
+    console.error('Calendrier des thèmes non publié :', e);
+    tpCalendrierSync = {etat:'erreur', erreur:(e && e.message) || String(e)};
+  }
+}
+/* Situation d'un thème aujourd'hui : "en_cours" | "archive" | "a_venir" | "brouillon". */
+function tpEtatTheme(t){
+  if(tpStatut(t) === 'brouillon') return 'brouillon';
+  if(t.id === temaCourantId()) return 'en_cours';
+  return tpDebutMs(t) > Date.now() ? 'a_venir' : 'archive';
+}
+function tpEtatLabel(e){ return {en_cours:'🟢 En cours (interactif)', archive:'🗄️ Archivé (lecture seule)', a_venir:'⏳ À venir', brouillon:'📝 Brouillon'}[e] || e; }
+
+/* Bloc de réouverture exceptionnelle d'un thème archivé, pour un élève (fiche élève). */
+function tpReouvertureHTML(s, temaId){
+  const t = getTema(temaId);
+  const etat = tpEtatTheme(t);
+  if(etat !== 'archive') return `<p class="tp-dim">Situation du thème : ${tpEtatLabel(etat)}.</p>`;
+  const ouvert = temaRouvertPour(temaId, s);
+  return `<div class="tp-reopen ${ouvert ? 'on' : ''}">
+    ${ouvert ? '🔓 <b>Thème rouvert pour cet élève</b> — il peut de nouveau répondre et modifier ses réponses.' : '🗄️ Thème archivé : l\'élève le consulte en lecture seule.'}
+    <button onclick="tpSetRouvert('${s.id}','${temaId}', ${ouvert ? 'false' : 'true'})">${ouvert ? '🔒 Refermer' : '🔓 Rouvrir exceptionnellement'}</button>
+  </div>`;
+}
+async function tpSetRouvert(studentId, temaId, ouvrir){
+  if(ouvrir && !confirm('Rouvrir ce thème archivé pour cet élève ? Il pourra de nouveau répondre et modifier ses réponses jusqu\'à ce que tu le refermes.')) return;
+  try{
+    await db.collection('eleves').doc(studentId).update({[`temasRouverts.${temaId}`]: ouvrir ? true : firebase.firestore.FieldValue.delete()});
+    const s = studentsData.find(x => x.id === studentId);
+    if(s){ s.temasRouverts = s.temasRouverts || {}; if(ouvrir) s.temasRouverts[temaId] = true; else delete s.temasRouverts[temaId]; }
+    renderTeacherTemas();
+  }catch(e){ alert('Impossible de modifier l\'accès : ' + (e && e.message ? e.message : e)); }
 }

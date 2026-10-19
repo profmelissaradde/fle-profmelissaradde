@@ -1130,15 +1130,21 @@ function temaMostRecentId(){
    historique conservé pour tous les thèmes déjà publiés. Côté professeure, aucun
    filtre n'est appliqué : elle voit et peut préparer tous les thèmes, y compris ceux
    pas encore publiés aux élèves. */
+/* Visibilité d'un thème pour un ÉLÈVE à une date donnée (AAAA-MM-JJ, UTC). Fonction pure,
+   partagée par l'affichage, l'archivage automatique et le calendrier lu par les règles
+   Firestore (voir tpCalendrier dans 11-theme-parcours.js). */
+function temaVisiblePourEleveLe(t, isoDate){
+  if(typeof tpStatut === 'function' && tpStatut(t) === 'brouillon') return false;
+  if(!t.date_debut) return true;
+  return isoDate >= t.date_debut;
+}
+function temaAujourdhuiIso(){ return new Date().toISOString().slice(0,10); }
 function temaEstVisibleEleve(t){
   /* Vue élève du compte professeure : tous les thèmes (brouillons compris) pour pouvoir les
      prévisualiser. Pour un élève : un thème en brouillon (format parcours, voir
      11-theme-parcours.js) n'est jamais visible, quelle que soit sa date. */
   if(typeof isTeacher !== 'undefined' && isTeacher) return true;
-  if(typeof tpStatut === 'function' && tpStatut(t) === 'brouillon') return false;
-  if(!t.date_debut) return true;
-  const aujourdhui = new Date().toISOString().slice(0,10);
-  return aujourdhui >= t.date_debut;
+  return temaVisiblePourEleveLe(t, temaAujourdhuiIso());
 }
 function temasSemanasVisiveisEleve(){
   const visiveis = temasSemanas.filter(temaEstVisibleEleve);
@@ -1147,6 +1153,39 @@ function temasSemanasVisiveisEleve(){
 function temaMostRecentVisibleId(){
   const visiveis = temasSemanasVisiveisEleve();
   return visiveis[visiveis.length - 1].id;
+}
+
+/* ---- Archivage automatique ----
+   Le thème EN COURS est le plus récent thème publié et visible pour les élèves aujourd'hui
+   (même règle que l'affichage). Tous les autres sont ARCHIVÉS : consultables, mais plus
+   aucune réponse ne peut être donnée, modifiée ou soumise — sauf si la professeure a
+   rouvert ce thème à l'élève (champ eleves/{uid}.temasRouverts.{temaId} = true).
+   Rien n'est jamais supprimé. Le blocage est aussi appliqué par les règles Firestore. */
+function temaCourantId(isoDate){
+  const d = isoDate || temaAujourdhuiIso();
+  const vis = temasSemanas.filter(t => temaVisiblePourEleveLe(t, d));
+  return vis.length ? vis[vis.length - 1].id : null;
+}
+function temaRouvertPour(temaId, eleve){
+  const e = eleve || student;
+  return !!(e && e.temasRouverts && e.temasRouverts[temaId] === true);
+}
+/* Vrai si l'élève courant ne peut plus travailler sur ce thème. La professeure, en « vue
+   élève », voit les thèmes passés comme ses élèves (lecture seule) ; ses aperçus de l'onglet
+   « Suivi thème » restent, eux, interactifs (rien n'y est enregistré). */
+function temaEstArchive(temaId){
+  if(temaId === temaCourantId()) return false;
+  const t = getTema(temaId);
+  /* Un brouillon ou un thème à venir n'est pas « archivé » (les élèves ne le voient pas ;
+     la professeure peut le prévisualiser). Archivé = publié, déjà commencé, plus en cours. */
+  if(typeof tpStatut === 'function' && tpStatut(t) === 'brouillon') return false;
+  if(t.date_debut && t.date_debut > temaAujourdhuiIso()) return false;
+  return !temaRouvertPour(temaId);
+}
+function temaArchiveBannerHTML(){
+  return `<div class="tema-archive-banner"><b>🗄️ Thème archivé — Consultation uniquement</b>
+    <span>Tu peux relire le contenu, regarder les vidéos et retrouver tes réponses et tes corrections, mais tu ne peux plus répondre ni modifier ce thème.</span>
+    <span class="pt">🇧🇷 Tema arquivado — somente consulta. Você pode reler o conteúdo e ver suas respostas e correções, mas não pode mais responder nem modificar.</span></div>`;
 }
 
 let temaSelectedId = null;      // thème actuellement affiché côté élève
@@ -1163,7 +1202,14 @@ function temaNiveauEffectif(){
 
 function temaExoHTML(exo, uid, skill){
   if(!exo) return '';
-  const opts = exo.options.map((o,i)=>`<button class="exo-opt" onclick="temaAnswerQCM('${uid}',${i},${exo.correct},'${skill}')">${o}</button>`).join('');
+  /* Thème archivé : options désactivées. L'ancien format ne garde que « fait / juste » par
+     compétence (pas l'option choisie) : on montre la bonne réponse seulement si l'élève
+     avait répondu, comme il l'avait vue à l'époque. */
+  const lectureSeule = temaEstArchive(temaSelectedId);
+  const st = lectureSeule ? (((student.temas||{})[temaSelectedId]||{})[skill]||null) : null;
+  const opts = exo.options.map((o,i)=> lectureSeule
+    ? `<button class="exo-opt ${st && st.done && i===exo.correct ? 'correct' : ''}" disabled>${o}</button>`
+    : `<button class="exo-opt" onclick="temaAnswerQCM('${uid}',${i},${exo.correct},'${skill}')">${o}</button>`).join('');
   const niveauBadge = exo.niveau ? `<span class="niveau-badge niveau-${exo.niveau}">${exo.niveau}</span>` : '';
   return `<div class="exo-box">
     ${niveauBadge}
@@ -1171,7 +1217,7 @@ function temaExoHTML(exo, uid, skill){
     <p class="exo-consigne-pt">🇧🇷 Escolha a resposta certa.</p>
     <p class="exo-question">${exo.q}</p>
     <div class="exo-options" id="opts-${uid}">${opts}</div>
-    <p class="exo-feedback" id="fb-${uid}"></p>
+    <p class="exo-feedback ${st && st.done ? (st.correct ? 'ok' : 'bad') : ''}" id="fb-${uid}">${lectureSeule ? (st && st.done ? (st.correct ? '✔ Tu avais réussi cette compétence.' : '✘ Tu avais répondu, mais pas correctement — la bonne réponse est en vert.') : '— Non fait avant l\'archivage.') : ''}</p>
   </div>`;
 }
 /* Plusieurs questions pour une même compétence (CO ou CE) — les thèmes plus
@@ -1186,6 +1232,7 @@ function temaExoListHTML(exos, uid, skill){
   return exos.map((exo,i)=> temaExoHTML(exo, `${uid}_${i}`, skill)).join('');
 }
 async function temaAnswerQCM(uid, chosen, correct, skill){
+  if(temaEstArchive(temaSelectedId)) return;
   const container = document.getElementById('opts-'+uid);
   const buttons = container.querySelectorAll('.exo-opt');
   buttons.forEach((b,i)=>{
@@ -1203,18 +1250,21 @@ async function temaAnswerQCM(uid, chosen, correct, skill){
 
 async function temaSaveField(skill, data){
   const temaId = temaSelectedId;
+  if(temaEstArchive(temaId)) return;
   student.temas = student.temas || {};
   student.temas[temaId] = student.temas[temaId] || {};
   student.temas[temaId][skill] = { ...(student.temas[temaId][skill]||{}), ...data, ts: new Date().toISOString() };
   if(!student.uid) return;
   try{
     await db.collection('eleves').doc(student.uid).update({
-      [`temas.${temaId}.${skill}`]: { ...data, ts: firebase.firestore.FieldValue.serverTimestamp() }
+      [`temas.${temaId}.${skill}`]: { ...data, ts: firebase.firestore.FieldValue.serverTimestamp() },
+      temaEcriture: temaId /* thème déclaré, vérifié par les règles Firestore */
     });
   }catch(e){ /* non bloquant — reste enregistré localement pour cette session */ }
 }
 
 async function temaSaveEE(uid){
+  if(temaEstArchive(temaSelectedId)) return;
   const ta = document.getElementById(uid);
   const status = document.getElementById('eestatus-'+uid);
   const text = ta.value.trim();
@@ -1240,6 +1290,7 @@ async function temaSaveEE(uid){
 
 const temaRecorders = {};
 async function temaToggleRec(uid){
+  if(temaEstArchive(temaSelectedId)) return;
   const btn = document.getElementById('btn-'+uid);
   const status = document.getElementById('status-'+uid);
   if(!temaRecorders[uid] || !temaRecorders[uid].active){
@@ -1432,8 +1483,10 @@ function renderTemas(){
     const done = temaAllDone(t.id);
     const active = t.id === temaSelectedId;
     const brouillon = typeof tpStatut === 'function' && tpStatut(t) === 'brouillon';
+    const etat = brouillon ? ' · brouillon (invisible pour les élèves)'
+      : t.id === temaCourantId() ? ' · en cours' : (temaEstArchive(t.id) ? ' · archivé' : ' · rouvert par ta professeure');
     return `<button class="tema-week-tab ${active?'active':''}" onclick="goTemaWeek('${t.id}')">
-      ${done ? '✅ ' : ''}${brouillon ? '📝 ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}${brouillon ? ' · brouillon (invisible pour les élèves)' : ''}</span>
+      ${done ? '✅ ' : ''}${brouillon ? '📝 ' : (temaEstArchive(t.id) ? '🗄️ ' : '')}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}${etat}</span>
     </button>`;
   }).join('');
 
@@ -1447,6 +1500,7 @@ function renderTemas(){
       <p class="tema-sub">${tema.sub_fr} · 🇧🇷 ${tema.titre_pt} — ${tema.sub_pt}</p>
     </div>
     <div class="tema-week-tabs">${weeksHTML}</div>
+    ${temaEstArchive(tema.id) ? temaArchiveBannerHTML() : ''}
     <p class="section-label" style="margin:0 0 6px; font-size:12.5px; text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink);">Niveau ${effNiveau} (attribué par ta professeure) · ⏱️ Durée totale estimée : ${data.duree}</p>
     <div class="tema-status-bar" id="tema-status-bar"></div>
     <div id="tema-cert-zone" style="margin-bottom:20px;"></div>
@@ -1495,17 +1549,20 @@ function renderTemas(){
   const eeUid = `tema_${tema.id}_${effNiveau}_ee`;
   const ee = data.ee;
   const savedEE = (student.temas[tema.id] && student.temas[tema.id].ee && student.temas[tema.id].ee.text) || '';
+  const archive = temaEstArchive(tema.id);
   grid.innerHTML += `
     <div class="tema-skill-card">
       <div class="tema-skill-top"><span class="tema-skill-icon">✍️</span><h3 class="tema-skill-name">${ee.titre_fr}</h3><span class="tema-skill-dur">${ee.dur}</span></div>
       <p class="tema-skill-name-pt">🇧🇷 ${ee.titre_pt}</p>
       <p class="tema-consigne">${ee.consigne_fr}</p>
       <p class="tema-consigne-pt">🇧🇷 ${ee.consigne_pt}</p>
-      <textarea class="ee-textarea" id="${eeUid}" placeholder="Écris ta réponse ici... / Escreva sua resposta aqui...">${savedEE}</textarea>
+      ${archive
+        ? (savedEE ? `<div class="tema-archive-answer">${typeof tpEsc === 'function' ? tpEsc(savedEE) : savedEE}</div><p class="ee-note">✅ Texte envoyé à ta professeure.</p>` : '<p class="ee-note">— Non fait avant l\'archivage.</p>')
+        : `<textarea class="ee-textarea" id="${eeUid}" placeholder="Écris ta réponse ici... / Escreva sua resposta aqui...">${savedEE}</textarea>
       <div style="display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;">
         <button class="rec-btn" onclick="temaSaveEE('${eeUid}')">📤 Envoyer à ma professeure</button>
         <p class="ee-note" id="eestatus-${eeUid}" style="margin:0;">${savedEE ? '✅ Déjà envoyé — tu peux le modifier et renvoyer.' : ''}</p>
-      </div>
+      </div>`}
     </div>
   `;
 
@@ -1520,12 +1577,12 @@ function renderTemas(){
       <div class="rec-box">
         <p class="rec-consigne">${eo.consigne_fr}</p>
         <p class="rec-consigne-pt">🇧🇷 ${eo.consigne_pt}</p>
-        <div class="rec-controls">
+        ${archive ? '' : `<div class="rec-controls">
           <button class="rec-btn" id="btn-${eoUid}" onclick="temaToggleRec('${eoUid}')">● Enregistrer</button>
           <span class="rec-time" id="time-${eoUid}">00:00</span>
-        </div>
+        </div>`}
         <div id="player-${eoUid}">${savedEO && savedEO.driveUrl ? `<audio class="rec-audio" controls src="${savedEO.driveUrl}"></audio>` : ''}</div>
-        <p class="rec-status ${savedEO && savedEO.done ? 'ok' : ''}" id="status-${eoUid}">${savedEO && savedEO.done ? '✅ Déjà envoyé à ta professeure.' : "Ton enregistrement sera envoyé automatiquement à ta professeure."}</p>
+        <p class="rec-status ${savedEO && savedEO.done ? 'ok' : ''}" id="status-${eoUid}">${savedEO && savedEO.done ? '✅ Déjà envoyé à ta professeure.' : (archive ? '— Non fait avant l\'archivage.' : "Ton enregistrement sera envoyé automatiquement à ta professeure.")}</p>
       </div>
     </div>
   `;
@@ -1565,6 +1622,7 @@ function temaReviewEditorHTML(s){
   const eo = t.eo || {};
   return `<div class="rec-box" style="margin-top:10px;">
     <p class="rec-consigne" style="font-weight:700;">🍅 ${getTema(teacherTemaSelectedId).titre_fr} — ${s.prenom} ${s.nom} · Niveau ${s.niveau || '—'}</p>
+    ${typeof tpReouvertureHTML === 'function' ? tpReouvertureHTML(s, teacherTemaSelectedId) : ''}
     <p style="font-size:13px; margin:6px 0;"><b>Compréhension orale :</b> ${t.co && t.co.done ? (t.co.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
     <p style="font-size:13px; margin:6px 0;"><b>Compréhension écrite :</b> ${t.ce && t.ce.done ? (t.ce.correct ? '✅ Correct' : '⚠️ Répondu, mais faux') : '⬜ Pas encore fait'}</p>
     <p style="font-size:13px; margin:10px 0 4px;"><b>Expression écrite :</b></p>
@@ -1619,7 +1677,7 @@ function renderTeacherTemas(){
       const allDone = doneCount===4;
       const review = t.review;
       return `<div class="teacher-entry">
-        <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
+        <div class="who">${s.prenom} ${s.nom} ${temaRouvertPour(teacherTemaSelectedId, s) ? '<b style="color:var(--ok)">🔓 rouvert</b> ' : ''}${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
         <div class="meta">Progression thème : <b style="color:${allDone?'var(--ok)':'var(--navy)'}">${doneCount}/4</b> ${allDone ? '· 🏆 certificat débloqué' : ''} ${review && review.note != null ? `· 📝 Note donnée : <b>${review.note}</b>` : ''}</div>
         <div class="teacher-entry-actions">
           <button onclick="toggleTemaReview('${s.id}')">${openTemaReviewId===s.id ? 'Fermer' : '👁️ Voir & noter'}</button>
