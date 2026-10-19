@@ -1,35 +1,28 @@
 /* ======================= ÉCRAN : ESPACE PROFESSEURE ======================= */
+/* Onglets de l'espace professeure : chaque onglet déclare la fonction qui remplit
+   #teacher-body. Les rubriques et les titres viennent du modèle de navigation
+   (15-navigation.js) ; les modules ajoutent leurs onglets avec registerTeacherTab. */
+const TEACHER_TABS = {
+  eleves: ()=>loadTeacherStudents(), rec: ()=>loadTeacherRecordings(), historique: ()=>loadTeacherHistorique(),
+  temas: ()=>loadTeacherTemas(), experimental: ()=>loadExperimentalAdmin(), dispo: ()=>loadAdminDispo(),
+  messages: ()=>loadTeacherMessages()
+};
+function registerTeacherTab(id, loader){ TEACHER_TABS[id] = loader; }
 function renderTeacher(){
   const c = document.getElementById('content');
-  if(!isTeacher){
-    goLogin();
-    return;
-  }
-  const titles = {eleves:'Élèves & attribution des niveaux', rec:'Enregistrements des élèves', temas:'Thème de la semaine — suivi & notes', dispo:'Disponibilités & réservations', experimental:'Cours expérimental', historique:'Historique des cours', messages:'Messagerie'};
+  if(!isTeacher){ goLogin(); return; }
+  if(!TEACHER_TABS[teacherTab]) teacherTab = 'accueil';
+  const cur = typeof navCurrent === 'function' ? navCurrent() : {section:null, tab:null};
+  const section = cur.section ? cur.section.label : 'Espace professeure';
+  const title = cur.tab ? cur.tab.label : '';
   c.innerHTML = `
-    <p class="eyebrow">Admin</p>
-    <h1 class="page-title">${titles[teacherTab]}</h1>
-    <div class="storage-note">🔒 Les profils et niveaux vivent dans Firestore (règles de sécurité), les fichiers audio dans ton Google Drive personnel — les deux ne sont pleinement accessibles qu'à ton compte professeure.</div>
-    <div class="teacher-tabs">
-      <button class="tab-btn ${teacherTab==='eleves'?'active':''}" onclick="setTeacherTab('eleves')">👤 Élèves & niveaux</button>
-      <button class="tab-btn ${teacherTab==='rec'?'active':''}" onclick="setTeacherTab('rec')">🎙️ Enregistrements</button>
-      <button class="tab-btn ${teacherTab==='temas'?'active':''}" onclick="setTeacherTab('temas')">🍅 Thème de la semaine</button>
-      <button class="tab-btn ${teacherTab==='dispo'?'active':''}" onclick="setTeacherTab('dispo')">📅 Disponibilités</button>
-      <button class="tab-btn ${teacherTab==='experimental'?'active':''}" onclick="setTeacherTab('experimental')">🧪 Cours expérimental</button>
-      <button class="tab-btn ${teacherTab==='messages'?'active':''}" onclick="setTeacherTab('messages')">✉️ Messages${teacherUnreadTotal()>0?` <span class="admin-pill" style="background:var(--bad); color:#fff;">${teacherUnreadTotal()}</span>`:''}</button>
-      <button class="tab-btn ${teacherTab==='historique'?'active':''}" onclick="setTeacherTab('historique')">📚 Historique</button>
-    </div>
-    <div id="teacher-body"><p class="teacher-empty">Chargement…</p></div>
+    <p class="eyebrow">${section}</p>
+    <h1 class="page-title">${cur.section && cur.section.tabs.length === 1 ? section : title}</h1>
+    <div id="teacher-body"><p class="teacher-empty" role="status">Chargement…</p></div>
   `;
-  if(teacherTab==='eleves') loadTeacherStudents();
-  else if(teacherTab==='rec') loadTeacherRecordings();
-  else if(teacherTab==='historique') loadTeacherHistorique();
-  else if(teacherTab==='temas') loadTeacherTemas();
-  else if(teacherTab==='experimental') loadExperimentalAdmin();
-  else if(teacherTab==='dispo') loadAdminDispo();
-  else if(teacherTab==='messages') loadTeacherMessages();
+  (TEACHER_TABS[teacherTab] || (()=>{}))();
 }
-function setTeacherTab(tab){ teacherTab = tab; render(); }
+function setTeacherTab(tab){ teacherTab = tab; screen = 'teacher'; render(); }
 
 /* ---- Onglet : Élèves & niveaux ---- */
 /* ---- Onglet : Cours expérimental ---- */

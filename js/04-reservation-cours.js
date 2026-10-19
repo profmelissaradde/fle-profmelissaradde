@@ -342,7 +342,6 @@ let dispoData = [];
 function renderHistorique(){
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
     <p class="eyebrow">Cours particuliers</p>
     <h1 class="page-title">📚 Historique de mes cours</h1>
     <div id="historique-body"><p class="teacher-empty">Chargement…</p></div>

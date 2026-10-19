@@ -548,7 +548,7 @@ function weekdayPickerHTML(prefix){
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       ${
         WEEKDAYS_FR.map(d => `
-          <div style="display:flex; align-items:center; gap:4px; font-size:12.5px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:5px 8px;">
+          <div style="display:flex; align-items:center; gap:4px; font-size:12.5px; background:var(--c-surface); border:1px solid var(--line); border-radius:6px; padding:5px 8px;">
             <label style="display:flex; align-items:center; gap:4px;">
               <input
                 type="checkbox"
@@ -2933,7 +2933,7 @@ function messageBubbleHTML(
           href="${esc(m.attachmentUrl)}"
           target="_blank"
           rel="noopener"
-          style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:8px 10px; background:#fff; border:1px solid var(--line); border-radius:8px; font-size:12.5px; color:var(--navy); text-decoration:none;"
+          style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:8px 10px; background:var(--c-surface); border:1px solid var(--line); border-radius:8px; font-size:12.5px; color:var(--navy); text-decoration:none;"
         >
           📎 ${esc(m.attachmentName||'Fichier')}
         </a>
@@ -3409,7 +3409,7 @@ function renderMessages(){
       >
 
       <label
-        style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff;"
+        style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:var(--c-surface);"
         title="Joindre une photo ou un fichier"
       >
         📎
@@ -3845,7 +3845,7 @@ function renderTeacherMessages(){
         >
 
         <label
-          style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff;"
+          style="cursor:pointer; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:var(--c-surface);"
           title="Joindre une photo ou un fichier"
         >
           📎
@@ -3947,7 +3947,7 @@ function renderTeacherMessages(){
               ? `
                 <span
                   class="admin-pill"
-                  style="background:var(--bad); color:#fff;"
+                  style="background:var(--c-danger-fill); color:#fff;"
                 >
                   ${t.unread}
                 </span>

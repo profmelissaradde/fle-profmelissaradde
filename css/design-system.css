@@ -21,6 +21,13 @@
   --c-text-2:        #5F6B67;   /* texte secondaire (5,2:1 sur ivoire) */
   --c-border:        #E3DFD7;   /* bordures de cartes (décoratives) */
   --c-border-strong: #858F8A;   /* bordures de champs (3,3:1) */
+  --c-strong:        #3E5A50;   /* aplats foncés sous du texte blanc (7,5:1) */
+  --c-on-primary:    #FFFFFF;
+  --c-success-fill:  #2E6B4F;   /* aplats de statut sous du texte blanc (identiques en sombre) */
+  --c-danger-fill:   #A23B32;
+  --c-ink-fill:      #303B38;   /* texte sur la couleur principale */
+  --c-path:          var(--c-primary); /* couleur du chemin pédagogique (modifiable par thème) */
+  color-scheme: light;
 
   /* ---- Statuts (toujours accompagnés d'une icône ou d'un libellé) ---- */
   --c-success: #2E6B4F;  --c-success-bg: #E6F2EA;
@@ -52,7 +59,7 @@
   /* ---- Alias historiques (styles en ligne générés par le JavaScript) ---- */
   --navy: var(--c-primary-ink);
   --navy-deep: #2C413A;
-  --brand-blue: var(--c-primary);
+  --brand-blue: var(--c-primary-ink);
   --accent: var(--c-primary);
   --gold: var(--c-rose);
   --gold-dark: var(--c-rose-ink);
@@ -67,6 +74,62 @@
   --pt: var(--c-rose-ink);
   --warn: var(--c-warning);  --warn-bg: var(--c-warning-bg);
   --info: var(--c-info);     --info-bg: var(--c-info-bg);
+}
+
+
+/* =============================================================================
+   VARIANTES DE PALETTE (Paramètres › Apparence) et THÈME SOMBRE
+   - data-palette sur <html> : "sauge" (défaut, ci-dessus) ou "bleu-rose".
+   - data-theme sur <html> : "clair", "sombre" ou "auto" (suit le réglage de l'appareil).
+   - Une palette personnalisée est appliquée en surcharge par 17-parametres.js, après
+     vérification des contrastes.
+   ============================================================================= */
+:root[data-palette="bleu-rose"]{
+  --c-bg:#F8F7F4; --c-bg-2:#EEF0F3; --c-surface-2:#F2F3F6;
+  --c-primary:#1F3A5F; --c-primary-hover:#2F5A8A; --c-primary-ink:#1F3A5F; --c-primary-soft:#DCE8F5;
+  --c-rose:#E9C6CF; --c-rose-soft:#F6E4E8; --c-rose-ink:#9A4F63;
+  --c-text:#2A3340; --c-text-2:#5B6573; --c-border:#E1E4EA; --c-border-strong:#7D8796; --c-strong:#1F3A5F;
+  --focus: 0 0 0 3px #F8F7F4, 0 0 0 5px #1F3A5F;
+}
+:root[data-theme="sombre"]{
+  color-scheme: dark;
+  --c-bg:#141A18; --c-bg-2:#1B2421; --c-surface:#1E2623; --c-surface-2:#252F2B;
+  --c-primary:#4F7A6B; --c-primary-hover:#5C8878; --c-primary-ink:#A8CDBF; --c-primary-soft:#24352F;
+  --c-rose:#8C6A60; --c-rose-soft:#2E2522; --c-rose-ink:#E0B7A9;
+  --c-text:#E7ECEA; --c-text-2:#AAB6B1; --c-border:#2F3A36; --c-border-strong:#71807A; --c-strong:#3E5A50;
+  --c-success:#7CC4A0; --c-success-bg:#18302A; --c-danger:#F08A80; --c-danger-bg:#3A1F1C;
+  --c-warning:#E8B865; --c-warning-bg:#33291A; --c-info:#9DB8E0; --c-info-bg:#1C2636;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 4px 16px rgba(0,0,0,.35); --shadow-3: 0 12px 32px rgba(0,0,0,.5);
+  --focus: 0 0 0 3px #141A18, 0 0 0 5px #A8CDBF;
+  --navy-deep:#0F1714;
+}
+:root[data-theme="sombre"][data-palette="bleu-rose"]{
+  --c-bg:#141B26; --c-bg-2:#1A2230; --c-surface:#1C2533; --c-surface-2:#232D3D;
+  --c-primary:#2F5A8A; --c-primary-hover:#3A6A9E; --c-primary-ink:#9DB8DD; --c-primary-soft:#22324A;
+  --c-rose:#9A6372; --c-rose-soft:#2E2229; --c-rose-ink:#E9B8C5;
+  --c-text:#E6EDF7; --c-text-2:#A9B4C2; --c-border:#2D3747; --c-border-strong:#728095; --c-strong:#2F5A8A;
+  --focus: 0 0 0 3px #141B26, 0 0 0 5px #9DB8DD;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-theme="auto"]{
+    color-scheme: dark;
+    --c-bg:#141A18; --c-bg-2:#1B2421; --c-surface:#1E2623; --c-surface-2:#252F2B;
+    --c-primary:#4F7A6B; --c-primary-hover:#5C8878; --c-primary-ink:#A8CDBF; --c-primary-soft:#24352F;
+    --c-rose:#8C6A60; --c-rose-soft:#2E2522; --c-rose-ink:#E0B7A9;
+    --c-text:#E7ECEA; --c-text-2:#AAB6B1; --c-border:#2F3A36; --c-border-strong:#71807A; --c-strong:#3E5A50;
+    --c-success:#7CC4A0; --c-success-bg:#18302A; --c-danger:#F08A80; --c-danger-bg:#3A1F1C;
+    --c-warning:#E8B865; --c-warning-bg:#33291A; --c-info:#9DB8E0; --c-info-bg:#1C2636;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 4px 16px rgba(0,0,0,.35); --shadow-3: 0 12px 32px rgba(0,0,0,.5);
+    --focus: 0 0 0 3px #141A18, 0 0 0 5px #A8CDBF;
+    --navy-deep:#0F1714;
+  }
+  :root[data-theme="auto"][data-palette="bleu-rose"]{
+    --c-bg:#141B26; --c-bg-2:#1A2230; --c-surface:#1C2533; --c-surface-2:#232D3D;
+    --c-primary:#2F5A8A; --c-primary-hover:#3A6A9E; --c-primary-ink:#9DB8DD; --c-primary-soft:#22324A;
+    --c-rose:#9A6372; --c-rose-soft:#2E2229; --c-rose-ink:#E9B8C5;
+    --c-text:#E6EDF7; --c-text-2:#A9B4C2; --c-border:#2D3747; --c-border-strong:#728095; --c-strong:#2F5A8A;
+    --focus: 0 0 0 3px #141B26, 0 0 0 5px #9DB8DD;
+  }
 }
 
 /* ---- Base ---- */
@@ -90,7 +153,7 @@ button:disabled{cursor:not-allowed;}
 /* ---- Accessibilité ---- */
 :focus-visible{outline:none; box-shadow:var(--focus); border-radius:var(--r-sm);}
 .sr-only{position:absolute!important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
-.skip-link{position:absolute; left:var(--sp-4); top:-60px; z-index:10000; background:var(--c-primary-ink); color:#fff; padding:10px 16px; border-radius:var(--r-sm); font-weight:600; text-decoration:none;}
+.skip-link{position:absolute; left:var(--sp-4); top:-60px; z-index:10000; background:var(--c-strong); color:#fff; padding:10px 16px; border-radius:var(--r-sm); font-weight:600; text-decoration:none;}
 .skip-link:focus{top:var(--sp-3); color:#fff;}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; scroll-behavior:auto!important;}
@@ -101,7 +164,7 @@ button:disabled{cursor:not-allowed;}
   display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2);
   min-height:var(--tap); padding:10px 18px; border-radius:var(--r-sm);
   border:1px solid transparent; font-weight:600; font-size:var(--fs-md); line-height:1.2;
-  background:var(--c-primary); color:#fff; text-decoration:none;
+  background:var(--c-primary); color:var(--c-on-primary); text-decoration:none;
   transition:background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 .btn:hover,.primary-btn:hover{background:var(--c-primary-hover); color:#fff;}

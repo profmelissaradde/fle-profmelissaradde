@@ -833,62 +833,6 @@ async function callDriveScript(payload){
   return data;
 }
 
-/* ======================= SIDEBAR ======================= */
-function renderSidebar(){
-  const sb = document.getElementById('sidebar');
-  let html = `
-    <p class="cover-label">${niveau ? 'Niveau '+niveau+(screen==='week'||screen==='bilan'?' · Dossier '+CURRENT_DOSSIER_NUM:'') : 'Français langue étrangère'}</p>
-    <h1 class="cover-title">FLE</h1>
-  `;
-  if(student.prenom && screen!=='login'){
-    let progressLine = niveau ? 'Niveau '+niveau : (isTeacher ? 'Compte professeure' : "En attente d'attribution");
-    if(niveau && student.uniteCourante && student.uniteCourante[CURRENT_DOSSIER_NUM]){
-      const w = weeks.find(x=>x.tag===student.uniteCourante[CURRENT_DOSSIER_NUM]);
-      if(w) progressLine += ` · Unité ${w.id}/5`;
-    }
-    html += `<div class="student-badge"><b>${student.prenom} ${student.nom}</b>${isTeacher ? '<span class="admin-pill">⚙️ Admin</span>' : ''}${progressLine}</div>
-    ${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? `<button class="nav-btn" onclick="goDossiers()"><span class="tag">📣</span> Message de ta professeure <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span></button>` : ''}
-    <button class="nav-btn" onclick="goLogin()">🚪 Se déconnecter</button>`;
-  }
-  if(screen==='week' || screen==='bilan'){
-    html += `<button class="nav-btn" onclick="goDossiers()">← Retour aux dossiers</button><div class="nav-sep"></div><nav class="weeks">`;
-    weeks.forEach(w=>{
-      html += `<button class="nav-btn ${(screen==='week'&&current===w.id)?'active':''}" style="--tag-color:${w.color}" onclick="goWeek(${w.id})"><span class="tag">${w.tag}</span> ${w.title_fr}</button>`;
-    });
-    html += `<button class="nav-btn ${screen==='bilan'?'active':''}" style="--tag-color:${BILAN_COLOR}" onclick="goBilan()"><span class="tag">✓</span> Bilan final</button></nav>`;
-  }
-  if(isTeacher && screen!=='login'){
-    html += `<div class="nav-sep"></div><p class="nav-section-label">Vue élève (aperçu complet)</p>
-      <div class="niveau-switch" style="display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 10px;">
-        ${niveauxMenu.map(n=>`<button class="tab-btn ${niveau===n.code?'active':''}" style="padding:4px 10px; font-size:12px;" onclick="setAdminNiveau('${n.code}')">${n.code}</button>`).join('')}
-      </div>`;
-  }
-  if(student.prenom && niveau && screen!=='login' && !isStudentExperimental()){
-    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='temas'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goTemas()"><span class="tag">🍅</span> Thème de la semaine${(typeof hasUnseenAnnouncement==='function' && hasUnseenAnnouncement()) ? ` <span class="admin-pill" style="background:var(--bad); color:#fff;">●</span>` : ''}</button>`;
-    html += `<button class="nav-btn ${screen==='survie'?'active':''}" style="--tag-color:var(--c-danger)" onclick="goSurvie()"><span class="tag">🆘</span> Phrases de survie</button>`;
-  }
-  if(student.prenom && screen!=='login'){
-    html += `<div class="nav-sep"></div><button class="nav-btn ${screen==='reserver'?'active':''}" style="--tag-color:var(--c-success)" onclick="goReserver()"><span class="tag">📅</span> ${isTeacher ? 'Disponibilités' : 'Réserver un cours'}</button>`;
-    html += `<button class="nav-btn ${screen==='forum'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goForum()"><span class="tag">💬</span> Forum</button>`;
-    if(!isTeacher){
-      html += `<button class="nav-btn ${screen==='messages'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goMessages()"><span class="tag">✉️</span> Message à Melissa${studentUnreadCount>0?` <span class="admin-pill" style="background:var(--bad); color:#fff;">${studentUnreadCount}</span>`:''}</button>`;
-      html += `<button class="nav-btn ${screen==='historique'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goHistorique()"><span class="tag">📚</span> Historique de mes cours</button>`;
-    }
-  }
-  if(isTeacher && screen!=='login'){
-    html += `<div class="nav-sep"></div><p class="nav-section-label">Admin</p>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='eleves'?'active':''}" onclick="goTeacherTab('eleves')"><span class="tag">👤</span> Élèves & niveaux</button>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='rec'?'active':''}" onclick="goTeacherTab('rec')"><span class="tag">🎙️</span> Enregistrements</button>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='temas'?'active':''}" onclick="goTeacherTab('temas')"><span class="tag">🍅</span> Suivi thème</button>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='experimental'?'active':''}" onclick="goTeacherTab('experimental')"><span class="tag">🧪</span> Cours expérimental</button>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='messages'?'active':''}" onclick="goTeacherTab('messages')"><span class="tag">✉️</span> Messages${teacherUnreadTotal()>0?` <span class="admin-pill" style="background:var(--bad); color:#fff;">${teacherUnreadTotal()}</span>`:''}</button>`;
-    html += `<button class="nav-btn ${screen==='teacher'&&teacherTab==='historique'?'active':''}" onclick="goTeacherTab('historique')"><span class="tag">📚</span> Historique</button>`;
-  }
-  if(screen==='login' || screen==='verify' || screen==='waiting'){
-    html += `<div class="sidebar-foot">🎙️ Les exercices audio sont enregistrés et envoyés directement à ta professeure.</div>`;
-  }
-  sb.innerHTML = html;
-}
 
 /* ======================= NAVIGATION ======================= */
 function goLogin(){ isTeacher=false; teacherTab='eleves'; niveau=null; current=null; try{ auth.signOut(); }catch(e){} screen='login'; render(); }
@@ -925,7 +869,7 @@ function setAdminNiveau(code){
   }
   render();
 }
-function goReserver(){ screen='reserver'; render(); }
+function goReserver(){ if(isTeacher){ goTeacherTab('dispo'); return; } screen='reserver'; render(); }
 function goForum(){ screen='forum'; render(); }
 function goMessages(){ screen='messages'; render(); }
 function goHistorique(){ screen='historique'; render(); }

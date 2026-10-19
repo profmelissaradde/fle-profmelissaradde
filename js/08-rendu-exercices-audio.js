@@ -1,39 +1,47 @@
-/* ======================= RENDU PRINCIPAL ======================= */
+/* ======================= RENDU PRINCIPAL (routeur unique) =======================
+   Chaque écran est déclaré UNE fois dans SCREENS (ou ajouté par un module avec
+   registerScreen). Le contrôle d'accès (rôle, statut expérimental, niveau) est fait par
+   navGuard (15-navigation.js) avant tout affichage ; les modules qui ont besoin d'agir
+   après un rendu s'inscrivent avec onAfterRender — plus aucune redéfinition de render(). */
+const SCREENS = {
+  login: ()=>renderLogin(), verify: ()=>renderVerify(), waiting: ()=>renderWaiting(),
+  dossiers: ()=>renderDossiers(), survie: ()=>renderSurvie(), temas: ()=>renderTemas(),
+  reserver: ()=>renderReserver(), forum: ()=>renderForum(), messages: ()=>renderMessages(),
+  historique: ()=>renderHistorique(), week: ()=>renderWeek(weeks.find(w=>w.id===current)),
+  bilan: ()=>renderBilan(), teacher: ()=>renderTeacher()
+};
+function registerScreen(id, fn){ SCREENS[id] = fn; }
+const AFTER_RENDER = [];
+function onAfterRender(fn){ AFTER_RENDER.push(fn); }
+
 function render(){
   const currentUser = auth.currentUser;
   /* Sécurité : tant que l'e-mail d'un compte élève n'est pas vérifié, on ne
      montre que l'écran de vérification — jamais le menu, les réservations,
      le forum ou l'historique. */
-  if(currentUser && currentUser.uid !== TEACHER_UID && !currentUser.emailVerified){
+  if(currentUser && currentUser.uid !== TEACHER_UID && !currentUser.emailVerified
+     && !(typeof isStudentExperimental === 'function' && isStudentExperimental())
+     && !(student && (student.experimentalLesson || student.registrationSource === 'cours-experimental'))){
     screen = 'verify';
+  }
+  if(screen === 'verify'){
     const sidebar = document.getElementById('sidebar');
     if(sidebar){ sidebar.innerHTML = ''; sidebar.style.display = 'none'; }
     renderVerify();
+    AFTER_RENDER.forEach(fn=>{ try{ fn(); }catch(e){ console.error(e); } });
     window.scrollTo(0,0);
     return;
   }
   const sidebar = document.getElementById('sidebar');
   if(sidebar){ sidebar.style.display = ''; }
+  if(typeof navGuard === 'function') navGuard();
 
   renderSidebar();
   const contentEl = document.getElementById('content');
-  /* Une seule couleur d'accent pour toute l'application (design system : css/design-system.css).
-     Les anciennes couleurs vives par section ont été retirées pour une interface homogène. */
-  const accent = "var(--c-primary)";
-  contentEl.style.setProperty('--accent', accent);
-  if(screen==='login') renderLogin();
-  else if(screen==='verify') renderVerify();
-  else if(screen==='waiting') renderWaiting();
-  else if(screen==='dossiers') renderDossiers();
-  else if(screen==='survie') renderSurvie();
-  else if(screen==='temas') renderTemas();
-  else if(screen==='reserver') renderReserver();
-  else if(screen==='forum') renderForum();
-  else if(screen==='messages') renderMessages();
-  else if(screen==='historique') renderHistorique();
-  else if(screen==='week') renderWeek(weeks.find(w=>w.id===current));
-  else if(screen==='bilan') renderBilan();
-  else if(screen==='teacher') renderTeacher();
+  contentEl.style.setProperty('--accent', 'var(--c-primary)');
+  const fn = SCREENS[screen] || SCREENS.login;
+  fn();
+  AFTER_RENDER.forEach(fn=>{ try{ fn(); }catch(e){ console.error(e); } });
   window.scrollTo(0,0);
 }
 
@@ -224,5 +232,8 @@ function renderMaintenance(){
   `;
 }
 
-if(MAINTENANCE_MODE){ renderMaintenance(); }
-else{ render(); }
+/* Premier affichage : une fois TOUS les scripts chargés (les modules 09 à 19 déclarent leurs
+   écrans et la navigation). */
+function demarrerApplication(){ if(MAINTENANCE_MODE){ renderMaintenance(); } else { render(); } }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrerApplication);
+else setTimeout(demarrerApplication, 0);

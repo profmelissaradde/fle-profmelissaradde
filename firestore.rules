@@ -47,7 +47,9 @@ service cloud.firestore {
       let rouverts = resource.data.get('temasRouverts', {});
       let p = get(/databases/$(database)/documents/config/temasCalendrier).data.periodes.get(temaId, null);
       return rouverts.get(temaId, false) == true
-        || (p != null && request.time >= p.debut && (p.fin == null || request.time < p.fin));
+        || (p != null && request.time >= p.debut && (p.fin == null || request.time < p.fin)
+            // thème attribué à certains élèves seulement (liste écrite par l'application de la professeure)
+            && (p.get('eleves', null) == null || request.auth.uid in p.eleves));
     }
 
     function correctionsThemeIntactes(temaId) {
@@ -63,6 +65,44 @@ service cloud.firestore {
       let declare = request.resource.data.get('temaEcriture', '');
       return modifies.size() == 0
         || (modifies.hasOnly([declare]) && themeOuvertPourEleve(declare) && correctionsThemeIntactes(declare));
+    }
+
+    // =========================================================
+    // MON PROFIL — champs personnels modifiables par l'élève lui-même
+    // (niveau, forfait, paiements, statut et droits restent réservés à la professeure)
+    // =========================================================
+
+    function texteProfilOk(d, changes, k, min, max) {
+      return !changes.hasAny([k]) || (d[k] is string && d[k].size() >= min && d[k].size() <= max);
+    }
+
+    function profilEleveValide() {
+      let d = request.resource.data;
+      let changes = d.diff(resource.data).affectedKeys();
+      return texteProfilOk(d, changes, 'prenom', 1, 60)
+        && texteProfilOk(d, changes, 'nom', 1, 60)
+        && texteProfilOk(d, changes, 'nomAffiche', 0, 40)
+        && texteProfilOk(d, changes, 'telephone', 0, 20)
+        && texteProfilOk(d, changes, 'whatsappCode', 0, 8)
+        && texteProfilOk(d, changes, 'timezone', 0, 60)
+        && texteProfilOk(d, changes, 'objectifs', 0, 1000)
+        && texteProfilOk(d, changes, 'avatar', 0, 20)
+        && (!changes.hasAny(['langue']) || d.langue in ['fr', 'fr-pt'])
+        && (!changes.hasAny(['apparence']) || d.apparence in ['clair', 'sombre', 'auto'])
+        && (!changes.hasAny(['preferences']) || (
+              d.preferences is map
+              && d.preferences.keys().hasOnly(['rythme', 'focus'])
+              && d.preferences.get('rythme', '') is string && d.preferences.get('rythme', '').size() <= 20
+              && d.preferences.get('focus', '') is string && d.preferences.get('focus', '').size() <= 20))
+        && (!changes.hasAny(['notifications']) || (
+              d.notifications is map
+              && d.notifications.keys().hasOnly(['whatsapp'])
+              && d.notifications.get('whatsapp', true) is bool))
+        && (!changes.hasAny(['profilMaj']) || (
+              d.profilMaj is map
+              && d.profilMaj.keys().hasOnly(['at', 'champs'])
+              && d.profilMaj.at == request.time
+              && d.profilMaj.champs is list && d.profilMaj.champs.size() <= 20));
     }
 
     // =========================================================
@@ -103,9 +143,12 @@ service cloud.firestore {
           owns(uid)
           && canUseStudentApp()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'uniteCourante', 'temas', 'temaEcriture', 'completed', 'lastAnnouncementSeenId', 'pack'
+            'uniteCourante', 'temas', 'temaEcriture', 'completed', 'lastAnnouncementSeenId', 'pack',
+            'prenom', 'nom', 'nomAffiche', 'telephone', 'whatsappCode', 'timezone', 'avatar', 'langue',
+            'objectifs', 'preferences', 'notifications', 'apparence', 'profilMaj'
           ])
           && ecritureThemesAutorisee()
+          && profilEleveValide()
           && (
             request.resource.data.get('pack', {}) == resource.data.get('pack', {})
             || request.resource.data.get('pack', {}).diff(resource.data.get('pack', {})).affectedKeys().hasOnly(['cpfNaNota'])
@@ -330,6 +373,52 @@ service cloud.firestore {
     match /annonces/{docId} {
       allow get, list: if canUseStudentApp() || isTeacher();
       allow create: if isTeacher();
+      allow delete: if isTeacher();
+    }
+
+    // =========================================================
+    // RESSOURCES (liens choisis par la professeure)
+    // =========================================================
+
+    function ressourceValide() {
+      let d = request.resource.data;
+      return d.titre is string && d.titre.size() > 0 && d.titre.size() <= 120
+        && d.url is string && d.url.size() <= 500 && d.url.matches('https://.+')
+        && d.type in ['document', 'video', 'audio', 'page', 'exercice']
+        && d.publie is bool
+        && d.niveaux is list && d.niveaux.size() <= 10
+        && d.get('description', '') is string && d.get('description', '').size() <= 400;
+    }
+
+    match /ressources/{docId} {
+      allow get, list: if isTeacher() || (canUseStudentApp() && resource.data.publie == true);
+      allow create, update: if isTeacher() && ressourceValide();
+      allow delete: if isTeacher();
+    }
+
+    // =========================================================
+    // SUIVI PÉDAGOGIQUE PRIVÉ (objectifs, difficultés, notes de la professeure)
+    // Jamais lisible par l'élève.
+    // =========================================================
+
+    match /suiviEleves/{uid} {
+      allow get, list, create, update, delete: if isTeacher();
+    }
+
+    // =========================================================
+    // JOURNAL D'ACTIVITÉ — ajout seul, lecture professeure, jamais modifié ni supprimé
+    // =========================================================
+
+    match /journal/{docId} {
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['type', 'message', 'details', 'par', 'parNom', 'ts'])
+        && request.resource.data.par == request.auth.uid
+        && request.resource.data.type is string && request.resource.data.type.size() <= 40
+        && request.resource.data.message is string && request.resource.data.message.size() <= 500
+        && request.resource.data.details is string && request.resource.data.details.size() <= 1500
+        && request.resource.data.parNom is string && request.resource.data.parNom.size() <= 80
+        && request.resource.data.ts == request.time;
+      allow get, list: if isTeacher();
     }
   }
 }
