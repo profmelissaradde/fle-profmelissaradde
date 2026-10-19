@@ -1131,6 +1131,11 @@ function temaMostRecentId(){
    filtre n'est appliqué : elle voit et peut préparer tous les thèmes, y compris ceux
    pas encore publiés aux élèves. */
 function temaEstVisibleEleve(t){
+  /* Vue élève du compte professeure : tous les thèmes (brouillons compris) pour pouvoir les
+     prévisualiser. Pour un élève : un thème en brouillon (format parcours, voir
+     11-theme-parcours.js) n'est jamais visible, quelle que soit sa date. */
+  if(typeof isTeacher !== 'undefined' && isTeacher) return true;
+  if(typeof tpStatut === 'function' && tpStatut(t) === 'brouillon') return false;
   if(!t.date_debut) return true;
   const aujourdhui = new Date().toISOString().slice(0,10);
   return aujourdhui >= t.date_debut;
@@ -1306,6 +1311,7 @@ async function temaToggleRec(uid){
 
 function temaAllDone(temaId){
   const id = temaId || temaSelectedId;
+  if(typeof tpIsV2 === 'function' && tpIsV2(getTema(id))) return !!tpTemaAllDoneFor(id, student.temas, niveau, student.niveauTheme);
   const t = (student.temas && student.temas[id]) || {};
   return !!(t.co && t.co.done && t.ce && t.ce.done && t.ee && t.ee.done && t.eo && t.eo.done);
 }
@@ -1375,8 +1381,14 @@ function downloadCertificate(){
   ctx.fillText(`${student.prenom} ${student.nom}`, 600, 425);
   ctx.font = '18px Georgia, serif';
   ctx.fillStyle = '#c9d3e6';
-  ctx.fillText(`Niveau ${niveau} — a terminé les 4 activités de la semaine`, 600, 470);
-  ctx.fillText('(compréhension orale, compréhension écrite, expression écrite, expression orale)', 600, 498);
+  if(typeof tpIsV2 === 'function' && tpIsV2(tema)){
+    const lvlUsed = (student.temas && student.temas[tema.id] && student.temas[tema.id].v2 && student.temas[tema.id].v2.niveau) || niveau;
+    ctx.fillText(`Parcours ${lvlUsed} — a terminé toutes les activités du thème de la semaine`, 600, 470);
+    ctx.fillText('(vocabulaire, compréhension écrite et orale, grammaire, production écrite et orale, synthèse)', 600, 498);
+  } else {
+    ctx.fillText(`Niveau ${niveau} — a terminé les 4 activités de la semaine`, 600, 470);
+    ctx.fillText('(compréhension orale, compréhension écrite, expression écrite, expression orale)', 600, 498);
+  }
   const t = (student.temas && student.temas[temaSelectedId]) || {};
   if(t.review && typeof t.review.note !== 'undefined' && t.review.note !== null){
     ctx.font = '700 26px Georgia, serif';
@@ -1399,6 +1411,13 @@ function goTemaWeek(id){
 
 function renderTemas(){
   const c = document.getElementById('content');
+  /* Les thèmes « parcours » peuvent être publiés / modifiés depuis l'espace enseignante
+     (config/temas) : on charge cette configuration une fois avant le premier affichage. */
+  if(typeof tpLoadConfig === 'function' && !tpConfig.loaded){
+    c.innerHTML = '<p class="teacher-empty">Chargement du thème…</p>';
+    tpLoadConfig().then(()=>{ if(screen==='temas') renderTemas(); });
+    return;
+  }
   if(!temaSelectedId){ temaSelectedId = temaMostRecentVisibleId(); }
   // Si l'id sélectionné correspond à un thème pas encore publié (ex: ancien lien, ou
   // date système qui a reculé), on retombe sur le dernier thème visible.
@@ -1412,10 +1431,13 @@ function renderTemas(){
   const weeksHTML = [...temasSemanasVisiveisEleve()].reverse().map(t=>{
     const done = temaAllDone(t.id);
     const active = t.id === temaSelectedId;
+    const brouillon = typeof tpStatut === 'function' && tpStatut(t) === 'brouillon';
     return `<button class="tema-week-tab ${active?'active':''}" onclick="goTemaWeek('${t.id}')">
-      ${done ? '✅ ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
+      ${done ? '✅ ' : ''}${brouillon ? '📝 ' : ''}${t.titre_fr}<span class="tema-week-tab-date">${t.periode}${brouillon ? ' · brouillon (invisible pour les élèves)' : ''}</span>
     </button>`;
   }).join('');
+
+  if(typeof tpIsV2 === 'function' && tpIsV2(tema)){ tpRenderStudent(c, tema, weeksHTML); return; }
 
   c.innerHTML = `
     <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
@@ -1518,6 +1540,7 @@ let openTemaReviewId = null;
 async function loadTeacherTemas(){
   const body = document.getElementById('teacher-body');
   try{
+    if(typeof tpLoadConfig === 'function') await tpLoadConfig();
     if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
     if(studentsData.length===0){ await loadTeacherStudents(); }
     renderTeacherTemas();
@@ -1577,7 +1600,8 @@ function renderTeacherTemas(){
   if(!body) return;
   if(!teacherTemaSelectedId){ teacherTemaSelectedId = temaMostRecentId(); }
   const tema = getTema(teacherTemaSelectedId);
-  const weeksHTML = [...temasSemanas].reverse().map(t=>{
+  if(typeof tpIsV2 === 'function' && tpIsV2(tema)){ tpRenderTeacher(body, tema); return; }
+  const weeksHTML = typeof tpTeacherWeeksHTML === 'function' ? tpTeacherWeeksHTML() : [...temasSemanas].reverse().map(t=>{
     const active = t.id === teacherTemaSelectedId;
     return `<button class="tema-week-tab ${active?'active':''}" onclick="setTeacherTemaWeek('${t.id}')">
       ${t.titre_fr}<span class="tema-week-tab-date">${t.periode}</span>
