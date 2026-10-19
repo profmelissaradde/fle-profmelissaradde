@@ -124,6 +124,12 @@ function doGet(e) {
 
     }
 
+    if (action === "acceptproposal" || action === "refuseproposal") {
+
+      return renderProposalPage_(action, slotId, token);
+
+    }
+
     if (!["confirm", "cancel", "reschedule"].includes(action)) {
 
       return HtmlService.createHtmlOutput(`
@@ -596,6 +602,10 @@ function doPost(e) {
     }
     if (data.action === "createZoomMeeting") { return handleCreateZoomMeeting(data, authCtx); }
     if (data.action === "syncRescheduledCourse") { return handleSyncRescheduledCourse(data, authCtx); }
+    if (data.action === "proposeReschedule") { return handleProposeReschedule(data, authCtx); }
+    if (data.action === "respondReschedule") { return handleRespondReschedule(data, authCtx); }
+    if (data.action === "applyTeacherReschedule") { return handleApplyTeacherReschedule(data, authCtx); }
+    if (data.action === "retryZoomSync") { return handleRetryZoomSync(data, authCtx); }
     if (data.action === "notifyPackPayment") { requireTeacher_(authCtx); return handleNotifyPackPayment(data); }
     if (data.action === "notifyPackBooked") { requireTeacher_(authCtx); return handleNotifyPackBooked(data); }
     if (data.action === "notifyPaymentReceived") { requireTeacher_(authCtx); return handleNotifyPaymentReceived(data); }
@@ -1148,6 +1158,14 @@ function handleCreateZoomMeeting(data, authCtx) {
       throw new Error("Ce cours n'appartient pas à cet utilisateur.");
     }
 
+    if (fieldBool_(fields, "anomalie")) {
+      throw new Error("Séance en anomalie : aucune réunion Zoom n'est créée tant qu'un report n'a pas été accepté.");
+    }
+    const zoomSyncState = firestoreValueToJs_(fields.zoomSync) || {};
+    if (zoomSyncState.status && zoomSyncState.status !== "ok") {
+      return jsonResponse({ ok: false, error: "Synchronisation Zoom en cours pour cette séance.", zoomStatus: zoomSyncState.status });
+    }
+
     const existingUrl = fieldString_(fields, "zoomJoinUrl");
     if (existingUrl) {
       return jsonResponse({
@@ -1258,95 +1276,26 @@ function sendRescheduleConfirmedEmail_(email, prenom, oldDateStr, newDateStr) {
   MailApp.sendEmail(email, sujet, corps, { htmlBody: html });
 }
 
+/* Action historique appelée par les anciennes versions de l'application après
+   avoir modifié la date elles-mêmes. Elle passe désormais par la synchro
+   idempotente rptSyncZoom_ (plus jamais de seconde réunion en cas d'échec). */
 function handleSyncRescheduledCourse(data, authCtx) {
   try {
     if (!data.slotId) throw new Error("slotId manquant");
-
-    const projectId = "fle-profmelissaradde";
     const token = getFirestoreAccessToken_();
-    const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-
-    const doc = getFirestoreDocument_(baseUrl, "disponibilites", data.slotId, token);
-    const fields = doc.fields || {};
-    const reservedBy = fieldString_(fields, "reservedBy");
-
-    if (!reservedBy) throw new Error("Ce créneau n'est pas réservé.");
-    if (!isTeacherAuth_(authCtx) && reservedBy !== authCtx.uid) {
-      throw new Error("Ce cours n'appartient pas à cet utilisateur.");
+    const slot = rptLoadSlot_(data.slotId, token);
+    if (!slot.reservedBy) throw new Error("Ce créneau n'est pas réservé.");
+    if (!isTeacherAuth_(authCtx) && slot.reservedBy !== authCtx.uid) throw new Error("Ce cours n'appartient pas à cet utilisateur.");
+    const zs = slot.zoomSync || {};
+    if (!(zs.status === "ok" && zs.targetDate === slot.date)) {
+      rptPatch_(data.slotId, token, { zoomSync: Object.assign({}, zs, { status: zs.targetDate === slot.date ? (zs.status || "pending") : "pending",
+        targetDate: slot.date, requestedAt: new Date().toISOString() }) });
     }
-
-    const newDate = fieldString_(fields, "date");
-    if (!newDate) throw new Error("Nouvelle date du cours introuvable.");
-
-    const rawDuration = fields.duree && (fields.duree.integerValue || fields.duree.doubleValue);
-    const duration = Math.max(15, Math.min(240, Number(rawDuration) || Number(data.duration) || 45));
-
-    const reservedName = fieldString_(fields, "reservedName");
-    const reservedEmail = fieldString_(fields, "reservedEmail");
-    const existingTopic = fieldString_(fields, "zoomTopic");
-    const topic = String(
-      existingTopic ||
-      data.topic ||
-      "Cours de français avec " + (reservedName || "élève")
-    ).slice(0, 160);
-
-    const storedJoinUrl = fieldString_(fields, "zoomJoinUrl");
-    const previousJoinUrl = String(data.previousZoomJoinUrl || storedJoinUrl || "");
-    let meetingId = fieldString_(fields, "zoomMeetingId") || extractZoomMeetingId_(previousJoinUrl);
-    let joinUrl = previousJoinUrl;
-    let movedExisting = false;
-
-    if (meetingId) {
-      try {
-        updateZoomMeeting_(meetingId, topic, newDate, duration);
-        movedExisting = true;
-      } catch (zoomUpdateError) {
-        console.warn("Impossible de déplacer la réunion Zoom existante, création d'une nouvelle réunion :", zoomUpdateError);
-        meetingId = "";
-      }
-    }
-
-    if (!meetingId) {
-      const meeting = createZoomMeeting_(topic, newDate, duration);
-      meetingId = String(meeting.id);
-      joinUrl = meeting.join_url;
-      movedExisting = false;
-    }
-
-    patchFirestoreFields_(baseUrl, "disponibilites", data.slotId, token, {
-      zoomJoinUrl: { stringValue: joinUrl },
-      zoomMeetingId: { stringValue: String(meetingId) },
-      zoomTopic: { stringValue: topic },
-      reminderSent: { booleanValue: false },
-      reminderSentForDate: { nullValue: null },
-      reminderActionToken: { nullValue: null }
-    });
-
-    if (reservedEmail) {
-      const studentTimezone = getStudentTimezone_(baseUrl, reservedBy, token) || "America/Sao_Paulo";
-      let oldDateStr = "";
-      if (data.oldDate) {
-        const oldDate = new Date(data.oldDate);
-        if (!isNaN(oldDate.getTime())) {
-          oldDateStr = formatDateInTimezone_(oldDate, studentTimezone);
-        }
-      }
-      const newDateStr = formatDateInTimezone_(new Date(newDate), studentTimezone);
-      sendRescheduleConfirmedEmail_(reservedEmail, reservedName, oldDateStr, newDateStr);
-    }
-
-    return jsonResponse({
-      ok: true,
-      joinUrl: joinUrl,
-      meetingId: String(meetingId),
-      movedExisting: movedExisting,
-      notified: !!reservedEmail
-    });
+    const zr = rptSyncZoom_(data.slotId);
+    return jsonResponse({ ok: zr.status === "ok", zoomStatus: zr.status, joinUrl: zr.joinUrl || null,
+      meetingId: null, movedExisting: zr.method === "updated", error: zr.error || null });
   } catch (err) {
-    return jsonResponse({
-      ok: false,
-      error: err && err.message ? err.message : String(err)
-    });
+    return jsonResponse({ ok: false, error: err && err.message ? err.message : String(err) });
   }
 }
 
@@ -3300,4 +3249,622 @@ function processReminderAction(
 
   }
 
+}
+/* ============================================================================
+
+   REPORTS DE SÉANCES (anomalies, propositions, acceptations) + SYNCHRO ZOOM
+
+   Principe : TOUTE modification définitive de la date d'une séance passe par
+   ce serveur (jamais directement par le navigateur de l'élève).
+
+   Séance en anomalie
+     → proposeReschedule (professeure) : la proposition est enregistrée avec un
+       identifiant, la date initiale et un jeton d'e-mail ; la séance reste en
+       anomalie, sa date et sa réunion Zoom ne bougent pas.
+     → respondReschedule (élève, depuis la plateforme) OU lien de l'e-mail
+       (processProposalAction) : même procédure rptRespond_ :
+         verrou → proposition encore valide ? → conflit de planning ? →
+         nouvelle date enregistrée + zoomSync.status = "pending" →
+         rptSyncZoom_ : déplacement de LA MÊME réunion Zoom (même lien) ;
+         si impossible, remplacement sécurisé (nouvelle réunion créée PUIS
+         ancienne supprimée, jamais deux réunions actives) ; erreur temporaire
+         → "retry" (déclencheur retryZoomSyncs) ; échec définitif → "error"
+         + e-mail à Melissa.
+     → refus : proposition marquée "refused", séance toujours en anomalie,
+       Melissa prévenue, rien n'est déplacé ni décompté.
+
+   Champs ajoutés sur disponibilites/{id} :
+     rescheduleRequest.{id, emailToken, baseDate, expiresAt, status…}
+     originalDate          date initiale de la séance (avant le 1er report)
+     zoomSync              {status, targetDate, attempts, method, lastError,
+                            nextAttemptAt, pendingNewMeetingId, notifiedFor…}
+     rescheduleHistory     historique (40 derniers événements)
+
+   DÉCLENCHEUR À AJOUTER : retryZoomSyncs — toutes les 10 minutes.
+
+   ============================================================================ */
+
+const FS_PROJECT_ = "fle-profmelissaradde";
+const RPT_MIN_DELAY_MS_ = 60 * 60 * 1000;          // acceptation possible jusqu'à 1 h avant le nouvel horaire
+const RPT_MAX_ZOOM_ATTEMPTS_ = 8;                   // au-delà : statut "error" + e-mail à Melissa
+const RPT_RETRY_DELAYS_MIN_ = [2, 5, 10, 20, 30, 60, 120, 240];
+
+function fsBase_() {
+  return `https://firestore.googleapis.com/v1/projects/${FS_PROJECT_}/databases/(default)/documents`;
+}
+function rptLoadSlot_(slotId, token) {
+  const doc = getFirestoreDocument_(fsBase_(), "disponibilites", slotId, token);
+  return firestoreFieldsToJs_(doc.fields || {});
+}
+function rptPatch_(slotId, token, obj) {
+  const fields = {};
+  Object.keys(obj).forEach(k => fields[k] = jsToFirestoreValue_(obj[k]));
+  patchFirestoreFields_(fsBase_(), "disponibilites", slotId, token, fields);
+}
+function rptHistory_(slot, event) {
+  const h = Array.isArray(slot.rescheduleHistory) ? slot.rescheduleHistory.slice(-39) : [];
+  h.push(Object.assign({ ts: new Date().toISOString() }, event));
+  return h;
+}
+/* Protection contre les doubles exécutions (double clic, e-mail + plateforme en
+   même temps, déclencheur qui tourne pendant une acceptation…). */
+function rptWithLock_(fn) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) {
+    throw new Error("Une autre opération est en cours sur le planning. Réessaie dans quelques secondes.");
+  }
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+function rptNewId_() { return Utilities.getUuid().replace(/-/g, ""); }
+function rptDuree_(v) { return Math.max(15, Math.min(240, Number(v) || 45)); }
+function rptParseDate_(value, label) {
+  const d = new Date(value);
+  if (!value || isNaN(d.getTime())) throw new Error((label || "La date") + " n'est pas valide.");
+  return d;
+}
+function rptErrMsg_(err) { return err && err.message ? err.message : String(err); }
+
+/* Conflits : une autre séance RÉSERVÉE qui chevauche le créneau, ou une autre
+   proposition de report encore en attente sur le même horaire. Les créneaux
+   libres (disponibilités non réservées) ne sont pas des conflits. */
+function rptFindConflicts_(token, slotId, start, duree) {
+  const startMs = start.getTime(), endMs = startMs + duree * 60000;
+  const overlaps = (s, d) => s < endMs && startMs < s + d * 60000;
+  const out = [];
+  const runQuery = (where) => {
+    const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+      method: "post", contentType: "application/json",
+      headers: { Authorization: "Bearer " + token },
+      payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }], where: where } }),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) throw new Error("Vérification du planning impossible (Firestore).");
+    return (JSON.parse(res.getContentText()) || []).filter(r => r.document)
+      .map(r => ({ id: r.document.name.split("/").pop(), data: firestoreFieldsToJs_(r.document.fields || {}) }));
+  };
+  const from = new Date(startMs - 6 * 3600000).toISOString(), to = new Date(startMs + 6 * 3600000).toISOString();
+  runQuery({ compositeFilter: { op: "AND", filters: [
+    { fieldFilter: { field: { fieldPath: "date" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: from } } },
+    { fieldFilter: { field: { fieldPath: "date" }, op: "LESS_THAN_OR_EQUAL", value: { stringValue: to } } }
+  ] } }).forEach(x => {
+    const f = x.data;
+    if (x.id === slotId || !f.reservedBy || f.experimentalCancelled || f.definitivelyCancelled) return;
+    if (overlaps(new Date(f.date).getTime(), rptDuree_(f.duree))) out.push({ id: x.id, label: (f.reservedName || "un élève") + " (" + formatDateFr_(new Date(f.date)) + ")" });
+  });
+  runQuery({ fieldFilter: { field: { fieldPath: "rescheduleRequest.status" }, op: "EQUAL", value: { stringValue: "pending" } } }).forEach(x => {
+    const r = x.data.rescheduleRequest || {};
+    if (x.id === slotId || r.by !== "teacher" || !r.proposedDate || !x.data.reservedBy) return;
+    if (overlaps(new Date(r.proposedDate).getTime(), rptDuree_(r.proposedDuree || x.data.duree))) {
+      out.push({ id: x.id, label: "proposition en attente pour " + (x.data.reservedName || "un élève") + " (" + formatDateFr_(new Date(r.proposedDate)) + ")" });
+    }
+  });
+  return out;
+}
+
+/* ---------- 1. Proposition de la professeure ---------- */
+function handleProposeReschedule(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    if (!data.slotId) throw new Error("slotId manquant");
+    const res = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(data.slotId, token);
+      if (!slot.reservedBy) throw new Error("Ce créneau n'est pas réservé.");
+      const proposed = rptParseDate_(data.proposedDate, "La date proposée");
+      if (proposed.getTime() - Date.now() < RPT_MIN_DELAY_MS_) throw new Error("La nouvelle date doit être au moins 1 h dans le futur.");
+      const duree = rptDuree_(data.proposedDuree || slot.duree);
+      const conflicts = rptFindConflicts_(token, data.slotId, proposed, duree);
+      if (conflicts.length && data.ignoreConflicts !== true) {
+        return { ok: false, conflict: true, conflicts: conflicts, error: "Conflit de planning : " + conflicts.map(c => c.label).join(" ; ") };
+      }
+      const proposal = {
+        id: rptNewId_(), by: "teacher", status: "pending",
+        proposedDate: proposed.toISOString(), proposedDuree: duree,
+        baseDate: slot.date, wasAnomalie: slot.anomalie === true,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(proposed.getTime() - RPT_MIN_DELAY_MS_).toISOString(),
+        emailToken: rptNewId_() + rptNewId_()
+      };
+      const previous = slot.rescheduleRequest && slot.rescheduleRequest.status === "pending" ? slot.rescheduleRequest : null;
+      rptPatch_(data.slotId, token, {
+        rescheduleRequest: proposal,
+        rescheduleHistory: rptHistory_(slot, { type: "proposed", by: "teacher", from: slot.date, to: proposal.proposedDate, proposalId: proposal.id,
+          replaced: previous ? (previous.id || previous.by) : null })
+      });
+      return { ok: true, proposal: proposal, slot: slot };
+    });
+    if (!res.ok) return jsonResponse(res);
+    let emailed = false;
+    if (res.slot.reservedEmail) {
+      try { sendProposalEmail_(res.slot, data.slotId, res.proposal); emailed = true; }
+      catch (e) { console.warn("E-mail de proposition non envoyé :", e); }
+    }
+    return jsonResponse({ ok: true, proposalId: res.proposal.id, emailed: emailed });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: rptErrMsg_(err) });
+  }
+}
+
+/* ---------- 2. Réponse de l'élève (plateforme ou e-mail : même procédure) ---------- */
+function handleRespondReschedule(data, authCtx) {
+  try {
+    if (!data.slotId) throw new Error("slotId manquant");
+    if (!["accept", "refuse"].includes(data.decision)) throw new Error("Décision inconnue.");
+    const actor = { uid: authCtx.uid, isTeacher: isTeacherAuth_(authCtx) };
+    return jsonResponse(rptRespond_(data.slotId, data.proposalId || null, data.decision, actor, "plateforme", null));
+  } catch (err) {
+    return jsonResponse({ ok: false, error: rptErrMsg_(err) });
+  }
+}
+
+/* Appelée par la page ouverte depuis l'e-mail (google.script.run). */
+function processProposalAction(action, slotId, emailToken) {
+  const decision = action === "acceptproposal" ? "accept" : action === "refuseproposal" ? "refuse" : null;
+  if (!decision || !slotId || !emailToken) throw new Error("Lien incomplet.");
+  const r = rptRespond_(slotId, null, decision, { uid: null, isTeacher: false }, "email", emailToken);
+  if (!r.ok) throw new Error(r.error || "Action impossible.");
+  if (r.refused) return "C'est noté : tu as refusé ce nouveau créneau. Melissa va te proposer une autre date.";
+  if (r.already) return "Ce report était déjà confirmé. Ton cours est bien prévu au nouvel horaire.";
+  return r.zoomStatus === "ok"
+    ? "Merci ! Ton cours est confirmé au nouvel horaire. Le bouton Zoom apparaîtra dans ton espace 15 minutes avant le cours."
+    : "Merci ! Ton cours est confirmé au nouvel horaire. La réunion Zoom est en cours de synchronisation : le bouton apparaîtra dans ton espace 15 minutes avant le cours.";
+}
+
+function rptRespond_(slotId, proposalId, decision, actor, via, emailToken) {
+  let result;
+  try {
+    result = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(slotId, token);
+      const req = slot.rescheduleRequest || null;
+      if (!emailToken && !actor.isTeacher && slot.reservedBy !== actor.uid) throw new Error("Ce cours n'appartient pas à cet utilisateur.");
+      if (emailToken && (!req || !req.emailToken || req.emailToken !== emailToken)) throw new Error("Ce lien n'est plus valide : utilise le dernier e-mail reçu ou ton espace de cours.");
+      if (!req || req.by !== "teacher") throw new Error("Aucune proposition de report en attente pour ce cours.");
+      if (proposalId && req.id && req.id !== proposalId) throw new Error("Cette proposition a été remplacée par une plus récente. Recharge la page.");
+      if (req.status === "accepted" && decision === "accept") return { ok: true, already: true, newDate: slot.date, slot: slot };
+      if (req.status !== "pending") throw new Error("Cette proposition n'est plus en attente.");
+      if (req.baseDate && req.baseDate !== slot.date) throw new Error("Le cours a été modifié depuis cette proposition.");
+
+      if (decision === "refuse") {
+        rptPatch_(slotId, token, {
+          rescheduleRequest: Object.assign({}, req, { status: "refused", refusedAt: new Date().toISOString(), via: via }),
+          rescheduleHistory: rptHistory_(slot, { type: "refused", via: via, to: req.proposedDate, proposalId: req.id || null })
+        });
+        return { ok: true, refused: true, slot: slot, req: req };
+      }
+
+      const proposed = rptParseDate_(req.proposedDate, "La date proposée");
+      if (proposed.getTime() - Date.now() < RPT_MIN_DELAY_MS_) throw new Error("Cette proposition a expiré (le nouvel horaire est trop proche). Melissa va te proposer une autre date.");
+      const duree = rptDuree_(req.proposedDuree || slot.duree);
+      const conflicts = rptFindConflicts_(token, slotId, proposed, duree);
+      if (conflicts.length) throw new Error("Ce créneau n'est plus disponible. Melissa va te proposer une autre date.");
+      rptApplyNewDate_(token, slotId, slot, proposed.toISOString(), duree,
+        { type: "accepted", via: via, by: actor.isTeacher ? "teacher" : "student", proposalId: req.id || null }, req);
+      return { ok: true, accepted: true, newDate: proposed.toISOString(), slot: slot };
+    });
+  } catch (err) {
+    return { ok: false, error: rptErrMsg_(err) };
+  }
+
+  if (result.refused) {
+    try { sendTeacherProposalAnswerEmail_(result.slot, result.req, false); } catch (e) { console.warn(e); }
+    return { ok: true, refused: true };
+  }
+  if (result.already) return { ok: true, already: true, newDate: result.newDate, zoomStatus: (result.slot.zoomSync || {}).status || "ok" };
+  const zr = rptSyncZoom_(slotId);
+  try { sendTeacherProposalAnswerEmail_(result.slot, { proposedDate: result.newDate }, true, zr.status); } catch (e) { console.warn(e); }
+  return { ok: true, accepted: true, newDate: result.newDate, zoomStatus: zr.status, zoomError: zr.error || null };
+}
+
+/* ---------- 3. Décision directe de la professeure ---------- */
+/* Choix d'une des 3 disponibilités de l'élève, ou changement direct (urgence). */
+function handleApplyTeacherReschedule(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    if (!data.slotId) throw new Error("slotId manquant");
+    const res = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(data.slotId, token);
+      if (!slot.reservedBy) throw new Error("Ce créneau n'est pas réservé.");
+      const newDate = rptParseDate_(data.newDate, "La nouvelle date");
+      if (newDate.getTime() <= Date.now()) throw new Error("La nouvelle date doit être dans le futur.");
+      const duree = rptDuree_(data.duree || slot.duree);
+      const conflicts = rptFindConflicts_(token, data.slotId, newDate, duree);
+      if (conflicts.length && data.ignoreConflicts !== true) {
+        return { ok: false, conflict: true, conflicts: conflicts, error: "Conflit de planning : " + conflicts.map(c => c.label).join(" ; ") };
+      }
+      const req = slot.rescheduleRequest && slot.rescheduleRequest.status === "pending" ? slot.rescheduleRequest : null;
+      rptApplyNewDate_(token, data.slotId, slot, newDate.toISOString(), duree,
+        { type: data.reason === "student_availability" ? "student_availability_accepted" : "direct", by: "teacher", via: "plateforme" }, req);
+      return { ok: true, newDate: newDate.toISOString() };
+    });
+    if (!res.ok) return jsonResponse(res);
+    const zr = rptSyncZoom_(data.slotId);
+    return jsonResponse({ ok: true, newDate: res.newDate, zoomStatus: zr.status, zoomError: zr.error || null, movedExisting: zr.method === "updated" });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: rptErrMsg_(err) });
+  }
+}
+
+/* Enregistre la nouvelle date (à appeler SOUS verrou). La séance quitte les
+   anomalies, devient une séance future, et la synchro Zoom passe "en attente". */
+function rptApplyNewDate_(token, slotId, slot, newDateISO, duree, event, req) {
+  const patch = {
+    date: newDateISO,
+    duree: duree,
+    originalDate: slot.originalDate || slot.date,
+    rescheduleRequested: false,
+    anomalie: false,
+    anomalieHandled: false,          // la NOUVELLE séance sera suivie normalement
+    clickedByStudent: null,
+    clickedByTeacher: null,
+    confirmed: false,
+    reminderSent: false,
+    reminderSentForDate: null,
+    reminderActionToken: null,
+    zoomSync: {
+      status: "pending", targetDate: newDateISO, attempts: 0,
+      requestedAt: new Date().toISOString(),
+      pendingNewMeetingId: null, notifiedFor: null
+    },
+    rescheduleHistory: rptHistory_(slot, Object.assign({ from: slot.date, to: newDateISO }, event))
+  };
+  patch.rescheduleRequest = req
+    ? Object.assign({}, req, { status: "accepted", acceptedAt: new Date().toISOString() })   /* jeton conservé : un 2e clic sur le lien répond « déjà confirmé » */
+    : null;
+  rptPatch_(slotId, token, patch);
+}
+
+/* ---------- 4. Synchronisation Zoom (idempotente) ---------- */
+function rptZoomTransient_(msg) { const e = new Error(msg); e.transient = true; return e; }
+
+function zoomRequest_(method, path, payload) {
+  let token;
+  try {
+    token = getZoomAccessToken_();
+    if (!token) throw new Error("jeton Zoom vide");
+  } catch (e) {
+    throw rptZoomTransient_("Authentification Zoom impossible : " + rptErrMsg_(e));
+  }
+  let res;
+  try {
+    const opts = { method: method, headers: { Authorization: "Bearer " + token }, muteHttpExceptions: true };
+    if (payload) { opts.contentType = "application/json"; opts.payload = JSON.stringify(payload); }
+    res = UrlFetchApp.fetch("https://api.zoom.us/v2" + path, opts);
+  } catch (e) {
+    throw rptZoomTransient_("Zoom injoignable : " + rptErrMsg_(e));
+  }
+  const code = res.getResponseCode();
+  if (code === 429 || code >= 500) throw rptZoomTransient_("Zoom indisponible (" + code + ")");
+  const text = res.getContentText() || "";
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch (e) { body = null; }
+  return { code: code, body: body, text: text };
+}
+function zoomPayload_(topic, startISO, duree) {
+  return {
+    topic: topic || "Cours de français",
+    start_time: Utilities.formatDate(new Date(startISO), "Europe/Paris", "yyyy-MM-dd'T'HH:mm:ss"),
+    timezone: "Europe/Paris",                 // Zoom applique lui-même l'heure d'été / d'hiver
+    duration: duree || 45
+  };
+}
+function zoomCreate_(topic, startISO, duree) {
+  const p = zoomPayload_(topic, startISO, duree);
+  p.type = 2;
+  p.settings = { join_before_host: true, waiting_room: true, approval_type: 2 };
+  const r = zoomRequest_("post", "/users/me/meetings", p);
+  if (r.code < 200 || r.code >= 300 || !r.body || !r.body.id) throw new Error("Création Zoom refusée (" + r.code + ") : " + r.text);
+  return r.body;
+}
+/* Vérifie que Zoom a vraiment enregistré le bon horaire (tolérance 1 min). */
+function zoomCheckStart_(meeting, startISO, occurrenceId) {
+  let st = meeting && meeting.start_time;
+  if (occurrenceId && meeting && Array.isArray(meeting.occurrences)) {
+    const occ = meeting.occurrences.find(o => String(o.occurrence_id) === String(occurrenceId));
+    st = occ && occ.start_time;
+  }
+  return !!st && Math.abs(new Date(st).getTime() - new Date(startISO).getTime()) <= 60000;
+}
+function rptMeetingShared_(token, meetingId, slotId) {
+  const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }],
+      where: { fieldFilter: { field: { fieldPath: "zoomMeetingId" }, op: "EQUAL", value: { stringValue: String(meetingId) } } } } }),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) throw rptZoomTransient_("Firestore indisponible");
+  return (JSON.parse(res.getContentText()) || []).filter(r => r.document && r.document.name.split("/").pop() !== slotId).length > 0;
+}
+
+/* Déplace la réunion existante ; sinon remplacement sécurisé. Retourne
+   {method, meetingId, joinUrl, oldToDelete}. Lève une erreur .transient pour
+   les pannes temporaires (nouvel essai automatique). */
+function rptZoomMoveOrReplace_(slot, slotId, token, target, duree, topic, zs) {
+  const currentId = String(slot.zoomMeetingId || extractZoomMeetingId_(slot.zoomJoinUrl) || "");
+
+  /* Création d'une nouvelle réunion, mémorisée AVANT toute autre étape : si le
+     script est interrompu, la reprise réutilise cette réunion (aucun doublon). */
+  const createPersisted = () => {
+    if (zs.pendingNewMeetingId) {
+      const g = zoomRequest_("get", "/meetings/" + encodeURIComponent(zs.pendingNewMeetingId));
+      if (g.code === 200 && g.body) {
+        const pr = zoomRequest_("patch", "/meetings/" + encodeURIComponent(zs.pendingNewMeetingId), zoomPayload_(topic, target, duree));
+        if (pr.code !== 204 && (pr.code < 200 || pr.code >= 300)) throw new Error("Mise à jour de la réunion de remplacement refusée (" + pr.code + ")");
+        return { id: String(zs.pendingNewMeetingId), join_url: g.body.join_url };
+      }
+    }
+    const m = zoomCreate_(topic, target, duree);
+    zs.pendingNewMeetingId = String(m.id);
+    rptPatch_(slotId, token, { zoomSync: Object.assign({}, zs, { pendingNewMeetingId: String(m.id), pendingNewJoinUrl: m.join_url }) });
+    return { id: String(m.id), join_url: m.join_url };
+  };
+
+  if (zs.pendingNewMeetingId && zs.pendingNewMeetingId !== currentId) {
+    const m = createPersisted();
+    return { method: "replaced", meetingId: m.id, joinUrl: m.join_url, oldToDelete: currentId || null };
+  }
+  if (!currentId) {
+    const m = createPersisted();
+    return { method: "created", meetingId: m.id, joinUrl: m.join_url, oldToDelete: null };
+  }
+
+  const g = zoomRequest_("get", "/meetings/" + encodeURIComponent(currentId));
+  if (g.code === 404 || (g.code >= 400 && g.code < 500 && g.code !== 401 && g.code !== 403)) {
+    const m = createPersisted();                            // réunion d'origine introuvable : on la recrée
+    return { method: "recreated", meetingId: m.id, joinUrl: m.join_url, oldToDelete: null };
+  }
+  if (g.code < 200 || g.code >= 300 || !g.body) throw rptZoomTransient_("Lecture de la réunion Zoom impossible (" + g.code + ")");
+  const meeting = g.body;
+
+  /* Réunion récurrente : on ne déplace JAMAIS toute la série. */
+  if (meeting.type === 3 || meeting.type === 8) {
+    if (slot.zoomOccurrenceId) {
+      const pr = zoomRequest_("patch", "/meetings/" + encodeURIComponent(currentId) + "?occurrence_id=" + encodeURIComponent(slot.zoomOccurrenceId), zoomPayload_(topic, target, duree));
+      if (pr.code === 204 || (pr.code >= 200 && pr.code < 300)) {
+        const v = zoomRequest_("get", "/meetings/" + encodeURIComponent(currentId) + "?show_previous_occurrences=true");
+        if (v.code === 200 && zoomCheckStart_(v.body, target, slot.zoomOccurrenceId)) {
+          return { method: "occurrence", meetingId: currentId, joinUrl: meeting.join_url || slot.zoomJoinUrl, oldToDelete: null };
+        }
+      }
+    }
+    const m = createPersisted();                            // séance détachée de la série, série intacte
+    return { method: "dedicated", meetingId: m.id, joinUrl: m.join_url, oldToDelete: null };
+  }
+  /* Réunion partagée par plusieurs séances : on ne la déplace pas. */
+  if (rptMeetingShared_(token, currentId, slotId)) {
+    const m = createPersisted();
+    return { method: "dedicated", meetingId: m.id, joinUrl: m.join_url, oldToDelete: null };
+  }
+
+  const pr = zoomRequest_("patch", "/meetings/" + encodeURIComponent(currentId), zoomPayload_(topic, target, duree));
+  if (pr.code === 204 || (pr.code >= 200 && pr.code < 300)) {
+    const v = zoomRequest_("get", "/meetings/" + encodeURIComponent(currentId));
+    if (v.code === 200 && zoomCheckStart_(v.body, target)) {
+      return { method: "updated", meetingId: currentId, joinUrl: meeting.join_url || slot.zoomJoinUrl, oldToDelete: null };
+    }
+    throw rptZoomTransient_("Zoom n'a pas encore pris en compte le nouvel horaire");
+  }
+  /* Modification refusée définitivement (ex. réunion verrouillée) : remplacement. */
+  const m = createPersisted();
+  return { method: "replaced", meetingId: m.id, joinUrl: m.join_url, oldToDelete: currentId };
+}
+
+function rptDeleteOldMeeting_(meetingId) {
+  if (!meetingId) return true;
+  try {
+    const r = zoomRequest_("delete", "/meetings/" + encodeURIComponent(meetingId));
+    return r.code === 204 || r.code === 404 || (r.code >= 200 && r.code < 300);
+  } catch (e) { return false; }
+}
+
+function rptSyncZoom_(slotId) {
+  let out;
+  try {
+    out = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(slotId, token);
+      const zs = Object.assign({}, slot.zoomSync || {});
+      if (!slot.reservedBy || slot.experimentalCancelled || slot.definitivelyCancelled) return { status: "skipped" };
+      const target = slot.date;
+      if (zs.status === "ok" && zs.targetDate === target) {
+        return { status: "ok", already: true, joinUrl: slot.zoomJoinUrl, slot: slot, zs: zs };
+      }
+      if (zs.targetDate !== target) { zs.attempts = 0; }   /* une réunion de remplacement déjà créée est réutilisée */
+      zs.targetDate = target;
+      zs.attempts = (zs.attempts || 0) + 1;
+      zs.lastAttemptAt = new Date().toISOString();
+      const duree = rptDuree_(slot.duree);
+      const topic = String(slot.zoomTopic || ("Cours de français avec " + (slot.reservedName || "élève"))).slice(0, 160);
+      try {
+        const r = rptZoomMoveOrReplace_(slot, slotId, token, target, duree, topic, zs);
+        let cleanup = null;
+        if (r.oldToDelete && r.oldToDelete !== r.meetingId) cleanup = rptDeleteOldMeeting_(r.oldToDelete) ? null : r.oldToDelete;
+        const newZs = { status: "ok", targetDate: target, attempts: zs.attempts, method: r.method, meetingId: r.meetingId,
+          syncedAt: new Date().toISOString(), lastError: null, nextAttemptAt: null, pendingNewMeetingId: null,
+          notifiedFor: zs.notifiedFor || null, oldMeetingToDelete: cleanup, cleanup: !!cleanup };
+        rptPatch_(slotId, token, {
+          zoomJoinUrl: r.joinUrl, zoomMeetingId: r.meetingId, zoomTopic: topic, zoomSync: newZs,
+          rescheduleHistory: rptHistory_(slot, { type: "zoom_synced", method: r.method, to: target, meetingId: r.meetingId })
+        });
+        return { status: "ok", method: r.method, joinUrl: r.joinUrl, slot: slot, zs: newZs, cleanupPending: !!cleanup };
+      } catch (err) {
+        const transient = err && err.transient === true;
+        const status = transient && zs.attempts < RPT_MAX_ZOOM_ATTEMPTS_ ? "retry" : "error";
+        const delay = RPT_RETRY_DELAYS_MIN_[Math.min(zs.attempts - 1, RPT_RETRY_DELAYS_MIN_.length - 1)];
+        const newZs = Object.assign({}, zs, { status: status, lastError: rptErrMsg_(err).slice(0, 300),
+          nextAttemptAt: status === "retry" ? new Date(Date.now() + delay * 60000).toISOString() : null });
+        rptPatch_(slotId, token, { zoomSync: newZs,
+          rescheduleHistory: rptHistory_(slot, { type: "zoom_" + status, to: target, error: newZs.lastError, attempt: zs.attempts }) });
+        return { status: status, error: newZs.lastError, slot: slot, zs: newZs };
+      }
+    });
+  } catch (err) {
+    /* Verrou indisponible ou Firestore en panne : rien n'a été modifié côté Zoom ;
+       le statut reste "pending" et le déclencheur réessaiera. */
+    return { status: "pending", error: rptErrMsg_(err) };
+  }
+
+  if (out.status === "ok" && !out.already && out.slot && out.slot.reservedEmail && out.zs.notifiedFor !== out.slot.date) {
+    try {
+      const token = getFirestoreAccessToken_();
+      const tz = getStudentTimezone_(fsBase_(), out.slot.reservedBy, token) || "America/Sao_Paulo";
+      const fromDate = rptLastFromDate_(out.slot);
+      sendRescheduleConfirmedEmail_(out.slot.reservedEmail, out.slot.reservedName,
+        fromDate ? formatDateInTimezone_(new Date(fromDate), tz) : "",
+        formatDateInTimezone_(new Date(out.slot.date), tz));
+      rptPatch_(slotId, token, { zoomSync: Object.assign({}, out.zs, { notifiedFor: out.slot.date }) });
+    } catch (e) { console.warn("Confirmation élève non envoyée :", e); }
+  }
+  if (out.status === "error") {
+    try { sendTeacherZoomErrorEmail_(out.slot, slotId, out.error); } catch (e) { console.warn(e); }
+  }
+  return { status: out.status, method: out.method, joinUrl: out.joinUrl, error: out.error };
+}
+function rptLastFromDate_(slot) {
+  const h = Array.isArray(slot.rescheduleHistory) ? slot.rescheduleHistory : [];
+  for (let i = h.length - 1; i >= 0; i--) {
+    if (h[i] && h[i].to === slot.date && h[i].from && h[i].from !== slot.date && h[i].type !== "zoom_synced") return h[i].from;
+  }
+  return null;
+}
+
+/* Déclencheur (toutes les 10 min) : reprend les synchronisations en attente
+   ou en échec temporaire, et supprime les anciennes réunions restées actives. */
+function retryZoomSyncs() {
+  const token = getFirestoreAccessToken_();
+  const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }],
+      where: { fieldFilter: { field: { fieldPath: "zoomSync.status" }, op: "IN",
+        value: { arrayValue: { values: [{ stringValue: "pending" }, { stringValue: "retry" }] } } } } } }),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) throw new Error("retryZoomSyncs : " + res.getContentText());
+  const now = Date.now();
+  (JSON.parse(res.getContentText()) || []).filter(r => r.document).forEach(r => {
+    const id = r.document.name.split("/").pop();
+    const zs = (firestoreFieldsToJs_(r.document.fields || {}).zoomSync) || {};
+    const due = zs.status === "pending"
+      ? now - new Date(zs.lastAttemptAt || zs.requestedAt || 0).getTime() > 2 * 60000
+      : !zs.nextAttemptAt || new Date(zs.nextAttemptAt).getTime() <= now;
+    if (due) rptSyncZoom_(id);
+  });
+  /* Nettoyage des anciennes réunions non supprimées */
+  const res2 = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }],
+      where: { fieldFilter: { field: { fieldPath: "zoomSync.cleanup" }, op: "EQUAL", value: { booleanValue: true } } } } }),
+    muteHttpExceptions: true
+  });
+  if (res2.getResponseCode() >= 200 && res2.getResponseCode() < 300) {
+    (JSON.parse(res2.getContentText()) || []).filter(r => r.document).forEach(r => {
+      const id = r.document.name.split("/").pop();
+      const zs = (firestoreFieldsToJs_(r.document.fields || {}).zoomSync) || {};
+      if (zs.oldMeetingToDelete && rptDeleteOldMeeting_(zs.oldMeetingToDelete)) {
+        rptPatch_(id, token, { zoomSync: Object.assign({}, zs, { oldMeetingToDelete: null, cleanup: false }) });
+      }
+    });
+  }
+}
+
+/* Relance manuelle depuis l'espace enseignante. */
+function handleRetryZoomSync(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    if (!data.slotId) throw new Error("slotId manquant");
+    const token = getFirestoreAccessToken_();
+    const slot = rptLoadSlot_(data.slotId, token);
+    if (slot.zoomSync && slot.zoomSync.status === "error") {
+      rptPatch_(data.slotId, token, { zoomSync: Object.assign({}, slot.zoomSync, { status: "retry", attempts: 0, nextAttemptAt: null }) });
+    }
+    const zr = rptSyncZoom_(data.slotId);
+    return jsonResponse({ ok: zr.status === "ok", zoomStatus: zr.status, error: zr.error || null, joinUrl: zr.joinUrl || null });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: rptErrMsg_(err) });
+  }
+}
+
+/* ---------- 5. E-mails ---------- */
+function sendProposalEmail_(slot, slotId, proposal) {
+  const token = getFirestoreAccessToken_();
+  const tz = getStudentTimezone_(fsBase_(), slot.reservedBy, token) || "America/Sao_Paulo";
+  const oldStr = formatDateInTimezone_(new Date(slot.date), tz);
+  const newStr = formatDateInTimezone_(new Date(proposal.proposedDate), tz);
+  const acceptUrl = reminderActionUrl_("acceptproposal", slotId, proposal.emailToken);
+  const refuseUrl = reminderActionUrl_("refuseproposal", slotId, proposal.emailToken);
+  const prenom = slot.reservedName || "";
+  const intro = slot.anomalie === true
+    ? "Ta séance du " + oldStr + " n'a pas pu avoir lieu. Je te propose de la reporter au :"
+    : "Je te propose de déplacer ton cours du " + oldStr + " au :";
+  const corps =
+    `Bonjour ${prenom},\n\n${intro}\n${newStr}\n\n` +
+    `ACCEPTER CE NOUVEL HORAIRE :\n${acceptUrl}\n\nREFUSER :\n${refuseUrl}\n\n` +
+    `Tu peux aussi répondre depuis ton espace de cours. Tant que tu n'as pas accepté, le cours n'est pas déplacé.\n\nÀ bientôt,\nMelissa`;
+  const html =
+    `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#20232b;max-width:620px;">` +
+    `<p>Bonjour ${escapeHtml_(prenom)},</p><p>${escapeHtml_(intro)}</p>` +
+    `<p style="font-size:17px;"><strong>${escapeHtml_(newStr)}</strong></p>` +
+    actionButton_("Accepter ce nouvel horaire", acceptUrl, "#167c5a") +
+    actionButton_("Refuser", refuseUrl, "#b4233d") +
+    `<p style="font-size:13px;color:#666;">Tu peux aussi répondre depuis ton espace de cours. Tant que tu n'as pas accepté, le cours n'est pas déplacé.</p>` +
+    `<p>À bientôt,<br>Melissa</p></div>`;
+  MailApp.sendEmail(slot.reservedEmail, "Nouveau créneau proposé pour ton cours", corps, { htmlBody: html });
+}
+function sendTeacherProposalAnswerEmail_(slot, req, accepted, zoomStatus) {
+  const name = slot.reservedName || "L'élève";
+  const when = req && req.proposedDate ? formatDateFr_(new Date(req.proposedDate)) : "";
+  const sujet = accepted ? `${name} a accepté le report` : `${name} a refusé le report proposé`;
+  const zoomLine = accepted
+    ? (zoomStatus === "ok" ? "La réunion Zoom a été synchronisée automatiquement." : "⚠️ Synchronisation Zoom en attente (" + (zoomStatus || "?") + ") : elle sera retentée automatiquement.")
+    : "La séance reste dans les anomalies à traiter : tu peux proposer une autre date depuis ton espace.";
+  MailApp.sendEmail(TEACHER_EMAIL, sujet,
+    `Bonjour Melissa,\n\n${name} a ${accepted ? "accepté" : "refusé"} le créneau du ${when}.\n${zoomLine}\n\nLa plateforme FLE`);
+}
+function sendTeacherZoomErrorEmail_(slot, slotId, error) {
+  MailApp.sendEmail(TEACHER_EMAIL, "⚠️ Synchronisation Zoom impossible — " + ((slot && slot.reservedName) || "séance"),
+    `Bonjour Melissa,\n\nLa réunion Zoom de la séance du ${slot && slot.date ? formatDateFr_(new Date(slot.date)) : "?"} (${slot && slot.reservedName || ""}) n'a pas pu être synchronisée après plusieurs essais.\n` +
+    `Erreur : ${error}\n\nLa date est bien enregistrée sur la plateforme, mais le lien Zoom n'est pas affiché à l'élève. ` +
+    `Utilise le bouton « Relancer la synchronisation Zoom » dans ton espace (séance ${slotId}).\n\nLa plateforme FLE`);
+}
+
+/* ---------- 6. Page ouverte depuis les boutons de l'e-mail de proposition ---------- */
+function renderProposalPage_(action, slotId, token) {
+  const accept = action === "acceptproposal";
+  const title = accept ? "Accepter le nouvel horaire" : "Refuser le nouvel horaire";
+  const message = accept
+    ? "Confirme que le nouvel horaire te convient. Ton cours sera déplacé et la réunion Zoom mise à jour automatiquement."
+    : "Confirme que ce nouvel horaire ne te convient pas. Melissa te proposera une autre date.";
+  const button = accept ? "Oui, j'accepte" : "Je refuse ce créneau";
+  return HtmlService.createHtmlOutput(
+    `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>` +
+    `<body style="font-family:Arial,sans-serif;background:#f5f6fa;margin:0;padding:30px 15px;color:#1d2433;">` +
+    `<div style="max-width:500px;margin:50px auto;background:#fff;border-radius:16px;padding:35px;box-shadow:0 8px 30px rgba(0,0,0,.08);">` +
+    `<h1 style="font-size:24px;text-align:center;">${escapeHtml_(title)}</h1><p style="line-height:1.6;color:#555;">${escapeHtml_(message)}</p>` +
+    `<button id="b" style="width:100%;margin-top:20px;padding:14px;border:0;border-radius:10px;background:${accept ? "#167c5a" : "#b4233d"};color:#fff;font-size:15px;font-weight:bold;cursor:pointer;" onclick="go()">${escapeHtml_(button)}</button>` +
+    `<div id="r" style="margin-top:20px;text-align:center;"></div></div>` +
+    `<script>function go(){var b=document.getElementById('b'),r=document.getElementById('r');b.disabled=true;b.textContent='Traitement…';` +
+    `google.script.run.withSuccessHandler(function(m){b.style.display='none';r.innerHTML='<p><strong>'+m+'</strong></p>';})` +
+    `.withFailureHandler(function(e){b.disabled=false;b.textContent=${JSON.stringify(button)};r.innerHTML='<p style="color:#b00020">'+e.message+'</p>';})` +
+    `.processProposalAction(${JSON.stringify(action)},${JSON.stringify(slotId)},${JSON.stringify(token)});}</script></body></html>`);
 }

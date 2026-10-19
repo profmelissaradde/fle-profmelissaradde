@@ -72,7 +72,14 @@ function openZoomLink(slotId){
   };
   attempt(false);
 }
-function zoomButtonHTML(slotId, dateStr, duree, joinUrl){
+function zoomButtonHTML(slotId, dateStr, duree, joinUrl, slot){
+  /* Séance en anomalie : jamais de lien (ce n'est pas un cours valide). Séance
+     reportée dont la réunion Zoom n'est pas encore synchronisée : pas de lien non
+     plus, on affiche le statut (voir 13-reports-seances.js). */
+  if(slot && slot.anomalie) return '';
+  if(slot && typeof rptZoomSyncEnCours === 'function' && rptZoomSyncEnCours(slot)){
+    return `<button class="rec-btn" disabled style="opacity:.65;cursor:not-allowed;margin-top:8px;" title="La date est enregistrée ; la réunion Zoom est en cours de mise à jour.">⏳ Synchronisation Zoom en attente</button>`;
+  }
   const acc = zoomAccess(dateStr, duree);
   const effectiveUrl = joinUrl || ZOOM_LINK || '';
   zoomUrlMap[slotId] = effectiveUrl;
@@ -513,72 +520,41 @@ async function proposeCustomReschedule(id){
 async function acceptStudentAvailability(id, proposedDate){
   const slot = dispoData.find(s=>s.id===id);
   if(!slot || !slot.rescheduleRequest) return;
-
   try{
-    await db.collection('disponibilites').doc(id).update({
-      date: proposedDate,
-      rescheduleRequest: null,
-      rescheduleRequested: false,
-      zoomJoinUrl: null,
-      anomalie: false,
-      anomalieHandled: true
-    });
-  }catch(e){
-    alert("Impossible d'accepter ce créneau pour le moment.");
-    return;
-  }
-
-  const sync = await syncRescheduledCourse(
-    id,
-    slot.date,
-    proposedDate,
-    slot.duree || 45,
-    slot.reservedName,
-    slot.zoomJoinUrl
-  );
-  if(!sync.ok){
-    alert("Le cours a été déplacé, mais la synchronisation Zoom / e-mail a échoué : " + (sync.error || "erreur inconnue"));
-  }
+    const r = await rptAppliquer(slot, proposedDate, slot.duree || 45, 'student_availability');
+    if(r.ok) alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
+  }catch(e){ alert(e.message); }
   await loadAdminDispo();
 }
 
-async function confirmTeacherProposal(id){
-  /* Peut être appelé depuis la page "Réserver" (dispoData déjà chargé) ou depuis la
-     bannière "prochain cours" (élèves classiques et élèves du cours expérimental,
-     qui n'ont jamais chargé dispoData) — on va chercher le créneau directement si
-     besoin plutôt que de dépendre du cache local. */
+/* Réponse de l'élève à une proposition de la professeure : tout est fait côté serveur
+   (vérifications, nouvelle date, réunion Zoom), exactement comme depuis l'e-mail. */
+async function rptSlotEleve(id){
   let slot = dispoData.find(s=>s.id===id);
-  if(!slot){
-    try{
-      const doc = await db.collection('disponibilites').doc(id).get();
-      if(doc.exists) slot = {id, ...doc.data()};
-    }catch(e){ /* slot restera indéfini, géré plus bas */ }
-  }
-  if(!slot || !slot.rescheduleRequest) return;
-  const newDate = slot.rescheduleRequest.proposedDate;
-  const newDuree = slot.rescheduleRequest.proposedDuree || slot.duree;
   try{
-    await db.collection('disponibilites').doc(id).update({
-      date: newDate, duree: newDuree, rescheduleRequest: null, anomalie: false, anomalieHandled: true, zoomJoinUrl: null
-    });
-  }catch(e){ alert("Impossible de confirmer pour le moment."); return; }
-  const sync = await syncRescheduledCourse(
-    id,
-    slot.date,
-    newDate,
-    newDuree,
-    `${student.prenom} ${student.nom}`,
-    slot.zoomJoinUrl
-  );
-  if(!sync.ok){
-    alert("Le cours a bien été déplacé, mais la synchronisation Zoom / e-mail a échoué. Préviens Melissa.");
-  }
+    const doc = await db.collection('disponibilites').doc(id).get();   // toujours la version à jour
+    if(doc.exists) slot = {id, ...doc.data()};
+  }catch(e){ /* on garde la version locale */ }
+  return slot;
+}
+async function confirmTeacherProposal(id){
+  const slot = await rptSlotEleve(id);
+  if(!slot || !slot.rescheduleRequest) return;
+  try{
+    const r = await rptRepondre(slot, 'accept');
+    alert(r.already ? 'Ce report était déjà confirmé.' : `✅ Ton cours est confirmé au ${fmtSlotDate(r.newDate)}. ` + (r.zoomStatus === 'ok'
+      ? `Le bouton Zoom apparaîtra ${ZOOM_OPEN_MINUTES_BEFORE} minutes avant le cours.`
+      : `La réunion Zoom est en cours de synchronisation : le bouton apparaîtra ${ZOOM_OPEN_MINUTES_BEFORE} minutes avant le cours.`));
+  }catch(e){ alert(e.message); }
   await loadDispoEleve();
   if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
 async function refuseTeacherProposal(id){
-  try{ await db.collection('disponibilites').doc(id).update({ rescheduleRequest: null }); }
-  catch(e){ alert("Impossible de refuser pour le moment."); return; }
+  const slot = await rptSlotEleve(id);
+  if(!slot || !slot.rescheduleRequest) return;
+  if(!confirm('Refuser ce nouveau créneau ? Ta professeure te proposera une autre date.')) return;
+  try{ await rptRepondre(slot, 'refuse'); alert('C\'est noté. Ta professeure va te proposer une autre date.'); }
+  catch(e){ alert(e.message); }
   await loadDispoEleve();
   if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
 }
@@ -660,7 +636,7 @@ function renderReserverBody(){
                 3. ${fmtSlotDate(s.rescheduleRequest.availability3)}
               </div>` : ''}
           </div>` : ''}
-        ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl)}
+        ${zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl, s)}
         ${!s.isPack && s.paymentStatus === 'pending' ? paymentOptionsHTML(s) : ''}
         ${!s.isPack && s.paymentStatus === 'paid' ? '<p style="color:var(--ok); font-size:12.5px; margin-top:8px;">✅ Paiement reçu, merci !</p>' : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="annulerReservation('${s.id}')">Annuler ma réservation</button>` : ''}
