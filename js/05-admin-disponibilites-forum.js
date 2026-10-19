@@ -123,7 +123,7 @@ async function loadNextCourseBanner(){
                 3. ${fmtSlotDate(s.rescheduleRequest.availability3)}
               </div>` : ''}
           </div>` : ''}
-        ${!pendingFromTeacher ? zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl) : ''}
+        ${!pendingFromTeacher ? zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl, s) : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="${cancelFn}('${s.id}')">Annuler ${s.isExperimental ? 'mon cours expérimental' : 'ma réservation'}</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}
         ${!canModify ? `<p style="font-size:11.5px; color:var(--grey); margin-top:6px;">${s.isExperimental ? 'Annulation ou demande de replanification possible jusqu\'à 24h avant le cours seulement — contacte ta professeure directement en dessous de ce délai.' : "Annulation ou demande de replanification possible jusqu'à 1h avant le cours seulement."}</p>` : ''}
@@ -496,88 +496,38 @@ async function directRescheduleAdmin(id){
     return;
   }
   const newDate = new Date(input.value).toISOString();
-  const oldDateStr = fmtSlotDate(slot.date);
   try{
-    await db.collection('disponibilites').doc(id).update({
-      date: newDate,
-      rescheduleRequest: null,
-      zoomJoinUrl: null,
-      anomalie: false,
-      anomalieHandled: true
-    });
-  }catch(e){
-    alert("Impossible de changer la date pour le moment.");
-    return;
-  }
-  const sync = await syncRescheduledCourse(
-    id,
-    slot.date,
-    newDate,
-    slot.duree,
-    slot.reservedName,
-    slot.zoomJoinUrl
-  );
-  adminRescheduleFormOpenId = null;
-  alert(
-    `Cours déplacé au ${fmtSlotDate(newDate)}.` +
-    (sync.ok
-      ? (sync.movedExisting ? " Réunion Zoom déplacée et confirmation envoyée à l'élève." : " Réunion Zoom recréée au bon horaire et confirmation envoyée à l'élève.")
-      : " ⚠️ Le cours est déplacé dans la plateforme, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"))
-  );
+    const r = await rptAppliquer(slot, newDate, slot.duree, 'direct');
+    if(!r.ok) return;
+    adminRescheduleFormOpenId = null;
+    alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
+  }catch(e){ alert(e.message); return; }
   await loadAdminDispo();
 }
 
+/* Proposition de déplacement d'un cours à venir : enregistrée côté serveur (avec un
+   lien sécurisé Accepter / Refuser dans l'e-mail) ; le cours ne bouge qu'après
+   l'accord de l'élève. */
 async function submitAdminRescheduleRequest(id){
   const slot = dispoData.find(s=>s.id===id);
   const input = document.getElementById('admin-reschedule-date-'+id);
-
   if(!slot || !input || !input.value){
     alert('Choisis une date et une heure.');
     return;
   }
-
   const proposedDate = new Date(input.value).toISOString();
-
   try{
-    await db.collection('disponibilites').doc(id).update({
-      rescheduleRequest: {
-        by:'teacher',
-        proposedDate,
-        proposedDuree: slot.duree || 45,
-        status:'pending'
-      }
-    });
-  }catch(e){
-    alert("Impossible d'envoyer la demande pour le moment.");
-    return;
-  }
-
-  if(slot.reservedEmail){
-    try{
-      await callDriveScript({
-        action:'notifyReschedule',
-        to:'student',
-        email:slot.reservedEmail,
-        name:slot.reservedName,
-        oldDate:fmtSlotDate(slot.date),
-        newDate:fmtSlotDate(proposedDate)
-      });
-    }catch(e){ /* non bloquant */ }
-  }
-
+    const r = await rptProposer(slot, proposedDate, slot.duree || 45);
+    if(!r.ok) return;
+    alert("Proposition envoyée" + (r.emailed ? " par e-mail" : "") + ". Le cours actuel reste réservé jusqu'à la réponse de l'élève.");
+  }catch(e){ alert(e.message); return; }
   adminRescheduleFormOpenId = null;
-
-  alert(
-    "Demande envoyée à l'élève. Le cours actuel reste réservé jusqu'à sa réponse."
-  );
-
   await postSystemMessage(
     slot.reservedBy,
     slot.reservedName,
-    `📅 Je te propose de déplacer ton cours du ${fmtSlotDate(slot.date)} au ${fmtSlotDate(proposedDate)}. Va dans « Réserver un cours » pour confirmer ou refuser.`,
+    `📅 Je te propose de déplacer ton cours du ${fmtSlotDate(slot.date)} au ${fmtSlotDate(proposedDate)}. Tu peux accepter ou refuser depuis l'e-mail reçu ou dans « Réserver un cours ».`,
     true
   );
-
   await loadAdminDispo();
 }
 
@@ -1425,11 +1375,12 @@ function renderAdminDispo(){
 
           ${
             s.reservedBy
-              ? zoomButtonHTML(
+              ? rptBadgeHTML(s, true) + zoomButtonHTML(
                   s.id,
                   s.date,
                   s.duree,
-                  s.zoomJoinUrl
+                  s.zoomJoinUrl,
+                  s
                 )
               : ''
           }
@@ -1655,9 +1606,10 @@ function renderPastSessions(){
         <div class="meta">
           ${
             s.anomalie
-              ? '<b style="color:var(--bad);">⚠️ Anomalie : pas rejoint par les deux</b> · '
+              ? '<b style="color:var(--bad);">⚠️ Anomalie : pas rejoint par les deux — non comptée comme effectuée</b> · '
               : ''
           }
+          ${rptBadgeHTML(s, true)}
 
           ${
             s.isExperimental
@@ -1678,7 +1630,7 @@ function renderPastSessions(){
                   onclick="toggleRescheduleForm('${s.id}')"
                   style="background:none; color:var(--bad);"
                 >
-                  📅 Proposer un nouveau créneau
+                  📅 ${rptPropositionEnAttente(s) ? 'Proposer une autre date' : 'Proposer un nouveau créneau'}
                 </button>
                 <button
                   onclick="dismissAnomalie('${s.id}')"
@@ -1906,66 +1858,22 @@ function rescheduleFormHTML(s, submitFn, toggleFn, directFn){
   `;
 }
 
+/* Proposition de report d'une séance en anomalie : la séance reste en anomalie
+   (date initiale, réunion Zoom conservées) jusqu'à l'acceptation de l'élève. */
 async function submitRescheduleProposal(id){
-  const val =
-    document.getElementById(
-      'reschedule-date-'+id
-    ).value;
-
-  if(!val){
-    alert(
-      'Choisis une date et une heure.'
-    );
-    return;
-  }
-
-  const slot =
-    dispoData.find(
-      s=>s.id===id
-    );
-
-  const proposedDate =
-    new Date(val).toISOString();
-
+  const val = document.getElementById('reschedule-date-'+id).value;
+  if(!val){ alert('Choisis une date et une heure.'); return; }
+  const slot = dispoData.find(s=>s.id===id);
+  if(!slot) return;
+  const proposedDate = new Date(val).toISOString();
   try{
-    await db
-      .collection('disponibilites')
-      .doc(id)
-      .update({
-        rescheduleRequest: {
-          by:'teacher',
-          proposedDate,
-          proposedDuree:
-            slot ? slot.duree : 45,
-          status:'pending'
-        }
-      });
-  }catch(e){
-    alert(
-      "Impossible d'envoyer la proposition pour le moment."
-    );
-    return;
-  }
-
-  if(slot && slot.reservedEmail){
-    try{
-      await callDriveScript({
-        action:'notifyReschedule',
-        to:'student',
-        email: slot.reservedEmail,
-        name: slot.reservedName,
-        oldDate: fmtSlotDate(slot.date),
-        newDate: fmtSlotDate(proposedDate)
-      });
-    }catch(e){ /* non bloquant */ }
-  }
-
+    const r = await rptProposer(slot, proposedDate, slot.duree || 45);
+    if(!r.ok) return;
+    alert("Proposition envoyée" + (r.emailed ? " par e-mail (boutons Accepter / Refuser)" : "") + " — la séance reste en anomalie jusqu'à la réponse de l'élève.");
+  }catch(e){ alert(e.message); return; }
   rescheduleFormOpenId = null;
-
-  alert(
-    "Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par mail)."
-  );
-
+  await postSystemMessage(slot.reservedBy, slot.reservedName,
+    `📅 Ta séance du ${fmtSlotDate(slot.date)} n'a pas pu avoir lieu. Je te propose de la reporter au ${fmtSlotDate(proposedDate)} : tu peux accepter ou refuser depuis l'e-mail reçu ou sur la page d'accueil.`, true);
   await loadTeacherHistorique();
 }
 
@@ -1978,25 +1886,13 @@ async function submitExperimentalReschedule(id){
   const val = document.getElementById('reschedule-date-'+id).value;
   if(!val){ alert('Choisis une date et une heure.'); return; }
   const slot = experimentalSlots.find(s=>s.id===id);
-  const proposedDate = new Date(val).toISOString();
+  if(!slot) return;
   try{
-    await db.collection('disponibilites').doc(id).update({
-      rescheduleRequest: { by:'teacher', proposedDate, proposedDuree: slot ? slot.duree : 45, status:'pending' }
-    });
-  }catch(e){
-    alert("Impossible d'envoyer la proposition pour le moment.");
-    return;
-  }
-  if(slot && slot.reservedEmail){
-    try{
-      await callDriveScript({
-        action:'notifyReschedule', to:'student', email: slot.reservedEmail, name: slot.reservedName,
-        oldDate: fmtSlotDate(slot.date), newDate: fmtSlotDate(proposedDate)
-      });
-    }catch(e){ /* non bloquant */ }
-  }
+    const r = await rptProposer(slot, new Date(val).toISOString(), slot.duree || 45);
+    if(!r.ok) return;
+    alert("Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par e-mail).");
+  }catch(e){ alert(e.message); return; }
   rescheduleFormOpenId = null;
-  alert("Proposition envoyée — en attente de confirmation de l'élève (dans son espace ou par mail).");
   await loadExperimentalAdmin();
 }
 
@@ -2005,34 +1901,15 @@ async function directRescheduleExperimental(id){
   if(!val){ alert('Choisis une date et une heure.'); return; }
   const slot = experimentalSlots.find(s=>s.id===id);
   if(!slot) return;
-  const newDate = new Date(val).toISOString();
-  const oldDateStr = fmtSlotDate(slot.date);
   try{
-    await db.collection('disponibilites').doc(id).update({
-      date: newDate,
-      rescheduleRequest: null,
-      zoomJoinUrl: null,
-      experimentalCancelled: false
-    });
-  }catch(e){
-    alert("Impossible de changer la date pour le moment.");
-    return;
-  }
-  const sync = await syncRescheduledCourse(
-    id,
-    slot.date,
-    newDate,
-    slot.duree,
-    slot.reservedName,
-    slot.zoomJoinUrl
-  );
-  rescheduleFormOpenId = null;
-  alert(
-    `Cours déplacé au ${fmtSlotDate(newDate)}.` +
-    (sync.ok
-      ? (sync.movedExisting ? " Réunion Zoom déplacée et confirmation envoyée à l'élève." : " Réunion Zoom recréée au bon horaire et confirmation envoyée à l'élève.")
-      : " ⚠️ Le cours est déplacé dans la plateforme, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"))
-  );
+    if(slot.experimentalCancelled){
+      await db.collection('disponibilites').doc(id).update({ experimentalCancelled: false });
+    }
+    const r = await rptAppliquer(slot, new Date(val).toISOString(), slot.duree, 'direct');
+    if(!r.ok) return;
+    rescheduleFormOpenId = null;
+    alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
+  }catch(e){ alert(e.message); return; }
   await loadExperimentalAdmin();
 }
 
@@ -2051,56 +1928,15 @@ async function cancelExperimentalSlotAdmin(id){
 }
 
 async function acceptStudentReschedule(id){
-  const slot =
-    dispoData.find(
-      s=>s.id===id
-    );
-
-  if(!slot || !slot.rescheduleRequest){
-    return;
-  }
-
-  const newDate =
-    slot.rescheduleRequest.proposedDate;
-
+  const slot = dispoData.find(s=>s.id===id);
+  if(!slot || !slot.rescheduleRequest) return;
+  const newDate = slot.rescheduleRequest.proposedDate;
   try{
-    await db
-      .collection('disponibilites')
-      .doc(id)
-      .update({
-        date: newDate,
-        rescheduleRequest: null,
-        anomalie: false,
-        anomalieHandled: true,
-        zoomJoinUrl: null
-      });
-  }catch(e){
-    alert(
-      "Impossible d'accepter pour le moment."
-    );
-    return;
-  }
-
-  const sync = await syncRescheduledCourse(
-    id,
-    slot.date,
-    newDate,
-    slot.duree,
-    slot.reservedName,
-    slot.zoomJoinUrl
-  );
-
-  if(!sync.ok){
-    alert("Le cours a été déplacé, mais Zoom / l'e-mail n'ont pas pu être synchronisés : " + (sync.error || "erreur inconnue"));
-  }
-
-  await postSystemMessage(
-    slot.reservedBy,
-    slot.reservedName,
-    `✅ J'ai confirmé ton cours au ${fmtSlotDate(newDate)}.`,
-    true
-  );
-
+    const r = await rptAppliquer(slot, newDate, slot.duree, 'student_availability');
+    if(!r.ok) return;
+    alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
+    await postSystemMessage(slot.reservedBy, slot.reservedName, `✅ J'ai confirmé ton cours au ${fmtSlotDate(r.newDate)}.`, true);
+  }catch(e){ alert(e.message); }
   await loadAdminDispo();
 }
 

@@ -380,17 +380,17 @@ async function loadPackSlotsByStudent(){
     const snap = await db.collection('disponibilites').where('isPack','==',true).get();
     const now = Date.now();
     packSlotsByStudent = {};
+    /* Une séance en anomalie n'est ni « effectuée » ni « à venir » ; une séance
+       reportée et acceptée redevient « à venir » (voir rptCompteurs, 13-reports-seances.js). */
+    const parEleve = {};
     snap.docs.forEach(d=>{
-      const slot = d.data();
+      const slot = {id:d.id, ...d.data()};
       if(!slot.reservedBy) return;
-      if(!packSlotsByStudent[slot.reservedBy]) packSlotsByStudent[slot.reservedBy] = {past:0, upcoming:0, nextDate:null};
-      const entry = packSlotsByStudent[slot.reservedBy];
-      const t = new Date(slot.date).getTime();
-      if(t < now){ entry.past++; }
-      else{
-        entry.upcoming++;
-        if(!entry.nextDate || t < new Date(entry.nextDate).getTime()) entry.nextDate = slot.date;
-      }
+      (parEleve[slot.reservedBy] = parEleve[slot.reservedBy] || []).push(slot);
+    });
+    Object.keys(parEleve).forEach(uid=>{
+      const c = rptCompteurs(parEleve[uid], now);
+      packSlotsByStudent[uid] = {past:c.effectuees, upcoming:c.aVenir, nextDate:c.nextDate, compteurs:c};
     });
   }catch(e){ packSlotsByStudent = {}; }
 }
@@ -533,7 +533,8 @@ function renderStudentsFlatList(){
         if(!packTotal) return '';
         const p = packSlotsByStudent[s.id] || {past:0, upcoming:0, nextDate:null};
         const renewSoon = p.upcoming <= 2;
-        return `<div class="meta">📆 Séances programmées : <b>${p.past} passée${p.past>1?'s':''}</b>, <b style="color:${renewSoon ? 'var(--bad)' : 'var(--navy)'}">${p.upcoming} à venir</b>${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ Pense à renouveler le forfait bientôt</span>` : ''}</div>`;
+        const c = p.compteurs || {effectuees:p.past, aVenir:p.upcoming, anomalies:0, zoomAttente:0};
+        return `<div class="meta">${rptCompteursHTML(c)}${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ Pense à renouveler le forfait bientôt</span>` : ''}</div>`;
       })()}
 
       <div class="teacher-entry-actions" style="margin-top:8px;">

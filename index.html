@@ -586,6 +586,12 @@ p.day-title-pt{font-size:13.5px; color:var(--pt); font-style:italic; margin:0 0 
 .tp-reopen.on{background:var(--ok-bg);}
 .tp-reopen button{border:0; border-radius:6px; padding:6px 10px; background:var(--navy); color:#fff; font-weight:700; cursor:pointer; font-size:12.5px;}
 .tp-input:disabled,.ee-textarea:disabled{background:#f7f7f9; color:var(--ink); opacity:1;}
+.rpt-badges{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0;}
+.rpt-badge{display:inline-block; font-size:12px; font-weight:700; padding:3px 9px; border-radius:12px; background:var(--cream); color:var(--navy);}
+.rpt-badge.wait{background:#fff6ea; color:#a65f00;}
+.rpt-badge.bad{background:var(--bad-bg); color:var(--bad);}
+.rpt-badge.ok{background:var(--ok-bg); color:var(--ok);}
+.rpt-mini{background:none; border:1px solid var(--line); color:var(--navy); border-radius:7px; padding:4px 9px; font-size:12px; cursor:pointer; font-weight:700;}
 .tp-toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:10px; font-size:13.5px; z-index:9999; max-width:92vw; display:none;}
 @media (max-width:820px){
   .tp-intro-grid{grid-template-columns:1fr;}
@@ -621,15 +627,16 @@ p.day-title-pt{font-size:13.5px; color:var(--pt); font-style:italic; margin:0 0 
 <script src="js/01-utilitaires-nav.js?v=20261004-1"></script>
 <script src="js/02-ecrans-auth-dossiers.js?v=20260929-2"></script>
 <script src="js/03-donnees-themes-semaine.js?v=20261019-2"></script>
-<script src="js/04-reservation-cours.js?v=20261014-1"></script>
-<script src="js/05-admin-disponibilites-forum.js?v=20261014-1"></script>
+<script src="js/04-reservation-cours.js?v=20261019-3"></script>
+<script src="js/05-admin-disponibilites-forum.js?v=20261019-3"></script>
 <script src="js/06-ecrans-semaine-bilan.js?v=20260929-2"></script>
-<script src="js/07-espace-professeure.js?v=20261004-1"></script>
+<script src="js/07-espace-professeure.js?v=20261019-3"></script>
 <script src="js/08-rendu-exercices-audio.js?v=20260929-2"></script>
 <script src="js/09-espace-experimental.js?v=20261004-1"></script>
 <script src="js/10-profils-regles-evaluations.js?v=20261004-1"></script>
 <script src="js/11-theme-parcours.js?v=20261019-2"></script>
 <script src="js/12-theme-entretien-embauche.js?v=20261019-1"></script>
+<script src="js/13-reports-seances.js?v=20261019-1"></script>
 <!-- pages-redeploy: 2026-10-06 -->
 </body>
 </html>

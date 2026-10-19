@@ -1,0 +1,335 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return isSignedIn()
+        && request.auth.uid == "pTbdNp5EiJe2jq80bgCi4Q01i4O2";
+    }
+
+    function isVerified() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true;
+    }
+
+    // Les comptes issus du cours expérimental restent utilisables après conversion,
+    // même si l'utilisateur n'a jamais validé son e-mail (comportement actuel de l'app).
+    function isOriginallyExperimental() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/eleves/$(request.auth.uid))
+        && (
+          get(/databases/$(database)/documents/eleves/$(request.auth.uid)).data.get('experimentalLesson', false) == true
+          || get(/databases/$(database)/documents/eleves/$(request.auth.uid)).data.get('registrationSource', '') == "cours-experimental"
+        );
+    }
+
+    function canUseStudentApp() {
+      return isVerified() || isOriginallyExperimental();
+    }
+
+    function owns(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // =========================================================
+    // THÈME DE LA SEMAINE — archivage en lecture seule
+    // L'application de la professeure publie config/temasCalendrier :
+    //   { periodes: { <temaId>: { debut: timestamp, fin: timestamp | null } } }
+    // Chaque sauvegarde d'élève déclare le thème modifié dans "temaEcriture".
+    // =========================================================
+
+    function themeOuvertPourEleve(temaId) {
+      let rouverts = resource.data.get('temasRouverts', {});
+      let p = get(/databases/$(database)/documents/config/temasCalendrier).data.periodes.get(temaId, null);
+      return rouverts.get(temaId, false) == true
+        || (p != null && request.time >= p.debut && (p.fin == null || request.time < p.fin));
+    }
+
+    function correctionsThemeIntactes(temaId) {
+      let avant = resource.data.get('temas', {}).get(temaId, {});
+      let apres = request.resource.data.get('temas', {}).get(temaId, {});
+      return apres.get('review', null) == avant.get('review', null)
+        && apres.get('v2', {}).get('fb', null) == avant.get('v2', {}).get('fb', null);
+    }
+
+    function ecritureThemesAutorisee() {
+      let modifies = request.resource.data.get('temas', {})
+                       .diff(resource.data.get('temas', {})).affectedKeys();
+      let declare = request.resource.data.get('temaEcriture', '');
+      return modifies.size() == 0
+        || (modifies.hasOnly([declare]) && themeOuvertPourEleve(declare) && correctionsThemeIntactes(declare));
+    }
+
+    // =========================================================
+    // PROFILS ÉLÈVES
+    // =========================================================
+
+    match /eleves/{uid} {
+
+      allow create: if owns(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.niveau == null
+        && request.resource.data.frequence == null
+        && request.resource.data.keys().hasOnly([
+          'prenom', 'nom', 'email', 'telephone', 'whatsappCode', 'country', 'cpf', 'timezone', 'uid',
+          'niveau', 'frequence', 'uniteCourante', 'status', 'registrationSource', 'experimentalLesson',
+          'experimentalCompleted', 'questionnaireExperimental', 'courseRulesAccepted', 'courseRulesVersion',
+          'courseRulesAcceptedAt', 'questionnaireCompletedAt', 'createdAt', 'experimentalSlotId'
+        ])
+        && (
+          (
+            request.resource.data.status == 'active'
+            && request.resource.data.registrationSource == 'plateforme'
+            && request.resource.data.experimentalLesson == false
+          )
+          ||
+          (
+            request.resource.data.status == 'experimental'
+            && request.resource.data.registrationSource == 'cours-experimental'
+            && request.resource.data.experimentalLesson == true
+          )
+        );
+
+      allow get: if isTeacher() || owns(uid);
+      allow list: if isTeacher();
+
+      allow update: if isTeacher()
+        || (
+          owns(uid)
+          && canUseStudentApp()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'uniteCourante', 'temas', 'temaEcriture', 'completed', 'lastAnnouncementSeenId', 'pack'
+          ])
+          && ecritureThemesAutorisee()
+          && (
+            request.resource.data.get('pack', {}) == resource.data.get('pack', {})
+            || request.resource.data.get('pack', {}).diff(resource.data.get('pack', {})).affectedKeys().hasOnly(['cpfNaNota'])
+          )
+        );
+
+      allow delete: if isTeacher();
+    }
+
+    // =========================================================
+    // ENREGISTREMENTS AUDIO
+    // =========================================================
+
+    match /enregistrements/{docId} {
+      allow create: if isVerified()
+        && request.resource.data.uid == request.auth.uid;
+      allow get, list, delete: if isTeacher();
+    }
+
+    // =========================================================
+    // DISPONIBILITÉS / COURS
+    // =========================================================
+
+    match /disponibilites/{docId} {
+
+      allow create, update, delete: if isTeacher();
+      allow get, list: if isTeacher();
+
+      // Lecture publique uniquement du créneau expérimental encore libre.
+      allow get: if request.auth == null
+        && resource.data.isExperimental == true
+        && resource.data.reservedBy == null;
+
+      // Un élève ne peut lire que ses propres réservations. Les créneaux libres
+      // sont fournis par l'Apps Script sous une forme nettoyée et sans données privées.
+      allow get, list: if canUseStudentApp()
+        && resource.data.reservedBy == request.auth.uid;
+
+      // Réservation initiale d'un cours expérimental.
+      allow update: if isSignedIn()
+        && resource.data.isExperimental == true
+        && resource.data.reservedBy == null
+        && request.resource.data.reservedBy == request.auth.uid
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.isExperimental == true
+        && request.resource.data.courseType == 'experimental'
+        && request.resource.data.courseTitle == 'Cours expérimental'
+        && request.resource.data.confirmed == false
+        && request.resource.data.reminderSent == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'reservedBy', 'reservedName', 'reservedEmail', 'reservedPhone',
+          'isExperimental', 'courseType', 'courseTitle', 'confirmed',
+          'reminderSent', 'experimentalRegisteredAt'
+        ]);
+
+      // Réservation initiale d'un cours classique. L'élève ne peut jamais se
+      // déclarer lui-même "paid" : la seule valeur autorisée ici est pending.
+      allow update: if canUseStudentApp()
+        && resource.data.get('isExperimental', false) != true
+        && resource.data.reservedBy == null
+        && request.resource.data.reservedBy == request.auth.uid
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.paymentStatus == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'reservedBy', 'reservedName', 'reservedEmail', 'paymentStatus'
+        ]);
+
+      // Suivi du clic Zoom et CPF de nota. Le lien Zoom lui-même est désormais
+      // écrit exclusivement par le backend Apps Script.
+      allow update: if canUseStudentApp()
+        && resource.data.reservedBy == request.auth.uid
+        && request.resource.data.reservedBy == resource.data.reservedBy
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'clickedByStudent', 'cpfNaNota'
+        ]);
+
+      // Annulation spécifique du cours expérimental : on garde l'identité du
+      // prospect et on marque simplement le cours comme annulé.
+      allow update: if canUseStudentApp()
+        && resource.data.isExperimental == true
+        && resource.data.reservedBy == request.auth.uid
+        && request.resource.data.experimentalCancelled == true
+        && request.resource.data.get('zoomJoinUrl', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'experimentalCancelled', 'zoomJoinUrl'
+        ]);
+
+      // Demande de replanification par l'élève (3 disponibilités). L'élève ne peut
+      // écrire qu'une demande « student » en attente, et ne peut ni écraser ni
+      // fabriquer une proposition de la professeure.
+      allow update: if canUseStudentApp()
+        && resource.data.reservedBy == request.auth.uid
+        && request.resource.data.reservedBy == resource.data.reservedBy
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.rescheduleRequest is map
+        && request.resource.data.rescheduleRequest.get('by', '') == 'student'
+        && request.resource.data.rescheduleRequest.get('status', '') == 'pending'
+        && request.resource.data.rescheduleRequest.keys().hasOnly([
+          'by', 'status', 'availability1', 'availability2', 'availability3', 'proposedDate', 'proposedDuree'
+        ])
+        && !(
+          resource.data.get('rescheduleRequest', null) is map
+          && resource.data.rescheduleRequest.get('by', '') == 'teacher'
+          && resource.data.rescheduleRequest.get('status', '') == 'pending'
+        )
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'rescheduleRequest'
+        ]);
+
+      // Réponse à une proposition de la professeure : SUPPRIMÉE côté client.
+      // L'acceptation / le refus passent par l'Apps Script (action respondReschedule
+      // ou lien sécurisé de l'e-mail), qui vérifie la proposition, les conflits et
+      // synchronise Zoom. Un élève ne peut donc plus écrire lui-même une date.
+    }
+
+    // =========================================================
+    // FORUM
+    // =========================================================
+
+    match /forum/{docId} {
+      allow get, list: if isVerified();
+
+      allow create: if isVerified()
+        && request.resource.data.authorUid == request.auth.uid;
+
+      allow update: if isTeacher();
+
+      allow update: if isVerified()
+        && request.resource.data.replies is list
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies']);
+
+      allow delete: if isTeacher();
+    }
+
+    // =========================================================
+    // MESSAGERIE PRIVÉE
+    // =========================================================
+
+    match /messages/{msgId} {
+
+      allow create: if canUseStudentApp()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 2000
+        && (
+          request.resource.data.text.size() > 0
+          || request.resource.data.attachmentUrl is string
+        )
+        && request.resource.data.senderUid == request.auth.uid
+        && (
+          (
+            isTeacher()
+            && request.resource.data.senderIsTeacher == true
+            && request.resource.data.studentUid is string
+          )
+          ||
+          (
+            !isTeacher()
+            && request.resource.data.senderIsTeacher == false
+            && request.resource.data.studentUid == request.auth.uid
+          )
+        );
+
+      allow get, list: if isTeacher()
+        || (
+          canUseStudentApp()
+          && resource.data.studentUid == request.auth.uid
+        );
+
+      allow update: if isTeacher()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readByTeacher']);
+
+      allow update: if canUseStudentApp()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readByStudent']);
+
+      allow update: if canUseStudentApp()
+        && resource.data.senderUid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'text', 'edited', 'editedAt'
+        ]);
+
+      allow update: if isTeacher()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForTeacher']);
+
+      allow update: if canUseStudentApp()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForStudent']);
+
+      allow delete: if isTeacher()
+        || (
+          canUseStudentApp()
+          && resource.data.studentUid == request.auth.uid
+        );
+    }
+
+    // =========================================================
+    // PRÉSENCE
+    // =========================================================
+
+    match /presence/{docId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if
+        (isTeacher() && docId == 'teacher')
+        || (canUseStudentApp() && docId == request.auth.uid);
+    }
+
+    // =========================================================
+    // CONFIGURATION
+    // =========================================================
+
+    match /config/{docId} {
+      allow get: if canUseStudentApp() || isTeacher();
+      allow write: if isTeacher();
+    }
+
+    // =========================================================
+    // ANNONCES
+    // =========================================================
+
+    match /annonces/{docId} {
+      allow get, list: if canUseStudentApp() || isTeacher();
+      allow create: if isTeacher();
+    }
+  }
+}
