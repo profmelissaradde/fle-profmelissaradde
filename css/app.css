@@ -761,3 +761,29 @@ body.sans-pt .lecon-accroche-pt, body.sans-pt .pt-title{display:none!important;}
   .page-head{padding-left:var(--sp-3); padding-right:var(--sp-3);}
   .quick-grid{grid-template-columns:1fr;}
 }
+
+/* ---- Forfaits : détail des séances, décisions, contrôle (js/20) ---- */
+.forfait-detail{margin:0 0 var(--sp-5);}
+.forfait-head{display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-3);}
+.forfait-head h3{margin:0; font-size:var(--fs-lg);}
+.seance-list{list-style:none; margin:var(--sp-3) 0; padding:0; display:flex; flex-direction:column; gap:var(--sp-2);}
+.seance-row{background:var(--c-surface); border:1px solid var(--c-border); border-left:4px solid var(--c-border-strong); border-radius:var(--r-md); padding:var(--sp-3) var(--sp-4);}
+.seance-row.realisee{border-left-color:var(--c-success);}
+.seance-row.decomptee,.seance-row.a_verifier,.seance-row.report_propose{border-left-color:#C08A2E;}
+.seance-row.anomalie{border-left-color:var(--c-danger);}
+.seance-row.programmee{border-left-color:var(--c-info);}
+.seance-row.annulee{opacity:.8;}
+.seance-top{display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2) var(--sp-3);}
+.seance-n{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; background:var(--c-surface-2); font-weight:700; font-size:var(--fs-xs);}
+.seance-date{flex:1 1 200px; font-weight:600; font-size:var(--fs-sm);}
+.seance-histo{margin-top:var(--sp-2); font-size:var(--fs-sm);}
+.seance-histo summary{cursor:pointer; color:var(--c-primary-ink); font-weight:600; min-height:var(--tap); display:flex; align-items:center;}
+.decision-box{margin-top:var(--sp-3); padding:var(--sp-3); border:1px dashed var(--c-border-strong); border-radius:var(--r-md); background:var(--c-surface-2);}
+.decision-box .btn-row{margin-top:var(--sp-2);}
+.decision-title{font-weight:650; font-size:var(--fs-sm); margin:0 0 var(--sp-2);}
+.anomalie-detail{margin-top:var(--sp-3); padding-top:var(--sp-3); border-top:1px solid var(--c-border);}
+.audit-list{margin:var(--sp-2) 0; padding-left:var(--sp-5); font-size:var(--fs-sm);}
+.audit-list li{margin-bottom:var(--sp-2);}
+.audit-list li.grave{color:var(--c-danger);}
+.audit-list li.grave .btn{color:var(--c-primary-ink);}
+.nouveau-forfait h4{margin:0 0 var(--sp-2);}

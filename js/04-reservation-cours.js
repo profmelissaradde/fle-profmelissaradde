@@ -353,18 +353,23 @@ async function loadHistoriqueEleve(){
   try{
     const snap = await db.collection('disponibilites').where('reservedBy','==',student.uid).get();
     const now = Date.now();
-    const past = snap.docs.map(d=>({id:d.id, ...d.data()}))
+    const toutes = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    /* Solde du forfait calculé à partir des séances réelles (20-forfaits.js). */
+    const fb = (typeof forfaitBilan === 'function' && student.pack && Number(student.pack.total)) ? forfaitBilan(student, toutes, now) : null;
+    const resume = fb ? `<div class="objectif-box" style="margin-bottom:16px;"><p class="fr" style="margin:0;"><b>Mon forfait :</b> ${fb.utilisees}/${fb.total} séances utilisées · ${fb.restantes} restante${fb.restantes>1?'s':''}${fb.programmees ? ` · ${fb.programmees} programmée${fb.programmees>1?'s':''}` : ''}${fb.anomalies ? ` · ${fb.anomalies} en attente de nouvelle date (non décomptée${fb.anomalies>1?'s':''})` : ''}</p></div>` : '';
+    const past = toutes
       .filter(s => new Date(s.date).getTime() < now - 3600000)
       .sort((a,b)=>new Date(b.date)-new Date(a.date));
     if(past.length===0){
-      body.innerHTML = `<p class="teacher-empty">Aucun cours passé pour le moment.</p>`;
+      body.innerHTML = resume + `<p class="teacher-empty">Aucun cours passé pour le moment.</p>`;
       return;
     }
-    body.innerHTML = past.map(s => `
+    body.innerHTML = resume + past.map(s => `
       <div class="slot-card" style="margin-bottom:12px;">
         <div class="slot-date">🗓️ ${fmtSlotDate(s.date)}</div>
         ${timezoneLineHTML(s.date)}
-        ${s.anomalie ? `<p style="color:var(--bad); font-weight:700; font-size:13px; margin:4px 0;">⚠️ Cours en anomalie (toi et l'élève n'avez pas tous les deux rejoint le lien Zoom)</p>` : ''}
+        ${typeof forfaitEtatSeance === 'function' ? `<p style="margin:4px 0;">${forfaitEtatHTML(forfaitEtatSeance(s, now))}${s.isPack ? ` <span class="tp-dim">${FORFAIT_ETATS[forfaitEtatSeance(s, now)].decompte ? 'décomptée du forfait' : 'non décomptée du forfait'}</span>` : ''}</p>` : ''}
+        ${s.anomalie ? `<p style="color:var(--bad); font-weight:700; font-size:13px; margin:4px 0;">⚠️ Ce cours n'a pas pu être confirmé (toi et ta professeure n'avez pas tous les deux rejoint le lien Zoom). Il n'est pas décompté : Melissa va te proposer une nouvelle date.</p>` : ''}
         ${s.isExperimental ? '' : (s.vocab ? `<div style="background:var(--cream); border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap; margin-top:8px;"><b>Vocabulaire vu :</b><br>${s.vocab}</div>` : `<p style="font-size:12.5px; color:var(--grey); margin-top:6px;">Le vocabulaire de ce cours n'a pas encore été ajouté.</p>`)}
         ${s.isExperimental ? '' : (s.recordingUrl ? `<a class="source-link" href="${s.recordingUrl}" target="_blank" rel="noopener" style="display:inline-block; margin-top:8px;">🎥 Voir l'enregistrement</a>` : '')}
       </div>

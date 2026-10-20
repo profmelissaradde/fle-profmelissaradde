@@ -77,23 +77,33 @@ function rptZoomSyncEnCours(s){
 function rptPropositionEnAttente(s){
   return !!(s && s.rescheduleRequest && s.rescheduleRequest.by === 'teacher' && s.rescheduleRequest.status === 'pending');
 }
+/* L'état d'une séance vient de la logique unique des forfaits (forfaitEtatSeance,
+   20-forfaits.js) : une séance passée n'est « effectuée » qu'avec une preuve de réalisation. */
 function rptEtat(s, now){
   now = now || Date.now();
-  if(s.anomalie) return rptPropositionEnAttente(s) ? 'report_propose' : 'anomalie';
+  const e = typeof forfaitEtatSeance === 'function' ? forfaitEtatSeance(s, now) : null;
+  if(e === 'anomalie' || e === 'report_propose') return e;
+  if(e === 'annulee') return 'annulee';
+  if(e === 'realisee' || e === 'decomptee') return 'effectuee';
   if(rptZoomSyncEnCours(s)) return s.zoomSync.status === 'error' ? 'zoom_erreur' : 'zoom_attente';
+  if(e === 'a_verifier') return 'a_verifier';
+  if(e) return 'a_venir';
+  if(s.anomalie) return rptPropositionEnAttente(s) ? 'report_propose' : 'anomalie';
   const fin = new Date(s.date).getTime() + (s.duree || 45) * 60000;
   return fin < now ? 'effectuee' : 'a_venir';
 }
-/* Compteurs « Élèves et niveaux » : une séance en anomalie n'est ni effectuée ni à
-   venir ; une séance reportée et acceptée compte comme « à venir » (même si Zoom est
-   encore en cours de synchronisation). */
+/* Compteurs « Élèves et niveaux » : une séance en anomalie (ou passée sans preuve) n'est ni
+   effectuée ni à venir ; une séance reportée et acceptée compte comme « à venir » (même si
+   Zoom est encore en cours de synchronisation). */
 function rptCompteurs(slots, now){
-  const c = {effectuees:0, aVenir:0, anomalies:0, zoomAttente:0, nextDate:null};
+  const c = {effectuees:0, aVenir:0, anomalies:0, aVerifier:0, zoomAttente:0, nextDate:null};
   (slots||[]).forEach(s=>{
-    if(!s.reservedBy || s.experimentalCancelled || s.definitivelyCancelled) return;
+    if(!s.reservedBy || s.experimentalCancelled) return;
     const e = rptEtat(s, now);
+    if(e === 'annulee') return;
     if(e === 'anomalie' || e === 'report_propose'){ c.anomalies++; return; }
-    if(e === 'effectuee'){ c.effectuees++; return; }
+    if(e === 'a_verifier'){ c.aVerifier++; return; }
+    if(e === 'effectuee'){ if(!s.definitivelyCancelled) c.effectuees++; return; }
     c.aVenir++;
     if(e === 'zoom_attente' || e === 'zoom_erreur') c.zoomAttente++;
     if(!c.nextDate || new Date(s.date) < new Date(c.nextDate)) c.nextDate = s.date;
@@ -102,6 +112,7 @@ function rptCompteurs(slots, now){
 }
 function rptCompteursHTML(c){
   return `📆 <b>${c.effectuees}</b> séance${c.effectuees>1?'s':''} effectuée${c.effectuees>1?'s':''} · <b>${c.aVenir}</b> à venir · <b style="color:${c.anomalies ? 'var(--bad)' : 'inherit'}">${c.anomalies}</b> anomalie${c.anomalies>1?'s':''} en attente`
+    + (c.aVerifier ? ` · <b style="color:var(--c-warning)">${c.aVerifier} passée${c.aVerifier>1?'s':''} à vérifier</b>` : '')
     + (c.zoomAttente ? ` · <b style="color:var(--c-warning)">${c.zoomAttente} synchro Zoom en attente</b>` : '');
 }
 

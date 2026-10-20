@@ -278,6 +278,8 @@ async function loadAdminDispo(){
   if(studentsData.length===0){
     await loadTeacherStudentsQuiet();
   }
+  /* Soldes de forfait réels pour le formulaire « Réserver un forfait ». */
+  if(typeof loadPackSlotsByStudent === 'function') await loadPackSlotsByStudent();
 
   await loadPaymentLinks();
 
@@ -919,14 +921,15 @@ function renderAdminDispo(){
 
   const packStudentOptions = studentsData.map(s=>{
     const pack = s.pack || {};
-    const remaining = (pack.total||0) - (pack.used||0);
+    /* Solde réel (20-forfaits.js) : séances réservables = restantes − programmées − à régulariser. */
+    const b = pack.total ? forfaitBilanEleve(s) : null;
 
     return `
       <option value="${esc(s.id)}">
         ${esc(s.prenom)} ${esc(s.nom)}${s.niveau ? ' · '+esc(s.niveau) : ''}
         — forfait ${
-          pack.total
-            ? `${pack.used||0}/${pack.total} (${remaining} restante${remaining>1?'s':''})`
+          b
+            ? `${b.utilisees}/${b.total} utilisées, ${b.reservables} à réserver${b.anomalies ? `, ${b.anomalies} en anomalie` : ''}`
             : 'non défini'
         }
       </option>
@@ -2117,8 +2120,7 @@ function prefillPackCount(){
   const remaining =
     Math.max(
       1,
-      (pack.total||0) -
-      (pack.used||0)
+      pack.total ? forfaitBilanEleve(s).reservables : 0
     );
 
   countEl.value =
@@ -2298,9 +2300,10 @@ async function reserverPack(){
   const pack =
     (s && s.pack) || {};
 
+  /* Séances encore réservables dans le forfait (solde réel, voir 20-forfaits.js). */
+  if(typeof loadPackSlotsByStudent === 'function') await loadPackSlotsByStudent();
   const remaining =
-    (pack.total||0) -
-    (pack.used||0);
+    pack.total ? forfaitBilanEleve(s).reservables : 0;
 
   if(
     pack.total &&
@@ -2321,7 +2324,7 @@ async function reserverPack(){
   ){
     if(
       !confirm(
-        `Attention : ${name} n'a que ${remaining} séance(s) restante(s) dans son forfait, tu es sur le point d'en créer ${dates.length}. Continuer quand même ?`
+        `Attention : ${name} n'a plus que ${remaining} séance(s) à réserver dans son forfait (les séances programmées et celles en anomalie sont déjà comptées), tu es sur le point d'en créer ${dates.length}. Continuer quand même ?`
       )
     ){
       return;
@@ -2331,6 +2334,8 @@ async function reserverPack(){
   let created = 0;
   const createdDates = [];
   const baseUsed = pack.used || 0;
+  /* Chaque séance est rattachée explicitement au forfait en cours (packId). */
+  const packId = (typeof forfaitAssurerId === 'function') ? await forfaitAssurerId(id) : null;
 
   for(const dateISO of dates){
     try{
@@ -2344,6 +2349,7 @@ async function reserverPack(){
             reservedName: name,
             reservedEmail: email,
             isPack: true,
+            ...(packId ? {packId} : {}),
             ts:
               firebase.firestore.FieldValue.serverTimestamp()
           });

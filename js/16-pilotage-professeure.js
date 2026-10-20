@@ -176,6 +176,8 @@ function profDashboardRender(){
   addTodo(unread, 'info', `message${unread>1?'s':''} non lu${unread>1?'s':''}`, "goTeacherTab('messages')", 'Lire');
   addTodo(aCorriger, 'warning', `réponse${aCorriger>1?'s':''} du thème à corriger`, "goTeacherTab('temas')", 'Corriger');
   addTodo(paiementsPack.length + coursImpayes.length, 'warning', `paiement${paiementsPack.length + coursImpayes.length>1?'s':''} en attente`, "goTeacherTab('finances')", 'Voir');
+  const aRegul = studentsData.filter(s => s.pack && Number(s.pack.total) && forfaitBilanEleve(s).statut === 'a_regulariser').length;
+  addTodo(aRegul, 'danger', `forfait${aRegul>1?'s':''} à régulariser (séances en anomalie ou à vérifier)`, "goTeacherTab('finances')", 'Voir');
   addTodo(aRenouveler.length, 'warning', `forfait${aRenouveler.length>1?'s':''} à renouveler bientôt`, "goTeacherTab('finances')", 'Voir');
   addTodo(sansNiveau.length, 'info', `élève${sansNiveau.length>1?'s':''} sans niveau attribué`, "profVoirSansNiveau()", 'Attribuer');
   addTodo(profilsModifies.length, 'info', `profil${profilsModifies.length>1?'s':''} modifié${profilsModifies.length>1?'s':''} par ${profilsModifies.length>1?'des élèves':'un élève'} cette semaine`, `openAdminStudentSection('${profilsModifies[0] ? profilsModifies[0].id : ''}','profil')`, 'Voir');
@@ -236,7 +238,7 @@ function profIsIssue(s){
   const req = s.rescheduleRequest || {};
   return !!(s.anomalie || rptPropositionEnAttente(s) || (req.status === 'pending') || rptZoomSyncEnCours(s));
 }
-registerTeacherTab('anomalies', ()=>loadTeacherHistorique());
+registerTeacherTab('anomalies', async ()=>{ await profEnsureStudents(); loadTeacherHistorique(); });
 (function(){
   const baseHisto = window.renderTeacherHistorique;
   window.renderTeacherHistorique = function(){
@@ -247,12 +249,29 @@ registerTeacherTab('anomalies', ()=>loadTeacherHistorique());
   window.renderPastSessions = function(){
     if(!profOnTab('anomalies')) return basePast.apply(this, arguments);
     const all = dispoData;
-    dispoData = all.filter(profIsIssue);
+    const filtres = all.filter(s => profIsIssue(s) || ['a_verifier'].includes(forfaitEtatSeance(s)) || (s.consommation && s.consommation.statut && s.anomalieHandled && (Date.now() - new Date(s.consommation.at).getTime()) < 7*86400000));
+    dispoData = filtres;
     try{ basePast.apply(this, arguments); } finally { dispoData = all; }
+    /* Même ordre que la liste existante (passées, plus récentes d'abord) : on complète chaque carte. */
+    const passees = filtres.filter(s => s.reservedBy && new Date(s.date).getTime() < Date.now() - 3600000).sort((a,b)=> new Date(b.date) - new Date(a.date));
+    const cartes = document.querySelectorAll('#admin-past-list > .teacher-entry');
+    passees.forEach((x, i) => { if(cartes[i]) cartes[i].insertAdjacentHTML('beforeend', profAnomalieDetailHTML(x)); });
     const el = document.getElementById('admin-past-list');
     if(el && /Aucun cours passé/.test(el.textContent)) el.innerHTML = profEmptyHTML('check', 'Aucune séance passée à régulariser', 'Les séances en anomalie apparaîtront ici avec les actions pour proposer un report.');
   };
 })();
+/* Détail d'une séance à régulariser : motif, forfait, proposition et relances, décision, historique. */
+function profAnomalieDetailHTML(x){
+  const etat = forfaitEtatSeance(x);
+  const motif = x.anomalie || etat === 'a_verifier'
+    ? (x.clickedByStudent && !x.clickedByTeacher ? "L'élève a rejoint Zoom, pas toi" : (!x.clickedByStudent && x.clickedByTeacher ? "Tu as rejoint Zoom, pas l'élève" : "Personne n'a rejoint le lien Zoom de la plateforme"))
+    : '';
+  const eleve = studentsData.find(e => e.id === x.reservedBy);
+  const forfait = x.isPack ? (eleve && eleve.pack && eleve.pack.total ? `Forfait de ${eleve.pack.total} séances — ${forfaitBilanEleve(eleve).utilisees}/${eleve.pack.total} utilisées` : 'Séance de forfait') : (x.isExperimental ? 'Cours expérimental' : "Cours à l'unité");
+  return `<div class="anomalie-detail">
+    <p class="meta">${forfaitEtatHTML(etat)} ${motif ? `· Motif : ${motif}` : ''} · ${forfait} · <b>${FORFAIT_ETATS[etat] && FORFAIT_ETATS[etat].decompte ? 'décomptée du forfait' : 'non décomptée'}</b></p>
+    ${forfaitPropositionHTML(x)}${forfaitDecisionFormHTML(x)}${forfaitHistoriqueHTML(x)}</div>`;
+}
 function profAnomaliesRender(){
   const body = profBody(); if(!body) return;
   const now = Date.now();
@@ -274,6 +293,7 @@ function profAnomaliesRender(){
       return `<div class="teacher-entry">
         <div class="who">${uiIcon('calendar')} ${fmtSlotDate(s.date)} <span class="tp-dim">— ${esc(s.reservedName || 'Élève')}</span></div>
         <div class="meta">${req.by === 'student' && req.status === 'pending' ? '<span class="badge badge-warning">Demande de report de l\'élève</span> ' : ''}${rptBadgeHTML(s, true)}</div>
+        ${forfaitPropositionHTML(s)}
         <div class="teacher-entry-actions"><button type="button" onclick="goTeacherTab('dispo')">Ouvrir dans le planning</button></div>
       </div>`;
     }).join('') : profEmptyHTML('check', 'Rien à suivre sur les séances à venir', '')}
@@ -332,7 +352,9 @@ function profFinancesRender(){
   const slots = profFin.slots;
   const flags = s => (typeof uiStudentFlags === 'function' ? uiStudentFlags(s) : {});
   const avecForfait = studentsData.filter(s => s.pack && Number(s.pack.total));
-  const restantes = avecForfait.reduce((n, s) => n + Math.max(0, (Number(s.pack.total)||0) - (Number(s.pack.used)||0)), 0);
+  const bilans = {}; avecForfait.forEach(s => { bilans[s.id] = forfaitBilanEleve(s); });
+  const restantes = avecForfait.reduce((n, s) => n + bilans[s.id].restantes, 0);
+  const aRegulariser = avecForfait.filter(s => bilans[s.id].statut === 'a_regulariser').length;
   const packsEnAttente = studentsData.filter(s => flags(s).paiement);
   const coursEnAttente = slots.filter(s => s.reservedBy && !s.isPack && !s.isExperimental && s.paymentStatus === 'pending');
   const aRenouveler = studentsData.filter(s => flags(s).renouveler);
@@ -344,12 +366,15 @@ function profFinancesRender(){
       <td><button type="button" class="btn btn-sm" onclick="profFinAction(()=>markPaymentReceived('${s.id}'), 'cours marqué payé', '${s.reservedBy}')">Marquer comme payé</button></td></tr>`)
   ];
 
-  const forfaits = avecForfait.sort((a,b)=> ((a.pack.total-a.pack.used)-(b.pack.total-b.pack.used))).map(s=>{
-    const p = s.pack, reste = Math.max(0, (Number(p.total)||0) - (Number(p.used)||0));
-    const statut = p.paymentStatus === 'paid' ? '<span class="badge badge-success">Payé</span>'
+  const ordreStatut = {a_regulariser:0, termine:1, a_renouveler:2, proche:3, actif:4, aucun:5};
+  const forfaits = avecForfait.sort((a,b)=> (ordreStatut[bilans[a.id].statut] - ordreStatut[bilans[b.id].statut]) || (bilans[a.id].restantes - bilans[b.id].restantes)).map(s=>{
+    const p = s.pack, b = bilans[s.id];
+    const paiement = p.paymentStatus === 'paid' ? '<span class="badge badge-success">Payé</span>'
       : (p.paymentLinks && Object.keys(p.paymentLinks).length ? '<span class="badge badge-warning">En attente</span>' : '<span class="badge">Liens à envoyer</span>');
-    return `<tr><td>${esc(s.prenom)} ${esc(s.nom||'')}</td><td>${p.used||0} / ${p.total}</td><td><b>${reste}</b>${flags(s).renouveler ? ' <span class="badge badge-warning">À renouveler</span>' : ''}</td>
-      <td>${statut}</td><td>${p.notaFiscalSent ? '<span class="badge badge-success">Envoyée</span>' : (p.paymentStatus === 'paid' ? '<span class="badge">À envoyer</span>' : '—')}</td>
+    return `<tr><td>${esc(s.prenom)} ${esc(s.nom||'')}</td><td>${b.total}</td><td>${b.utilisees}${b.decomptees ? ` <span class="tp-dim">(dont ${b.decomptees} décomptée${b.decomptees>1?'s':''})</span>` : ''}</td><td><b>${b.restantes}</b></td>
+      <td>${b.programmees}</td><td>${b.anomalies ? `<b style="color:var(--c-danger)">${b.anomalies}</b>` : 0}${b.aVerifier ? ` <span class="badge badge-warning">+${b.aVerifier} à vérifier</span>` : ''}</td>
+      <td>${paiement}${p.notaFiscalSent ? ' <span class="badge badge-success">Nota envoyée</span>' : (p.paymentStatus === 'paid' ? ' <span class="badge">Nota à envoyer</span>' : '')}</td>
+      <td>${forfaitStatutHTML(b)}</td>
       <td><button type="button" class="btn btn-secondary btn-sm" onclick="openAdminStudentSection('${s.id}','forfait')">Gérer</button></td></tr>`;
   }).join('');
 
@@ -377,13 +402,14 @@ function profFinancesRender(){
       ${profStatHTML('forfaits en cours', avecForfait.length, '')}
       ${profStatHTML('séances restantes (tous forfaits)', restantes, '')}
       ${profStatHTML('paiements en attente', packsEnAttente.length + coursEnAttente.length, packsEnAttente.length + coursEnAttente.length ? 'warning' : 'ok')}
+      ${profStatHTML('forfaits à régulariser', aRegulariser, aRegulariser ? 'danger' : 'ok', "goTeacherTab('controle')")}
       ${profStatHTML('forfaits à renouveler', aRenouveler.length, aRenouveler.length ? 'warning' : '')}
     </div>
     <h2 class="section-title">À encaisser</h2>
     ${encaisser.length ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Objet</th><th scope="col">Montant (tarif actuel)</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${encaisser.join('')}</tbody></table></div>`
       : profEmptyHTML('check', 'Aucun paiement en attente', '')}
     <h2 class="section-title">Forfaits</h2>
-    ${forfaits ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Utilisées</th><th scope="col">Restantes</th><th scope="col">Paiement</th><th scope="col">Nota fiscal</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${forfaits}</tbody></table></div>`
+    ${forfaits ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Forfait</th><th scope="col">Réalisées</th><th scope="col">Restantes</th><th scope="col">Programmées</th><th scope="col">Anomalies</th><th scope="col">Paiement</th><th scope="col">Statut</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${forfaits}</tbody></table></div>`
       : profEmptyHTML('wallet', 'Aucun forfait en cours', 'Les forfaits se créent depuis Cours › Planning (« Réserver un forfait »).')}
     <h2 class="section-title">Séances effectuées par mois</h2>
     <div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Mois</th><th scope="col">Forfait</th><th scope="col">À l'unité</th><th scope="col">Cours expérimental</th><th scope="col">Total</th></tr></thead>
@@ -395,7 +421,7 @@ function profFinancesRender(){
       : profEmptyHTML('wallet', 'Aucun paiement enregistré pour le moment', '')}
     <h2 class="section-title">Liens de paiement C6 Bank (cours à l'unité)</h2>
     ${typeof paymentLinksEditorHTML === 'function' ? paymentLinksEditorHTML() : ''}
-    <p class="tp-dim">Les tarifs se modifient dans Paramètres › Réglages › Tarifs.</p>`;
+    <p class="tp-dim">« Réalisées » : séances qui ont eu lieu (Zoom rejoint par vous deux, ou confirmées par toi) et séances décomptées sur décision motivée. Une séance en anomalie n'est jamais décomptée tant qu'elle n'est pas régularisée. Les tarifs se modifient dans Paramètres › Réglages › Tarifs.</p>`;
 }
 async function profFinAction(fn, libelle, eleveId){
   await fn();
@@ -500,7 +526,7 @@ async function ficheLoadAsync(section, s){
       el.innerHTML = `<p class="rpt-counters">${rptCompteursHTML(c)}</p>
         ${slots.length ? `<ul class="course-list">${slots.map(x=>{
           const etat = rptEtat(x, now);
-          const lab = {anomalie:'<span class="badge badge-danger">Anomalie</span>', report_propose:'<span class="badge badge-warning">Report proposé</span>', zoom_attente:'<span class="badge badge-warning">Zoom en attente</span>', zoom_erreur:'<span class="badge badge-danger">Zoom en échec</span>', a_venir:'<span class="badge badge-info">À venir</span>', effectuee:'<span class="badge badge-success">Effectuée</span>'}[etat] || '';
+          const lab = {anomalie:'<span class="badge badge-danger">Anomalie</span>', report_propose:'<span class="badge badge-warning">Report proposé</span>', zoom_attente:'<span class="badge badge-warning">Zoom en attente</span>', zoom_erreur:'<span class="badge badge-danger">Zoom en échec</span>', a_venir:'<span class="badge badge-info">À venir</span>', effectuee:'<span class="badge badge-success">Effectuée</span>', a_verifier:'<span class="badge badge-warning">Passée, à vérifier</span>', annulee:'<span class="badge">Annulée</span>'}[etat] || '';
           return `<li class="course-row"><span class="course-time">${uiIcon('clock')}${fmtSlotDate(x.date)}</span><span class="course-who">${lab}${x.isExperimental ? ' <span class="badge">Cours expérimental</span>' : ''}${x.isPack ? ' <span class="badge">Forfait</span>' : ''}${x.experimentalCancelled || x.definitivelyCancelled ? ' <span class="badge">Annulée</span>' : ''}</span>${x.vocab ? '<span class="tp-dim">Récap ajouté</span>' : ''}</li>`;
         }).join('')}</ul>` : profEmptyHTML('calendar', 'Aucun cours réservé', '')}`;
     }

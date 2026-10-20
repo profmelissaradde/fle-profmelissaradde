@@ -383,7 +383,7 @@ async function loadPackSlotsByStudent(){
     });
     Object.keys(parEleve).forEach(uid=>{
       const c = rptCompteurs(parEleve[uid], now);
-      packSlotsByStudent[uid] = {past:c.effectuees, upcoming:c.aVenir, nextDate:c.nextDate, compteurs:c};
+      packSlotsByStudent[uid] = {past:c.effectuees, upcoming:c.aVenir, nextDate:c.nextDate, compteurs:c, slots:parEleve[uid]};
     });
   }catch(e){ packSlotsByStudent = {}; }
 }
@@ -514,20 +514,20 @@ function renderStudentsFlatList(){
     const behind = stats.thisWeek < 3;
     const pack = s.pack || {};
     const packTotal = pack.total || 0;
-    const packUsed = pack.used || 0;
-    const packRemaining = packTotal - packUsed;
     return `<div class="teacher-entry">
       <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
       <div class="meta">${s.email} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
       <div class="meta">📍 Progression (Dossier 0) : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, 0)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, 0)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, 0)].note20}/20</b>` : ''}` : ''}</div>
       <div class="meta">✅ ${stats.total}/${TOTAL_ACTIVITIES} activités faites au total · <b style="color:${behind ? 'var(--bad)' : 'var(--ok)'}">${stats.thisWeek} cette semaine</b>${behind ? ' ⚠️ moins de la moitié' : ''}</div>
-      <div class="meta">📦 Forfait : ${packTotal ? `<b style="color:${packRemaining<=0?'var(--bad)':'var(--navy)'}">${packUsed}/${packTotal} séances utilisées</b> (${packRemaining} restante${packRemaining>1?'s':''})` : 'aucun forfait défini'}${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) ? ` · <span style="color:${pack.paymentStatus==='paid' ? 'var(--ok)' : 'var(--bad)'};">💳 ${pack.paymentStatus==='paid' ? 'Payé' : 'Paiement en attente'}</span>` : ''}</div>
+      <div class="meta">📦 Forfait : ${packTotal ? `${forfaitResumeHTML(forfaitBilanEleve(s))} ${forfaitStatutHTML(forfaitBilanEleve(s))}` : 'aucun forfait défini'}${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) ? ` · <span style="color:${pack.paymentStatus==='paid' ? 'var(--ok)' : 'var(--bad)'};">💳 ${pack.paymentStatus==='paid' ? 'Payé' : 'Paiement en attente'}</span>` : ''}</div>
       ${(()=>{
         if(!packTotal) return '';
         const p = packSlotsByStudent[s.id] || {past:0, upcoming:0, nextDate:null};
-        const renewSoon = p.upcoming <= 2;
+        /* Alerte de renouvellement : solde réel du forfait (anomalies et séances programmées comprises). */
+        const bf = forfaitBilanEleve(s);
+        const renewSoon = ['a_renouveler','termine','proche'].includes(bf.statut);
         const c = p.compteurs || {effectuees:p.past, aVenir:p.upcoming, anomalies:0, zoomAttente:0};
-        return `<div class="meta">${rptCompteursHTML(c)}${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ Pense à renouveler le forfait bientôt</span>` : ''}</div>`;
+        return `<div class="meta">${rptCompteursHTML(c)}${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ ${bf.statut === 'termine' ? 'Forfait terminé : à renouveler' : 'Pense à renouveler le forfait bientôt'}</span>` : (bf.statut === 'a_regulariser' ? ` · <span style="color:var(--c-danger); font-weight:700;">À régulariser avant tout renouvellement</span>` : '')}</div>`;
       })()}
 
       <div class="teacher-entry-actions" style="margin-top:8px;">

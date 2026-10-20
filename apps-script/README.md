@@ -30,3 +30,17 @@ Heure d'été / d'hiver : Zoom reçoit l'heure locale de Paris avec `timezone: "
    Cette version contient aussi l'archivage des thèmes : connecte-toi d'abord une fois en professeure (étape 4) pour publier le calendrier des thèmes.
 
 Si l'application est mise en ligne avant le nouveau script, une acceptation affichera « action inconnue » : rien n'est modifié, il suffit de faire les étapes 1-2.
+
+## Mise à jour du 20/10/2026 — créneaux libres et relances des reports
+- **Correctif** : les créneaux libres sont de nouveau envoyés aux élèves (`listAvailableSlots` utilise `IS_NULL`).
+- **Nouvelle action** `remindProposal` : relance manuelle d'une proposition de report, depuis Cours › Reports & anomalies ou depuis la fiche Forfait.
+  - Elle renvoie le même lien ; elle est refusée si une relance a déjà été faite il y a moins de 12 h.
+  - Au maximum 6 relances par proposition.
+- **Nouvelle fonction** `relancerPropositionsAuto` : relance automatique après N jours sans réponse.
+  - Par défaut : après 2 jours, au plus 2 fois.
+  - Réglable dans Paramètres › Réglages › Relances.
+  - Une absence de réponse n'est jamais une acceptation.
+
+À faire :
+1. Coller `Code.gs`, puis **Nouvelle version** du déploiement existant (l'URL ne change pas).
+2. Ajouter un déclencheur : fonction `relancerPropositionsAuto`, basé sur le temps, **tous les jours** (par exemple entre 9 h et 10 h).
