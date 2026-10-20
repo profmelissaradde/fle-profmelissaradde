@@ -25,15 +25,15 @@ const TEACHER_EMAIL = "prof.melissaradde@gmail.com";
 const ZOOM_MEETING_NAME = "Cours de français — Prof Melissa Radde";
 const ZOOM_OPEN_MINUTES_BEFORE = 15;
 const ZOOM_UNIQUE_LINKS = true;
-const FORFAIT_MIN = 5;
-const FORFAIT_MAX = 16;
+let FORFAIT_MIN = 5;   /* valeurs par défaut — modifiables dans Paramètres › Tarifs (config/plateforme) */
+let FORFAIT_MAX = 16;
 /* Tarification : un cours à l'unité coûte PRIX_COURS. À partir d'un forfait de
    FORFAIT_MIN séances (et jusqu'à FORFAIT_MAX), une remise de FORFAIT_REMISE
    s'applique sur le total — confirmé par Melissa. Sert à calculer le montant
    et la modalité de paiement Crédito à choisir côté C6 Bank (voir
    calculerPrixForfait dans 05-admin-disponibilites-forum.js). */
-const PRIX_COURS = 87;
-const FORFAIT_REMISE = 0.10;
+let PRIX_COURS = 87;
+let FORFAIT_REMISE = 0.10;
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -70,7 +70,7 @@ window.addEventListener('load', () => {
              de la semaine, aux dossiers, etc. Voir setAdminNiveau() dans 01-utilitaires-nav.js. */
           niveau = niveau || 'A1'; current = null;
           student = {prenom:'Melissa', nom:'Radde', email:cred.user.email || email, telephone:'', uid:cred.user.uid, uniteCourante:{}, frequence:null, temas:{}};
-          teacherTab = 'eleves'; screen = 'teacher';
+          teacherTab = 'accueil'; screen = 'teacher';
           startTeacherPresenceHeartbeat(); startTeacherMessagesListener(); render();
           /* Republie le calendrier d'archivage des thèmes (lu par les règles Firestore). */
           if(typeof tpLoadConfig === 'function') tpLoadConfig().then(()=>tpSyncCalendrier());
@@ -135,7 +135,7 @@ window.addEventListener('load', () => {
        espace expérimental restreint, sans niveau. */
     const isExperimental = record.status === 'experimental';
     if(isExperimental){ niveau = null; screen = 'experimental'; }
-    else if(record.niveau){ niveau = record.niveau; screen = 'dossiers'; }
+    else if(record.niveau){ niveau = record.niveau; screen = 'accueil'; }
     else{ niveau = null; screen = 'waiting'; }
     render();
   };

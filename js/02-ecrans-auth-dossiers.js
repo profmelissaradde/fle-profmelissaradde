@@ -29,12 +29,12 @@ function renderAuthBody(){
       </div>
       <div class="field"><label>WhatsApp</label>
         <div style="display:grid;grid-template-columns:minmax(150px,42%) 1fr;gap:8px;">
-          <select id="su-wa-code" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;">${whatsappCodeOptions('+55')}</select>
+          <select id="su-wa-code" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--c-surface);">${whatsappCodeOptions('+55')}</select>
           <input id="su-tel" type="tel" autocomplete="tel-national" placeholder="Numéro WhatsApp">
         </div>
       </div>
       <div class="field"><label>CPF</label><input id="su-cpf" type="text" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" oninput="maskSignupCPF(this)"></div>
-      <div class="field"><label>Fuseau horaire</label><select id="su-timezone" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff;">${timezoneOptions(detectedTimezone())}</select></div>
+      <div class="field"><label>Fuseau horaire</label><select id="su-timezone" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--c-surface);">${timezoneOptions(detectedTimezone())}</select></div>
       <div class="field"><label>Mot de passe</label><div class="pw-wrap"><input id="su-pw" type="password" placeholder="8 caractères minimum"><button type="button" class="pw-toggle" onclick="togglePw('su-pw',this)">👁</button></div></div>
       <div class="field"><label>Confirmer le mot de passe</label><div class="pw-wrap"><input id="su-pw2" type="password" placeholder="••••••••"><button type="button" class="pw-toggle" onclick="togglePw('su-pw2',this)">👁</button></div></div>
       <button class="primary-btn" id="su-btn" onclick="doSignup()">Créer mon compte →</button>
@@ -170,7 +170,7 @@ async function refreshNiveau(){
     const doc = await db.collection('eleves').doc(student.uid).get();
     if(doc.exists){
       const rec = doc.data();
-      if(rec.niveau){ niveau = rec.niveau; screen = 'dossiers'; render(); return; }
+      if(rec.niveau){ niveau = rec.niveau; screen = 'accueil'; render(); return; }
     }
   }catch(e){}
   alert("Ton niveau n'a pas encore été attribué par ta professeure. Réessaie un peu plus tard.");
@@ -247,7 +247,6 @@ function speakText(text, lang){
 function renderSurvie(){
   const c = document.getElementById('content');
   c.innerHTML = `
-    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
     <p class="eyebrow">Toujours accessible, quel que soit ton niveau</p>
     <h1 class="page-title">🆘 Phrases de survie</h1>
     <div class="objectif-box">

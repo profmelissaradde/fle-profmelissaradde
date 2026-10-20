@@ -349,7 +349,6 @@ function tpDraw(){
       ${ctx.draft ? '<br>⚠️ Contenu NON enregistré (brouillon de l\'éditeur).' : ''}</div>` : '';
 
   const header = ctx.mode === 'prof' ? '' : `
-    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
     <div class="tema-header">
       <p class="tema-period">📅 ${tpEsc(tema.periode)}</p>
       <h1>🍅 ${tema.titre_fr}</h1>
@@ -364,8 +363,8 @@ function tpDraw(){
     <p class="section-label tp-meta">Niveau ${tpEsc(lvl)}${ctx.preview ? '' : (student.niveauTheme ? ' (choisi par ta professeure pour ce thème)' : ' (attribué par ta professeure)')} · ⏱️ Travail estimé : ${duree} · ${acts.length} activités</p>
     <div class="tp-progress" role="progressbar" aria-label="Progression du parcours" aria-valuemin="0" aria-valuemax="${acts.length}" aria-valuenow="${nbDone}"><div class="tp-progress-bar" style="width:${pct}%"></div></div>
     <p class="tp-progress-label">${nbDone} / ${acts.length} activités terminées (${pct} %)</p>
-    <div class="tema-status-bar tp-sommaire">${chips}</div>
-    <div class="tp-legend">⬜ à faire · ✏️ commencée · ✅ terminée (corrigée automatiquement) · 🕓 envoyée, en attente de correction · 🟢 validée par ta professeure</div>
+    ${typeof cheminHTML === 'function' ? cheminHTML(ctx) : `<div class="tema-status-bar tp-sommaire">${chips}</div>
+    <div class="tp-legend">⬜ à faire · ✏️ commencée · ✅ terminée (corrigée automatiquement) · 🕓 envoyée, en attente de correction · 🟢 validée par ta professeure</div>`}
     <div id="tp-act-zone"></div>
   `;
   const zone = document.getElementById('tp-act-zone');
@@ -1245,6 +1244,9 @@ async function tpSyncCalendrier(){
     const data = {};
     Object.keys(periodes).forEach(id => {
       data[id] = {debut: TS.fromDate(new Date(periodes[id].debut)), fin: periodes[id].fin == null ? null : TS.fromDate(new Date(periodes[id].fin))};
+      /* Thème attribué à certains élèves seulement (Pédagogie › Thèmes › Parcours) : les règles
+         Firestore n'acceptent alors que les réponses de ces élèves. */
+      if(Array.isArray(periodes[id].eleves)) data[id].eleves = periodes[id].eleves;
     });
     await ref.set({periodes: data, signature, maj: new Date().toISOString()});
     tpCalendrierSync = {etat:'ok', erreur:null};

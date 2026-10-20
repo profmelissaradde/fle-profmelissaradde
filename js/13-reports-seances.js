@@ -56,7 +56,8 @@ async function rptRelancerZoom(slotId){
     const r = await rptCall({action:'retryZoomSync', slotId});
     alert(r.ok ? '✅ Réunion Zoom synchronisée.' : `⚠️ Synchronisation toujours impossible : ${r.error || r.zoomStatus || 'erreur inconnue'}. Une nouvelle tentative automatique aura lieu.`);
   }catch(e){ alert(e.message); }
-  if(typeof loadAdminDispo === 'function' && screen === 'reserver') await loadAdminDispo();
+  if(typeof loadAdminDispo === 'function' && screen === 'teacher' && teacherTab === 'dispo') await loadAdminDispo();
+  else if(screen === 'teacher' && teacherTab === 'accueil' && typeof profDashboardLoad === 'function') await profDashboardLoad();
   else if(typeof loadTeacherHistorique === 'function') await loadTeacherHistorique();
 }
 

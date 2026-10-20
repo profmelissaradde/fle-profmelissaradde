@@ -38,34 +38,10 @@
     if(typeof loadNextCourseBanner === 'function') loadNextCourseBanner();
   }
 
-  const baseRenderSidebar = window.renderSidebar;
-  window.renderSidebar = function(){
-    if(!isExperimentalStudent()) return baseRenderSidebar();
-    const sb = document.getElementById('sidebar'); if(!sb) return;
-    sb.innerHTML = `
-      <p class="cover-label">Cours expérimental</p><h1 class="cover-title">FLE</h1>
-      <div class="student-badge"><b>${student.prenom || ''} ${student.nom || ''}</b>Cours expérimental</div>
-      <button class="nav-btn ${screen==='experimental'?'active':''}" onclick="goExperimentalHome()"><span class="tag">🧪</span> Mon cours expérimental</button>
-      <button class="nav-btn ${screen==='messages'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goMessages()"><span class="tag">✉️</span> Message à Melissa${typeof studentUnreadCount !== 'undefined' && studentUnreadCount>0 ? ` <span class="admin-pill" style="background:var(--bad); color:#fff;">${studentUnreadCount}</span>` : ''}</button>
-      <button class="nav-btn ${screen==='historique'?'active':''}" style="--tag-color:var(--c-primary)" onclick="goHistorique()"><span class="tag">📚</span> Historique de mes cours</button>
-      <div class="nav-sep"></div><button class="nav-btn" onclick="goLogin()">🚪 Se déconnecter</button>`;
-  };
-
+  /* Menu, droits d'accès et redirections : voir 15-navigation.js (rôle « experimental »). */
   window.goExperimentalHome = function(){ if(!isExperimentalStudent()) return; screen = 'experimental'; render(); };
-  const baseGoDossiers = window.goDossiers; window.goDossiers = function(){ if(isExperimentalStudent()) return goExperimentalHome(); return baseGoDossiers(); };
-  const baseGoForum = window.goForum; window.goForum = function(){ if(isExperimentalStudent()) return goExperimentalHome(); return baseGoForum(); };
-  const baseGoReserver = window.goReserver; window.goReserver = function(){ if(isExperimentalStudent()) return goExperimentalHome(); return baseGoReserver(); };
-
-  const baseRender = window.render;
-  window.render = function(){
-    if(isExperimentalStudent() && ['dossiers','forum','reserver','week','bilan','temas','survie','waiting'].includes(screen)) screen = 'experimental';
-    if(screen === 'experimental' && isExperimentalStudent()){
-      const sidebar = document.getElementById('sidebar'); if(sidebar) sidebar.style.display = '';
-      renderSidebar(); const contentEl = document.getElementById('content'); if(contentEl) contentEl.style.setProperty('--accent', 'var(--c-success)');
-      renderExperimentalHome(); window.scrollTo(0,0); return;
-    }
-    return baseRender();
-  };
+  window.isExperimentalStudent = isExperimentalStudent;
+  registerScreen('experimental', renderExperimentalHome);
 })();
 
 /* ======================= MESSAGERIE PROF — TOUS LES ÉLÈVES ======================= */
@@ -113,7 +89,7 @@
         <div id="thread-messages" style="max-height:420px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--c-surface-2);">${msgs.length?msgs.map(m=>messageBubbleHTML(m,m.senderIsTeacher,'teacher')).join(''):'<p class="teacher-empty">Aucun message pour le moment — tu peux démarrer la conversation.</p>'}</div>
         <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
           <input id="thread-input" type="text" placeholder="Écrire un message…" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;" onkeydown="if(event.key==='Enter') sendTeacherMessage()">
-          <label style="cursor:pointer;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;" title="Joindre une photo ou un fichier">📎<input type="file" style="display:none" onchange="handleAttachmentChange('teacher', this)"></label>
+          <label style="cursor:pointer;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--c-surface);" title="Joindre une photo ou un fichier">📎<input type="file" style="display:none" onchange="handleAttachmentChange('teacher', this)"></label>
           <button class="rec-btn" onclick="sendTeacherMessage()">Envoyer</button>
         </div><div id="teacher-attach-status" style="font-size:11.5px;color:var(--grey);margin-top:4px;"></div>`;
       const el=document.getElementById('thread-messages'); if(el) el.scrollTop=el.scrollHeight; return;
@@ -124,6 +100,6 @@
     if(filterEl){filterEl.value=previousFilter;filterEl.oninput=function(){window.__teacherMessageFilter=this.value;renderTeacherMessages();};}
     const q=norm(previousFilter), filtered=contacts.filter(c=>{if(!q)return true;const p=c.profile||{};return norm(`${c.studentName||''} ${p.email||''} ${p.telephone||''}`).includes(q);});
     const list=document.getElementById('teacher-message-contacts'); if(!list)return;
-    list.innerHTML=filtered.length?filtered.map(t=>{const p=t.profile||{}, experimental=p.experimentalLesson===true||p.registrationSource==='cours-experimental'||p.status==='experimental';return `<div class="teacher-entry" style="cursor:pointer;" onclick="openTeacherThread('${t.studentUid}')"><div class="who">${esc(t.studentName)} ${experimental?'<span class="admin-pill" style="background:var(--c-warning-bg);color:var(--c-warning);">🧪 Expérimental</span>':''} ${t.unread?`<span class="admin-pill" style="background:var(--bad);color:#fff;">${t.unread}</span>`:''}</div><div class="meta">${p.email?esc(p.email):''}${t.lastText?`${p.email?' · ':''}${esc((t.lastText||'').slice(0,90))}`:' · Nouvelle conversation'}</div><div class="meta" style="font-size:11.5px;">${presenceLabel(t.studentUid)}</div></div>`;}).join(''):'<p class="teacher-empty">Aucun élève ne correspond à cette recherche.</p>';
+    list.innerHTML=filtered.length?filtered.map(t=>{const p=t.profile||{}, experimental=p.experimentalLesson===true||p.registrationSource==='cours-experimental'||p.status==='experimental';return `<div class="teacher-entry" style="cursor:pointer;" onclick="openTeacherThread('${t.studentUid}')"><div class="who">${esc(t.studentName)} ${experimental?'<span class="admin-pill" style="background:var(--c-warning-bg);color:var(--c-warning);">🧪 Expérimental</span>':''} ${t.unread?`<span class="admin-pill" style="background:var(--c-danger-fill);color:#fff;">${t.unread}</span>`:''}</div><div class="meta">${p.email?esc(p.email):''}${t.lastText?`${p.email?' · ':''}${esc((t.lastText||'').slice(0,90))}`:' · Nouvelle conversation'}</div><div class="meta" style="font-size:11.5px;">${presenceLabel(t.studentUid)}</div></div>`;}).join(''):'<p class="teacher-empty">Aucun élève ne correspond à cette recherche.</p>';
   };
 })();

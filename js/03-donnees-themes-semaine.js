@@ -1493,7 +1493,6 @@ function renderTemas(){
   if(typeof tpIsV2 === 'function' && tpIsV2(tema)){ tpRenderStudent(c, tema, weeksHTML); return; }
 
   c.innerHTML = `
-    <div class="week-footer" style="margin-top:0; margin-bottom:18px;"><button onclick="goDossiers()">← Retour aux dossiers</button><div></div></div>
     <div class="tema-header">
       <p class="tema-period">📅 ${tema.periode}</p>
       <h1>🍅 ${tema.titre_fr}</h1>

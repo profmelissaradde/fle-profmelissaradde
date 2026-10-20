@@ -1,12 +1,8 @@
-/* ======================= INTERFACE : NAVIGATION MOBILE, NOTIFICATIONS, ACCESSIBILITÉ =======================
-   Couche d'ergonomie posée APRÈS tous les écrans existants (aucune règle métier modifiée) :
+/* ======================= INTERFACE : NOTIFICATIONS, FILTRES, ACCESSIBILITÉ =======================
    1. Notifications accessibles à la place des alert() du navigateur.
-   2. Mobile : barre du haut (titre + Menu), barre de navigation inférieure (4 destinations
-      principales + « Plus »), barre latérale transformée en menu coulissant.
-   3. Tableau de bord élève : prochain cours, thème de la semaine (progression), forfait.
-   4. « Élèves & niveaux » : recherche et filtres (à traiter, forfait à renouveler, sans niveau…).
-   5. Accessibilité : éléments cliquables utilisables au clavier, focus déplacé sur le contenu
-      au changement d'écran, page de la navigation indiquée (aria-current), annonces vocales. */
+   4. « Élèves » : recherche et filtres (à traiter, forfait à renouveler, sans niveau…).
+   5. Accessibilité : éléments cliquables utilisables au clavier, libellés des champs.
+   La navigation (menus, barre inférieure, focus au changement d'écran) est dans 15-navigation.js. */
 (function(){
   /* ---------------------------------------------------------------------------
      1. NOTIFICATIONS
@@ -51,241 +47,8 @@
      lisible. confirm() reste natif (il doit bloquer pour attendre la réponse). */
   window.alert = function(message){ window.uiNotify(message); };
 
-  /* ---------------------------------------------------------------------------
-     2. NAVIGATION
-     --------------------------------------------------------------------------- */
-  const SCREEN_TITLES = {
-    dossiers:'Accueil', week:'Unité', bilan:'Bilan', temas:'Thème de la semaine', survie:'Phrases de survie',
-    reserver:'Cours', forum:'Forum', messages:'Messages', historique:'Historique', profil:'Mon profil',
-    regles:'Règles & fonctionnement', 'admin-cours':'Vue des cours', experimental:'Mon cours expérimental',
-    waiting:'Bienvenue', teacher:'Espace enseignante'
-  };
-  const TEACHER_TAB_TITLES = {eleves:'Élèves & niveaux', rec:'Enregistrements', temas:'Suivi du thème', dispo:'Disponibilités', experimental:'Cours expérimental', historique:'Historique', messages:'Messages'};
-
-  function navItems(){
-    if(!student || !student.prenom || ['login','verify'].includes(screen)) return [];
-    if(isTeacher){
-      const unread = typeof teacherUnreadTotal === 'function' ? teacherUnreadTotal() : 0;
-      return [
-        {id:'t-eleves', label:'Élèves', ic:'👥', go:()=>goTeacherTab('eleves'), active: screen==='teacher' && teacherTab==='eleves'},
-        {id:'t-planning', label:'Planning', ic:'📅', go:()=>goReserver(), active: screen==='reserver'},
-        {id:'t-theme', label:'Thème', ic:'📝', go:()=>goTeacherTab('temas'), active: screen==='teacher' && teacherTab==='temas'},
-        {id:'t-messages', label:'Messages', ic:'✉️', go:()=>goTeacherTab('messages'), active: screen==='teacher' && teacherTab==='messages', badge: unread}
-      ];
-    }
-    const unread = typeof studentUnreadCount !== 'undefined' ? studentUnreadCount : 0;
-    if(typeof isExperimentalStudent === 'function' && isExperimentalStudent()){
-      return [
-        {id:'e-home', label:'Mon cours', ic:'🏠', go:()=>goExperimentalHome(), active: screen==='experimental'},
-        {id:'e-messages', label:'Messages', ic:'✉️', go:()=>goMessages(), active: screen==='messages', badge: unread},
-        {id:'e-histo', label:'Historique', ic:'📚', go:()=>goHistorique(), active: screen==='historique'}
-      ];
-    }
-    if(!niveau){
-      return [
-        {id:'w-home', label:'Accueil', ic:'🏠', go:()=>goWaiting(), active: screen==='waiting'},
-        {id:'w-cours', label:'Cours', ic:'📅', go:()=>goReserver(), active: screen==='reserver'},
-        {id:'w-messages', label:'Messages', ic:'✉️', go:()=>goMessages(), active: screen==='messages', badge: unread}
-      ];
-    }
-    return [
-      {id:'s-home', label:'Accueil', ic:'🏠', go:()=>goDossiers(), active: ['dossiers','week','bilan'].includes(screen)},
-      {id:'s-theme', label:'Thème', ic:'📝', go:()=>goTemas(), active: screen==='temas'},
-      {id:'s-cours', label:'Cours', ic:'📅', go:()=>goReserver(), active: screen==='reserver'},
-      {id:'s-messages', label:'Messages', ic:'✉️', go:()=>goMessages(), active: screen==='messages', badge: unread}
-    ];
-  }
-  let currentItems = [];
-  window.uiNavGo = function(id){
-    const it = currentItems.find(x=>x.id===id);
-    closeDrawer(false);
-    if(it) it.go();
-  };
-
-  function ensureChrome(){
-    if(!document.querySelector('.topbar')){
-      const tb = document.createElement('header');
-      tb.className = 'topbar';
-      tb.innerHTML = `<span class="topbar-brand">FLE · Melissa Radde</span><span class="topbar-title" id="topbar-title" aria-live="polite"></span>
-        <button class="topbar-menu-btn" type="button" id="topbar-menu-btn" aria-controls="sidebar" aria-expanded="false"><span aria-hidden="true">☰</span> Menu</button>`;
-      document.body.insertBefore(tb, document.querySelector('.app'));
-      tb.querySelector('#topbar-menu-btn').onclick = ()=> toggleDrawer();
-      const ov = document.createElement('div');
-      ov.className = 'nav-overlay';
-      ov.onclick = ()=> closeDrawer(true);
-      document.body.appendChild(ov);
-      const bn = document.createElement('nav');
-      bn.className = 'bottomnav';
-      bn.id = 'bottomnav';
-      bn.setAttribute('aria-label', 'Navigation principale');
-      document.body.appendChild(bn);
-    }
-  }
-  function isMobile(){ return window.matchMedia('(max-width: 899px)').matches; }
-  function setSidebarInert(){
-    const sb = document.getElementById('sidebar');
-    if(!sb) return;
-    const hidden = isMobile() && !document.body.classList.contains('nav-open');
-    if(hidden){ sb.setAttribute('aria-hidden', 'true'); sb.setAttribute('inert', ''); }
-    else { sb.removeAttribute('aria-hidden'); sb.removeAttribute('inert'); }
-  }
-  function openDrawer(){
-    document.body.classList.add('nav-open');
-    const btn = document.getElementById('topbar-menu-btn'); if(btn) btn.setAttribute('aria-expanded', 'true');
-    setSidebarInert();
-    const first = document.querySelector('#sidebar .sidebar-close') || document.querySelector('#sidebar button');
-    if(first) setTimeout(()=>first.focus(), 60);
-  }
-  function closeDrawer(returnFocus){
-    if(!document.body.classList.contains('nav-open')) return;
-    document.body.classList.remove('nav-open');
-    const btn = document.getElementById('topbar-menu-btn'); if(btn) btn.setAttribute('aria-expanded', 'false');
-    setSidebarInert();
-    if(returnFocus && btn) btn.focus();
-  }
-  function toggleDrawer(){ document.body.classList.contains('nav-open') ? closeDrawer(true) : openDrawer(); }
-  window.uiOpenMenu = openDrawer;
-  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && document.body.classList.contains('nav-open')) closeDrawer(true); });
-  window.addEventListener('resize', ()=>{ if(!isMobile()) closeDrawer(false); setSidebarInert(); });
-  /* Un choix dans le menu coulissant le referme. */
-  document.addEventListener('click', e=>{
-    if(!document.body.classList.contains('nav-open')) return;
-    const b = e.target.closest('#sidebar .nav-btn');
-    if(b) setTimeout(()=>closeDrawer(false), 0);
-  });
-
-  function updateChrome(){
-    ensureChrome();
-    currentItems = navItems();
-    const bn = document.getElementById('bottomnav');
-    const tb = document.querySelector('.topbar');
-    const show = currentItems.length > 0;
-    document.body.classList.toggle('no-bottomnav', !show);
-    if(tb) tb.style.display = show ? '' : 'none';
-    if(bn){
-      bn.style.display = show ? '' : 'none';
-      const anyActive = currentItems.some(i=>i.active);
-      bn.innerHTML = currentItems.map(i=>`<button type="button" onclick="uiNavGo('${i.id}')" ${i.active ? 'aria-current="page"' : ''}>
-          <span class="ic" aria-hidden="true">${i.ic}</span><span>${i.label}</span>
-          ${i.badge ? `<span class="dot" aria-label="${i.badge} non lu${i.badge>1?'s':''}">${i.badge}</span>` : ''}</button>`).join('')
-        + `<button type="button" onclick="uiOpenMenu()" ${!anyActive ? 'aria-current="page"' : ''} aria-controls="sidebar"><span class="ic" aria-hidden="true">☰</span><span>Plus</span></button>`;
-    }
-    const t = document.getElementById('topbar-title');
-    if(t){
-      let title = SCREEN_TITLES[screen] || '';
-      if(screen === 'teacher') title = TEACHER_TAB_TITLES[teacherTab] || title;
-      if(screen === 'reserver' && isTeacher) title = 'Planning & disponibilités';
-      t.textContent = title;
-    }
-    /* Bouton de fermeture du menu coulissant (mobile) */
-    const sb = document.getElementById('sidebar');
-    if(sb && !sb.querySelector('.sidebar-close')){
-      const c = document.createElement('button');
-      c.type = 'button'; c.className = 'nav-btn sidebar-close'; c.style.display = 'none';
-      c.innerHTML = '<span class="tag" aria-hidden="true">✕</span> Fermer le menu';
-      c.onclick = ()=> closeDrawer(true);
-      sb.insertBefore(c, sb.firstChild);
-    }
-    if(sb){
-      sb.querySelectorAll('.nav-btn').forEach(b=>{
-        if(b.classList.contains('active')) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
-      });
-    }
-    setSidebarInert();
-  }
-
-  /* ---------------------------------------------------------------------------
-     3. TABLEAU DE BORD ÉLÈVE
-     --------------------------------------------------------------------------- */
-  function themeProgress(tema){
-    const t = (student.temas && student.temas[tema.id]) || {};
-    if(typeof tpIsV2 === 'function' && tpIsV2(tema)){
-      const lvl = (t.v2 && t.v2.niveau) || tpNiveauPour(tema, niveau, student.niveauTheme);
-      const d = tpLevelData(tema, lvl);
-      if(!d) return {done:0, total:0};
-      const st = {r:(t.v2&&t.v2.r)||{}, a:(t.v2&&t.v2.a)||{}, fb:(t.v2&&t.v2.fb)||{}};
-      return {done: d.activites.filter(a=>tpActDone(a, st)).length, total: d.activites.length, duree: d.duree};
-    }
-    const keys = ['co','ce','ee','eo'];
-    return {done: keys.filter(k=>t[k] && t[k].done).length, total: 4};
-  }
-  function dashboardHTML(){
-    const pack = student.pack || {};
-    const total = Number(pack.total) || 0, used = Number(pack.used) || 0;
-    const reste = Math.max(0, total - used);
-    return `<section class="dash-grid" aria-label="Tableau de bord">
-      <div class="dash-next-course" id="dash-next-course"></div>
-      <article class="dash-card dash-theme" id="dash-theme-card" aria-live="polite">
-        <h2>Thème de la semaine</h2>
-        <div class="ui-skeleton" style="height:22px; width:70%;"></div>
-        <div class="ui-skeleton" style="height:8px;"></div>
-      </article>
-      <article class="dash-card">
-        <h2>Mes dossiers</h2>
-        <p class="dash-main">Niveau ${niveau}</p>
-        <p class="dash-sub">Continue ton dossier là où tu t'es arrêté(e).</p>
-        <a class="btn btn-secondary" href="#dossier-grid">Voir mes dossiers</a>
-      </article>
-      ${total ? `<article class="dash-card">
-        <h2>Mon forfait</h2>
-        <p class="dash-main">${reste} séance${reste>1?'s':''} restante${reste>1?'s':''}</p>
-        <div class="dash-progress" role="img" aria-label="${used} séances utilisées sur ${total}"><span style="width:${Math.min(100, Math.round(100*used/total))}%"></span></div>
-        <p class="dash-sub">${used} / ${total} utilisées</p>
-        <button class="btn btn-secondary" type="button" onclick="goReserver()">Réserver un cours</button>
-      </article>` : `<article class="dash-card">
-        <h2>Mes cours</h2>
-        <p class="dash-main">Réserver un cours</p>
-        <p class="dash-sub">Choisis un créneau dans le calendrier.</p>
-        <button class="btn btn-secondary" type="button" onclick="goReserver()">Voir les créneaux</button>
-      </article>`}
-    </section>`;
-  }
-  async function fillThemeCard(){
-    const card = document.getElementById('dash-theme-card');
-    if(!card) return;
-    try{
-      if(typeof tpLoadConfig === 'function' && !tpConfig.loaded) await tpLoadConfig();
-      const id = typeof temaCourantId === 'function' ? (temaCourantId() || temaMostRecentVisibleId()) : temaMostRecentVisibleId();
-      const tema = getTema(id);
-      const p = themeProgress(tema);
-      const pct = p.total ? Math.round(100 * p.done / p.total) : 0;
-      const label = p.done === 0 ? 'Commencer' : (p.done >= p.total ? 'Revoir' : 'Continuer');
-      if(!document.getElementById('dash-theme-card')) return;
-      card.innerHTML = `<h2>Thème de la semaine</h2>
-        <p class="dash-main">${tema.titre_fr}</p>
-        <p class="dash-sub">${tema.periode}${p.duree ? ` · ${p.duree.min}–${p.duree.max} min` : ''}</p>
-        <div class="dash-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Progression du thème"><span style="width:${pct}%"></span></div>
-        <p class="dash-sub">${p.done} / ${p.total} activités terminées</p>
-        <button class="btn" type="button" onclick="goTemas()">${label} →</button>`;
-    }catch(e){
-      card.innerHTML = `<h2>Thème de la semaine</h2><p class="dash-sub">Le thème n'a pas pu être chargé.</p><button class="btn btn-secondary" type="button" onclick="goTemas()">Ouvrir le thème</button>`;
-    }
-  }
-  if(typeof window.renderDossiers === 'function'){
-    const baseRenderDossiers = window.renderDossiers;
-    window.renderDossiers = function(){
-      baseRenderDossiers();
-      if(isTeacher || (typeof isStudentExperimental === 'function' && isStudentExperimental())) return;
-      const c = document.getElementById('content');
-      const title = c && c.querySelector('h1.page-title');
-      if(!title) return;
-      title.textContent = `Bonjour ${student.prenom || ''} 👋`;
-      const eyebrow = c.querySelector('.eyebrow'); if(eyebrow) eyebrow.textContent = `Niveau ${niveau} · Tableau de bord`;
-      const wrap = document.createElement('div');
-      wrap.innerHTML = dashboardHTML();
-      title.after(wrap.firstElementChild);
-      /* Le prochain cours (bannière existante, remplie de façon asynchrone) prend la 1re place. */
-      const banner = document.getElementById('next-course-banner');
-      const slot = document.getElementById('dash-next-course');
-      if(banner && slot) slot.appendChild(banner);
-      const grid = document.getElementById('dossier-grid');
-      if(grid && !(grid.previousElementSibling && grid.previousElementSibling.matches('.section-title'))){
-        const h = document.createElement('h2'); h.className = 'section-title'; h.textContent = 'Mes dossiers';
-        grid.before(h);
-      }
-      fillThemeCard();
-    };
-  }
+  /* 2. NAVIGATION et 3. TABLEAU DE BORD : déplacés dans 15-navigation.js et
+     18-espace-eleve.js (architecture par rubriques). */
 
   /* ---------------------------------------------------------------------------
      4. ÉLÈVES & NIVEAUX : recherche et filtres
@@ -302,6 +65,7 @@
       sansNiveau: !s.niveau
     };
   }
+  window.uiStudentFlags = studentFlags;
   const FILTERS = [
     {id:'tous', label:'Tous'},
     {id:'anomalie', label:'⚠️ À traiter'},
@@ -360,6 +124,11 @@
       el.setAttribute('tabindex', '0');
     });
     (root || document).querySelectorAll('.dossier-card.locked').forEach(el=> el.setAttribute('aria-disabled', 'true'));
+    /* Tableaux affichés en cartes sur téléphone : chaque cellule reprend le titre de sa colonne. */
+    (root || document).querySelectorAll('table.ui-table').forEach(t=>{
+      const heads = Array.from(t.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+      t.querySelectorAll('tbody tr').forEach(tr=> Array.from(tr.children).forEach((td, i)=>{ if(heads[i] && !td.hasAttribute('data-label')) td.setAttribute('data-label', heads[i]); }));
+    });
     (root || document).querySelectorAll('iframe:not([title])').forEach(f=> f.setAttribute('title', 'Vidéo'));
     (root || document).querySelectorAll('.teacher-empty').forEach(el=>{ if(/Chargement/.test(el.textContent)) el.setAttribute('role', 'status'); });
     (root || document).querySelectorAll('textarea:not([aria-label]):not([id])').forEach(t=>{ if(t.placeholder) t.setAttribute('aria-label', t.placeholder); });
@@ -399,30 +168,11 @@
   });
 
   /* ---------------------------------------------------------------------------
-     RACCORDEMENT : après chaque rendu d'écran
+     RACCORDEMENT
      --------------------------------------------------------------------------- */
-  let lastScreenKey = null;
-  const baseRender = window.render;
-  window.render = function(){
-    baseRender.apply(this, arguments);
-    updateChrome();
-    const key = screen + '|' + (screen === 'teacher' ? teacherTab : '') + '|' + (screen === 'week' ? current : '');
-    if(lastScreenKey !== null && key !== lastScreenKey){
-      /* Nouvel écran : le focus va au contenu (lecteurs d'écran, clavier). */
-      const c = document.getElementById('content');
-      if(c && !(document.activeElement && document.activeElement.matches('input,textarea,select'))) c.focus({preventScroll:true});
-    }
-    lastScreenKey = key;
-  };
-  const baseSidebar = window.renderSidebar;
-  window.renderSidebar = function(){
-    baseSidebar.apply(this, arguments);
-    updateChrome();
-  };
   document.addEventListener('DOMContentLoaded', ()=>{
-    ensureChrome(); updateChrome();
     observer.observe(document.body, {childList:true, subtree:true});
     enhance(document);
   });
-  if(document.readyState !== 'loading'){ ensureChrome(); updateChrome(); observer.observe(document.body, {childList:true, subtree:true}); }
+  if(document.readyState !== 'loading'){ observer.observe(document.body, {childList:true, subtree:true}); }
 })();
