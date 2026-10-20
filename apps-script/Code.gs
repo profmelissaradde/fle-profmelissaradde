@@ -1916,11 +1916,13 @@ function handleListAvailableSlots(data, authCtx) {
     const query = {
       structuredQuery: {
         from: [{ collectionId: "disponibilites" }],
+        /* Créneaux libres = reservedBy à null. Firestore n'accepte la comparaison à null
+           que sous la forme IS_NULL : un filtre EQUAL + nullValue ne renvoie AUCUN document
+           (vérifié le 20/10/2026 : 0 résultat contre 146 avec IS_NULL). */
         where: {
-          fieldFilter: {
+          unaryFilter: {
             field: { fieldPath: "reservedBy" },
-            op: "EQUAL",
-            value: { nullValue: null }
+            op: "IS_NULL"
           }
         }
       }
