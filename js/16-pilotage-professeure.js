@@ -164,7 +164,7 @@ function profDashboardRender(){
       <span class="course-time">${uiIcon('clock')}${fmtSlotDate(s.date)}</span>
       <span class="course-who">${esc(s.reservedName || 'Élève')}${s.isExperimental ? ' <span class="badge badge-info">Cours expérimental</span>' : ''}${s.isPack ? '' : (s.paymentStatus === 'pending' ? ' <span class="badge badge-warning">Paiement en attente</span>' : '')}</span>
       ${rptBadgeHTML(s, true)}
-      <span class="course-actions">${s.zoomJoinUrl ? `<a class="btn btn-secondary btn-sm" href="${esc(s.zoomJoinUrl)}" target="_blank" rel="noopener">Ouvrir Zoom</a>` : '<span class="badge">Lien Zoom à venir</span>'}</span>
+      <span class="course-actions">${s.zoomJoinUrl ? `<button type="button" class="btn btn-secondary btn-sm" onclick="profOuvrirZoom('${s.id}')">Ouvrir Zoom</button>` : '<span class="badge">Lien Zoom à venir</span>'}</span>
     </li>`;
 
   const todo = [];
@@ -271,6 +271,13 @@ function profAnomalieDetailHTML(x){
   return `<div class="anomalie-detail">
     <p class="meta">${forfaitEtatHTML(etat)} ${motif ? `· Motif : ${motif}` : ''} · ${forfait} · <b>${FORFAIT_ETATS[etat] && FORFAIT_ETATS[etat].decompte ? 'décomptée du forfait' : 'non décomptée'}</b></p>
     ${forfaitPropositionHTML(x)}${forfaitDecisionFormHTML(x)}${forfaitHistoriqueHTML(x)}</div>`;
+}
+/* Ouvre Zoom depuis le tableau de bord EN ENREGISTRANT le clic (clickedByTeacher), comme le
+   bouton du planning : c'est ce clic qui prouve que le cours a eu lieu (voir 20-forfaits.js). */
+function profOuvrirZoom(slotId){
+  const s = ((profDash && profDash.slots) || []).find(x => x.id === slotId);
+  if(s && s.zoomJoinUrl) zoomUrlMap[slotId] = s.zoomJoinUrl;
+  openZoomLink(slotId);
 }
 function profAnomaliesRender(){
   const body = profBody(); if(!body) return;
