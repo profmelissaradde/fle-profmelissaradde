@@ -201,7 +201,7 @@ async function reglesReinitialiser(){
 
 /* ---- Onglet Paramètres › Réglages ---- */
 let paramSection = 'tarifs';
-const PARAM_SECTIONS = [['tarifs','Tarifs & forfaits'],['apparence','Apparence'],['profil','Mon profil'],['integrations','Intégrations']];
+const PARAM_SECTIONS = [['tarifs','Tarifs & forfaits'],['relances','Relances'],['apparence','Apparence'],['profil','Mon profil'],['integrations','Intégrations']];
 async function paramLoad(){
   const body = profBody(); if(!body) return;
   await plateformeCharger(true);
@@ -214,6 +214,7 @@ function paramRender(){
   let html = '';
   if(plateforme.erreur) html += `<p class="tp-warn">Lecture de config/plateforme impossible (${esc(plateforme.erreur)}). Les valeurs par défaut sont utilisées.</p>`;
   if(paramSection === 'tarifs') html += paramTarifsHTML();
+  if(paramSection === 'relances') html += paramRelancesHTML();
   if(paramSection === 'apparence') html += paramApparenceHTML();
   if(paramSection === 'profil') html += paramProfilHTML();
   if(paramSection === 'integrations') html += paramIntegrationsHTML();
@@ -265,6 +266,24 @@ async function paramTarifsEnregistrer(){
   catch(e){ uiNotify("Enregistrement impossible pour le moment (règles Firestore de config ?).", 'error'); }
 }
 
+function paramRelancesHTML(){
+  const r = Object.assign({actif:true, delaiJours:2, max:2}, plateforme.data.relances || {});
+  return `<section class="settings-card" aria-labelledby="rel-t"><h2 id="rel-t">Relances des propositions de report</h2>
+    <p class="page-intro">Quand un élève ne répond pas à une proposition de nouvelle date, l'Apps Script lui renvoie le même e-mail (mêmes boutons Accepter / Refuser). Une absence de réponse n'est jamais considérée comme une acceptation. Tu peux aussi relancer à la main depuis Cours › Reports & anomalies (au plus une fois toutes les 12 h).</p>
+    <label class="check-row"><input type="checkbox" id="rel-actif" ${r.actif !== false ? 'checked' : ''}> Relancer automatiquement</label>
+    <div class="form-grid">
+      <div class="field"><label for="rel-delai">Après combien de jours sans réponse</label><input id="rel-delai" type="number" min="1" max="14" value="${Number(r.delaiJours)||2}"></div>
+      <div class="field"><label for="rel-max">Nombre maximal de relances automatiques</label><input id="rel-max" type="number" min="0" max="5" value="${Number(r.max)||0}"></div>
+    </div>
+    <p class="field-help">Nécessite le déclencheur quotidien <code>relancerPropositionsAuto</code> dans l'Apps Script (voir apps-script/README.md).</p>
+    <div class="btn-row"><button type="button" class="btn" onclick="paramRelancesEnregistrer()">Enregistrer</button></div></section>`;
+}
+async function paramRelancesEnregistrer(){
+  const n = id => Number((document.getElementById(id) || {}).value);
+  const r = {actif: !!(document.getElementById('rel-actif') || {}).checked, delaiJours: Math.min(14, Math.max(1, Math.round(n('rel-delai')) || 2)), max: Math.min(5, Math.max(0, Math.round(n('rel-max')) || 0))};
+  try{ await plateformeEnregistrer({relances: r}, 'Réglage des relances modifié'); uiNotify('Relances enregistrées.', 'success'); paramRender(); }
+  catch(e){ uiNotify("Enregistrement impossible pour le moment.", 'error'); }
+}
 function paramApparenceHTML(){
   const a = Object.assign({}, PLATEFORME_DEFAUTS.apparence, plateforme.data.apparence || {});
   const s = Object.assign({}, PLATEFORME_DEFAUTS.apparence.saison, a.saison || {});

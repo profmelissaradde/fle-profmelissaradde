@@ -606,6 +606,7 @@ function doPost(e) {
     if (data.action === "respondReschedule") { return handleRespondReschedule(data, authCtx); }
     if (data.action === "applyTeacherReschedule") { return handleApplyTeacherReschedule(data, authCtx); }
     if (data.action === "retryZoomSync") { return handleRetryZoomSync(data, authCtx); }
+    if (data.action === "remindProposal") { return handleRemindProposal(data, authCtx); }
     if (data.action === "notifyPackPayment") { requireTeacher_(authCtx); return handleNotifyPackPayment(data); }
     if (data.action === "notifyPackBooked") { requireTeacher_(authCtx); return handleNotifyPackBooked(data); }
     if (data.action === "notifyPaymentReceived") { requireTeacher_(authCtx); return handleNotifyPaymentReceived(data); }
@@ -3808,7 +3809,7 @@ function handleRetryZoomSync(data, authCtx) {
 }
 
 /* ---------- 5. E-mails ---------- */
-function sendProposalEmail_(slot, slotId, proposal) {
+function sendProposalEmail_(slot, slotId, proposal, rappel) {
   const token = getFirestoreAccessToken_();
   const tz = getStudentTimezone_(fsBase_(), slot.reservedBy, token) || "America/Sao_Paulo";
   const oldStr = formatDateInTimezone_(new Date(slot.date), tz);
@@ -3831,7 +3832,8 @@ function sendProposalEmail_(slot, slotId, proposal) {
     actionButton_("Refuser", refuseUrl, "#b4233d") +
     `<p style="font-size:13px;color:#666;">Tu peux aussi répondre depuis ton espace de cours. Tant que tu n'as pas accepté, le cours n'est pas déplacé.</p>` +
     `<p>À bientôt,<br>Melissa</p></div>`;
-  MailApp.sendEmail(slot.reservedEmail, "Nouveau créneau proposé pour ton cours", corps, { htmlBody: html });
+  const sujet = rappel ? "Rappel : réponds à la proposition de nouveau créneau" : "Nouveau créneau proposé pour ton cours";
+  MailApp.sendEmail(slot.reservedEmail, sujet, rappel ? "(Rappel) " + corps : corps, { htmlBody: rappel ? `<p style="font-family:Arial,sans-serif;color:#8A5A12;"><strong>Rappel</strong> — tu n'as pas encore répondu à cette proposition.</p>` + html : html });
 }
 function sendTeacherProposalAnswerEmail_(slot, req, accepted, zoomStatus) {
   const name = slot.reservedName || "L'élève";
@@ -3869,4 +3871,81 @@ function renderProposalPage_(action, slotId, token) {
     `google.script.run.withSuccessHandler(function(m){b.style.display='none';r.innerHTML='<p><strong>'+m+'</strong></p>';})` +
     `.withFailureHandler(function(e){b.disabled=false;b.textContent=${JSON.stringify(button)};r.innerHTML='<p style="color:#b00020">'+e.message+'</p>';})` +
     `.processProposalAction(${JSON.stringify(action)},${JSON.stringify(slotId)},${JSON.stringify(token)});}</script></body></html>`);
+}
+
+
+/* ============================================================================
+   RELANCES DES PROPOSITIONS DE REPORT
+   - Manuelle (bouton « Relancer l'élève ») : au plus une toutes les 12 h.
+   - Automatique (déclencheur relancerPropositionsAuto, une fois par jour) : après
+     config/plateforme.relances.delaiJours jours sans réponse (2 par défaut), au plus
+     relances.max fois (2 par défaut) ; désactivable avec relances.actif = false.
+   Une relance renvoie le MÊME lien (même jeton) : aucune nouvelle proposition n'est créée.
+   Une absence de réponse n'est jamais une acceptation. Le forfait n'est jamais modifié.
+   ============================================================================ */
+const RPT_RELANCE_MIN_MS_ = 12 * 3600 * 1000;
+const RPT_RELANCE_TOTAL_MAX_ = 6;
+
+function rptRelancer_(slotId, via) {
+  return rptWithLock_(() => {
+    const token = getFirestoreAccessToken_();
+    const slot = rptLoadSlot_(slotId, token);
+    const req = slot.rescheduleRequest || null;
+    if (!req || req.by !== "teacher" || req.status !== "pending") throw new Error("Aucune proposition en attente de réponse pour ce cours.");
+    if (!slot.reservedEmail) throw new Error("Pas d'adresse e-mail pour cet élève : relance impossible par e-mail.");
+    if (req.expiresAt && new Date(req.expiresAt).getTime() <= Date.now()) throw new Error("Cette proposition a expiré : propose une nouvelle date.");
+    const last = req.lastReminderAt ? new Date(req.lastReminderAt).getTime() : 0;
+    if (last && Date.now() - last < RPT_RELANCE_MIN_MS_) throw new Error("Une relance a déjà été envoyée il y a moins de 12 heures.");
+    const n = Number(req.reminders || 0);
+    if (n >= RPT_RELANCE_TOTAL_MAX_) throw new Error("Nombre maximal de relances atteint pour cette proposition.");
+    sendProposalEmail_(slot, slotId, req, true);
+    const now = new Date().toISOString();
+    const upd = Object.assign({}, req, { reminders: n + 1, lastReminderAt: now });
+    if (via === "auto") upd.autoReminders = Number(req.autoReminders || 0) + 1;
+    rptPatch_(slotId, token, {
+      rescheduleRequest: upd,
+      rescheduleHistory: rptHistory_(slot, { type: "reminder", via: via, proposalId: req.id || null, n: n + 1 })
+    });
+    return { ok: true, reminders: n + 1 };
+  });
+}
+function handleRemindProposal(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    if (!data.slotId) throw new Error("slotId manquant");
+    return jsonResponse(rptRelancer_(data.slotId, "manuel"));
+  } catch (err) {
+    return jsonResponse({ ok: false, error: rptErrMsg_(err) });
+  }
+}
+function relancerPropositionsAuto() {
+  const token = getFirestoreAccessToken_();
+  let cfg = { actif: true, delaiJours: 2, max: 2 };
+  try {
+    const doc = getFirestoreDocument_(fsBase_(), "config", "plateforme", token);
+    const r = (firestoreFieldsToJs_(doc.fields || {}).relances) || {};
+    cfg = { actif: r.actif !== false, delaiJours: Math.max(1, Number(r.delaiJours) || 2), max: Math.max(0, Math.min(5, Number(r.max) || 2)) };
+  } catch (e) { /* valeurs par défaut */ }
+  if (!cfg.actif || !cfg.max) return { sent: 0 };
+  const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }],
+      where: { fieldFilter: { field: { fieldPath: "rescheduleRequest.status" }, op: "EQUAL", value: { stringValue: "pending" } } } } }),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) throw new Error("relancerPropositionsAuto : " + res.getContentText());
+  let sent = 0;
+  const now = Date.now();
+  (JSON.parse(res.getContentText()) || []).filter(r => r.document).forEach(r => {
+    const id = r.document.name.split("/").pop();
+    const slot = firestoreFieldsToJs_(r.document.fields || {});
+    const req = slot.rescheduleRequest || {};
+    if (req.by !== "teacher" || !slot.reservedEmail) return;
+    if (Number(req.autoReminders || 0) >= cfg.max) return;
+    if (req.expiresAt && new Date(req.expiresAt).getTime() <= now) return;
+    const depuis = new Date(req.lastReminderAt || req.createdAt || 0).getTime();
+    if (now - depuis < cfg.delaiJours * 86400000) return;
+    try { rptRelancer_(id, "auto"); sent++; } catch (e) { console.warn("Relance automatique impossible pour " + id + " : " + rptErrMsg_(e)); }
+  });
+  return { sent: sent };
 }

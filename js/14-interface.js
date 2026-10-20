@@ -58,9 +58,11 @@
     const p = (typeof packSlotsByStudent !== 'undefined' && packSlotsByStudent[s.id]) || null;
     const c = p && p.compteurs;
     const pack = s.pack || {};
+    const b = (typeof forfaitBilanEleve === 'function' && pack.total) ? forfaitBilanEleve(s) : null;
     return {
-      anomalie: !!(c && (c.anomalies > 0 || c.zoomAttente > 0)),
-      renouveler: !!(pack.total && p && p.upcoming <= 2),
+      anomalie: !!((c && (c.anomalies > 0 || c.zoomAttente > 0)) || (b && b.statut === 'a_regulariser')),
+      /* Solde réel du forfait : une anomalie non résolue ne déclenche jamais « à renouveler ». */
+      renouveler: !!(b && ['a_renouveler','termine','proche'].includes(b.statut)),
       paiement: !!(pack.paymentLinks && Object.keys(pack.paymentLinks).length && pack.paymentStatus !== 'paid'),
       sansNiveau: !s.niveau
     };

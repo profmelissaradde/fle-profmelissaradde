@@ -82,6 +82,7 @@ const NAV_MODEL = {
     {id:'parametres', label:'Paramètres', icon:'settings', tabs:[
       {tab:'parametres', label:'Réglages'},
       {screen:'regles', label:'Règles affichées'},
+      {tab:'controle', label:'Contrôle des forfaits'},
       {tab:'journal', label:"Journal d'activité"}]}
   ],
   eleve: [

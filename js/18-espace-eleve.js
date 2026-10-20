@@ -71,7 +71,7 @@ function eleveProgression(tema){ return profThemeProgress({temas: student.temas,
 function renderAccueil(){
   const c = document.getElementById('content'); if(!c) return;
   const pack = student.pack || {};
-  const total = Number(pack.total) || 0, used = Number(pack.used) || 0, reste = Math.max(0, total - used);
+  const total = Number(pack.total) || 0;
   c.innerHTML = `
     <div class="hello">${profilAvatarHTML(student, 'lg')}<div><p class="eyebrow">Niveau ${esc(niveau)} · Accueil</p><h1 class="page-title">Bonjour ${esc(student.nomAffiche || student.prenom || '')} 👋</h1></div></div>
     <div id="announcement-banner"></div>
@@ -80,11 +80,7 @@ function renderAccueil(){
       <div class="dash-next-course" id="next-course-banner"><div class="ui-skeleton" style="height:96px"></div></div>
       <article class="dash-card dash-theme" id="dash-theme-card" aria-live="polite"><h2>Thème de la semaine</h2><div class="ui-skeleton" style="height:22px;width:70%"></div></article>
       <article class="dash-card" id="dash-todo-card"><h2>À faire</h2><div class="ui-skeleton" style="height:60px"></div></article>
-      ${total ? `<article class="dash-card"><h2>Mon forfait</h2>
-        <p class="dash-main">${reste} séance${reste>1?'s':''} restante${reste>1?'s':''}</p>
-        <div class="dash-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${used}" aria-label="${used} séances utilisées sur ${total}"><span style="width:${Math.min(100, Math.round(100*used/total))}%"></span></div>
-        <p class="dash-sub">${used} / ${total} utilisées</p>
-        <button class="btn btn-secondary" type="button" onclick="goReserver()">Réserver un cours</button></article>`
+      ${total ? `<article class="dash-card" id="dash-forfait-card"><h2>Mon forfait</h2><div class="ui-skeleton" style="height:48px"></div></article>`
       : `<article class="dash-card"><h2>Mes cours</h2><p class="dash-main">Réserver un cours</p><p class="dash-sub">Choisis un créneau dans le calendrier.</p>
         <button class="btn btn-secondary" type="button" onclick="goReserver()">Voir les créneaux</button></article>`}
       <article class="dash-card"><h2>Mes dossiers</h2><p class="dash-main">Niveau ${esc(niveau)}</p><p class="dash-sub">Continue ton dossier là où tu t'es arrêté(e).</p>
@@ -95,6 +91,22 @@ function renderAccueil(){
   if(typeof renderAnnouncementBanner === 'function') renderAnnouncementBanner();
   if(typeof renderPackPaymentBanner === 'function') renderPackPaymentBanner();
   accueilRemplir();
+}
+/* Solde du forfait de l'élève connecté (ses propres séances, lecture autorisée par les règles). */
+async function eleveForfaitBilan(){
+  if(isTeacher || !student || !student.uid || !(student.pack && Number(student.pack.total))) return null;
+  try{
+    const snap = await db.collection('disponibilites').where('reservedBy', '==', student.uid).get();
+    return forfaitBilan(student, snap.docs.map(d=>({id:d.id, ...d.data()})));
+  }catch(e){ return null; }
+}
+function eleveForfaitCarteHTML(b){
+  const pct = b.total ? Math.min(100, Math.round(100 * b.utilisees / b.total)) : 0;
+  return `<h2>Mon forfait</h2>
+    <p class="dash-main">${b.restantes} séance${b.restantes>1?'s':''} restante${b.restantes>1?'s':''}</p>
+    <div class="dash-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${b.total}" aria-valuenow="${b.utilisees}" aria-label="${b.utilisees} séances utilisées sur ${b.total}"><span style="width:${pct}%"></span></div>
+    <p class="dash-sub">${b.utilisees} / ${b.total} utilisées${b.programmees ? ` · ${b.programmees} programmée${b.programmees>1?'s':''}` : ''}${b.anomalies ? ` · ${b.anomalies} à reprogrammer (non décomptée${b.anomalies>1?'s':''})` : ''}</p>
+    ${b.reservables ? `<button class="btn btn-secondary" type="button" onclick="goReserver()">Voir mes cours</button>` : ''}`;
 }
 async function accueilRemplir(){
   try{ await Promise.all([(typeof tpLoadConfig === 'function' && !tpConfig.loaded) ? tpLoadConfig() : null, plateformeCharger()]); }catch(e){}
@@ -131,9 +143,16 @@ async function accueilRemplir(){
     if(corr) items.push(`<li><button type="button" class="todo-link" onclick="screen='exercices'; render()">${uiIcon('pen')}<span>${corr} réponse${corr>1?'s':''} à revoir après correction</span></button></li>`);
     const unread = navUnreadEleve();
     if(unread) items.push(`<li><button type="button" class="todo-link" onclick="goMessages()">${uiIcon('chat')}<span>${unread} message${unread>1?'s':''} de Melissa</span></button></li>`);
-    const pack = student.pack || {};
-    const reste = Math.max(0, (Number(pack.total)||0) - (Number(pack.used)||0));
-    if(pack.total && reste <= 1) items.push(`<li><button type="button" class="todo-link" onclick="goMessages()">${uiIcon('wallet')}<span>${reste ? 'Plus qu\'une séance' : 'Plus de séance'} dans ton forfait : parle du renouvellement avec Melissa</span></button></li>`);
+    /* Forfait : solde réel calculé à partir des séances (20-forfaits.js). */
+    const fb = await eleveForfaitBilan();
+    if(fb){
+      fb.seances.filter(x => x.etat === 'report_propose').forEach(x => items.unshift(`<li><button type="button" class="todo-link" onclick="document.getElementById('next-course-banner').scrollIntoView({behavior:'smooth'})">${uiIcon('calendar')}<span>Melissa te propose une nouvelle date pour ton cours du ${fmtSlotDate(x.s.date)} : confirme ou refuse</span></button></li>`));
+      const sansProp = fb.seances.filter(x => x.etat === 'anomalie').length;
+      if(sansProp) items.push(`<li><span class="todo-link">${uiIcon('clock')}<span>${sansProp} cours n'${sansProp>1?'ont':'a'} pas eu lieu : ${sansProp>1?'ils restent':'il reste'} dans ton forfait, Melissa va te proposer une nouvelle date.</span></span></li>`);
+      if(['termine','a_renouveler'].includes(fb.statut)) items.push(`<li><button type="button" class="todo-link" onclick="goMessages()">${uiIcon('wallet')}<span>${fb.statut === 'termine' ? 'Ton forfait est terminé' : 'Toutes les séances de ton forfait sont programmées'} : parle du renouvellement avec Melissa</span></button></li>`);
+      const fc = document.getElementById('dash-forfait-card');
+      if(fc) fc.innerHTML = eleveForfaitCarteHTML(fb);
+    }
     todo.innerHTML = `<h2>À faire</h2>${items.length ? `<ul class="todo-simple">${items.join('')}</ul>` : `<p class="dash-sub">${uiIcon('check')} Tout est à jour. Bravo !</p>`}`;
   }
 }
@@ -160,7 +179,7 @@ async function renderProfilEleve(){
   await eleveChargerProfil(true);
   if(screen !== 'profil') return;
   const s = student, pack = s.pack || {}, prefs = s.preferences || {}, notif = s.notifications || {};
-  const total = Number(pack.total) || 0, used = Number(pack.used) || 0, reste = Math.max(0, total - used);
+  const total = Number(pack.total) || 0;
   const opts = (liste, v) => liste.map(([k,l]) => `<option value="${k}" ${v===k?'selected':''}>${l}</option>`).join('');
   const tema = niveau ? eleveThemeCourant() : null;
   const prog = tema ? eleveProgression(tema) : null;
@@ -170,7 +189,7 @@ async function renderProfilEleve(){
     <section class="dash-grid" aria-label="Mon parcours">
       <article class="dash-card"><h2>Niveau</h2><p class="dash-main">${s.niveau ? esc(s.niveau) : 'En cours d\'attribution'}</p><p class="dash-sub">Attribué par ta professeure.</p></article>
       ${prog ? `<article class="dash-card"><h2>Thème en cours</h2><p class="dash-main">${prog.done} / ${prog.total}</p><p class="dash-sub">${tema.titre_fr}</p></article>` : ''}
-      <article class="dash-card"><h2>Forfait</h2>${total ? `<p class="dash-main">${reste} séance${reste>1?'s':''} restante${reste>1?'s':''}</p><p class="dash-sub">${used} / ${total} utilisées${pack.paymentStatus === 'paid' ? ' · payé' : ''}</p>` : '<p class="dash-sub">Aucun forfait en cours.</p>'}</article>
+      <article class="dash-card" id="profil-forfait-card"><h2>Forfait</h2>${total ? '<div class="ui-skeleton" style="height:40px"></div>' : '<p class="dash-sub">Aucun forfait en cours.</p>'}</article>
       ${s.frequence ? `<article class="dash-card"><h2>Rythme</h2><p class="dash-main">${s.frequence} séance${s.frequence>1?'s':''} / semaine</p></article>` : ''}
     </section>
     <form class="settings-card" id="profil-form" onsubmit="event.preventDefault(); profilEnregistrer()" novalidate>
@@ -205,6 +224,7 @@ async function renderProfilEleve(){
     <h2 class="section-title">Mes dossiers</h2>
     <div id="profil-dossiers"></div>`;
   if(typeof window.profilDossiersHTML === 'function') document.getElementById('profil-dossiers').innerHTML = window.profilDossiersHTML(s);
+  if(total){ const fb = await eleveForfaitBilan(); const el = document.getElementById('profil-forfait-card'); if(el && fb) el.innerHTML = eleveForfaitCarteHTML(fb) + (pack.paymentStatus === 'paid' ? '<p class="dash-sub">Paiement reçu.</p>' : ''); }
 }
 registerScreen('profil', ()=>{ if(!isTeacher) renderProfilEleve(); });
 

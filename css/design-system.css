@@ -206,7 +206,7 @@ label{color:var(--c-text);}
 .alert{border-radius:var(--r-md); padding:var(--sp-3) var(--sp-4); font-size:var(--fs-sm); line-height:1.55; border:1px solid transparent;}
 
 /* ---- Tableaux ---- */
-.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--r-md); border:1px solid var(--c-border);}
+.table-wrap{position:relative; overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--r-md); border:1px solid var(--c-border);}
 
 /* ---- Notifications (remplacent alert()) ---- */
 .ui-toasts{position:fixed; z-index:10050; left:50%; transform:translateX(-50%); bottom:calc(var(--sp-6) + env(safe-area-inset-bottom)); width:min(560px, calc(100vw - 24px)); display:flex; flex-direction:column; gap:var(--sp-2); pointer-events:none;}
