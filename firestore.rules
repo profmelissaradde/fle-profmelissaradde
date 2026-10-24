@@ -420,5 +420,27 @@ service cloud.firestore {
         && request.resource.data.ts == request.time;
       allow get, list: if isTeacher();
     }
+
+    // =========================================================
+    // SUIVI DES COURS — écrit par l'Apps Script (compte de service,
+    // hors règles). Historique en ajout seul : jamais modifié ni supprimé.
+    // =========================================================
+    match /evenementsCours/{docId} {
+      allow get, list: if isTeacher()
+        || (isSignedIn() && resource.data.eleveId == request.auth.uid);
+      // Décisions prises par Melissa depuis la plateforme (séance réalisée, statut corrigé).
+      allow create: if isTeacher()
+        && request.resource.data.auteur == 'administratrice'
+        && request.resource.data.type in ['lesson_completed', 'lesson_status_corrected']
+        && request.resource.data.details is string && request.resource.data.details.size() <= 1500;
+      allow update, delete: if false;
+    }
+
+    match /notificationsProf/{docId} {
+      allow get, list: if isTeacher();
+      allow update: if isTeacher()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lu', 'luAt']);
+      allow create, delete: if false;
+    }
   }
 }
