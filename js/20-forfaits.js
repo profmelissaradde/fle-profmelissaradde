@@ -181,7 +181,7 @@ async function forfaitDecider(slotId, decision, motif){
   if(typeof journaliser === 'function') journaliser('seance', `Décision sur une séance : ${def.label}`, {seance: slotId, motif, avant, apres});
   uiNotify('Décision enregistrée.', 'success');
   if(typeof loadPackSlotsByStudent === 'function') await loadPackSlotsByStudent();
-  if(typeof profCache !== 'undefined') profCache.slotsAt = 0;
+  if(typeof SEANCES !== 'undefined') SEANCES.at = 0;
   return {ok:true};
 }
 /* Formulaire inline de décision (évite les fenêtres prompt()). */

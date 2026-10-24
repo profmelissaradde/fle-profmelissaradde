@@ -50,7 +50,7 @@ async function loadExperimentalAdmin(){
   }
   try{
     const slotsSnap = await db.collection('disponibilites').where('isExperimental','==',true).get();
-    experimentalSlots = slotsSnap.docs.map(d=>({id:d.id, ...d.data()}))
+    experimentalSlots = slotsSnap.docs.map(d=>({id:d.id, ...d.data()})).filter(s => s.isExperimental === true)
       .sort((a,b)=> new Date(a.date) - new Date(b.date));
   }catch(e){
     console.error(e);
@@ -343,49 +343,21 @@ async function copyExperimentalLink(){
 }
 
 let studentsData = [];
-let openBilanId = null;
-/* Un seul élève à la fois peut avoir ses liens de paiement de forfait dépliés
-   dans cette liste — repliés par défaut, pour ne pas afficher en permanence
-   11 champs d'URL (PIX, 2×Débito, 2×4 Crédito) pour chaque élève, y compris
-   ceux qui n'ont même pas de forfait. */
-let packLinksOpenId = null;
-function togglePackLinks(id){
-  packLinksOpenId = (packLinksOpenId === id) ? null : id;
-  renderTeacherStudentsList();
-}
-/* Un seul élève à la fois a son panneau d'édition (niveau/rythme/forfait/
-   liens/actions) déplié — replié par défaut pour que la liste reste lisible :
-   chaque élève n'affiche qu'un résumé en lecture seule tant qu'on ne clique
-   pas sur "✏️ Gérer". */
-let editOpenId = null;
-function toggleEditStudent(id){
-  editOpenId = (editOpenId === id) ? null : id;
-  if(editOpenId !== id){ packLinksOpenId = null; }
-  renderTeacherStudentsList();
-}
-/* Séances de forfait (isPack:true) de tous les élèves, regroupées par élève —
-   une seule requête pour tout le monde plutôt qu'une par élève. Sert à
-   afficher l'avancement réel (passées/à venir) et à savoir quand proposer un
-   renouvellement, dans renderStudentsFlatList ci-dessous. */
 let packSlotsByStudent = {};
 async function loadPackSlotsByStudent(){
-  try{
-    const snap = await db.collection('disponibilites').where('isPack','==',true).get();
-    const now = Date.now();
-    packSlotsByStudent = {};
-    /* Une séance en anomalie n'est ni « effectuée » ni « à venir » ; une séance
-       reportée et acceptée redevient « à venir » (voir rptCompteurs, 13-reports-seances.js). */
-    const parEleve = {};
-    snap.docs.forEach(d=>{
-      const slot = {id:d.id, ...d.data()};
-      if(!slot.reservedBy) return;
-      (parEleve[slot.reservedBy] = parEleve[slot.reservedBy] || []).push(slot);
-    });
-    Object.keys(parEleve).forEach(uid=>{
-      const c = rptCompteurs(parEleve[uid], now);
-      packSlotsByStudent[uid] = {past:c.effectuees, upcoming:c.aVenir, nextDate:c.nextDate, compteurs:c, slots:parEleve[uid]};
-    });
-  }catch(e){ packSlotsByStudent = {}; }
+  /* Séances de forfait regroupées par élève, à partir de la source commune (22-seances.js). */
+  await seancesCharger();
+  const now = Date.now();
+  const parEleve = {};
+  SEANCES.liste.forEach(slot=>{
+    if(slot.isPack !== true || !slot.reservedBy) return;
+    (parEleve[slot.reservedBy] = parEleve[slot.reservedBy] || []).push(slot);
+  });
+  packSlotsByStudent = {};
+  Object.keys(parEleve).forEach(uid=>{
+    const c = rptCompteurs(parEleve[uid], now);
+    packSlotsByStudent[uid] = {past:c.effectuees, upcoming:c.aVenir, nextDate:c.nextDate, compteurs:c, slots:parEleve[uid]};
+  });
 }
 async function loadTeacherStudents(){
   const body = document.getElementById('teacher-body');
@@ -409,79 +381,6 @@ async function loadTeacherStudentsQuiet(){
     );
   }catch(e){ studentsData = []; }
 }
-function toggleBilanEditor(id){
-  openBilanId = (openBilanId === id) ? null : id;
-  renderTeacherStudentsList();
-}
-function bilanEditorHTML(s){
-  if(!s.niveau){
-    return `<div class="rec-box" style="margin-top:10px;">
-      <p class="rec-consigne">Attribue d'abord un niveau à ${s.prenom} avant de remplir un bilan (le bilan est rattaché à un niveau + un dossier).</p>
-      <button onclick="toggleBilanEditor('${s.id}')" style="background:none; color:var(--grey); border:none; font-weight:700; cursor:pointer;">Fermer</button>
-    </div>`;
-  }
-  /* Cet éditeur rapide (accessible directement depuis la liste des élèves) reste
-     volontairement figé sur le Dossier 0 : CURRENT_DOSSIER_NUM est un pointeur
-     partagé avec la navigation élève/aperçu-cours et ne doit pas influencer cet
-     écran. Pour noter le Dossier 1 (ou un autre), utiliser l'onglet complet de
-     la fiche élève (« Dossiers & bilans », dans 10-profils-regles-evaluations.js),
-     qui prend le numéro de dossier en paramètre explicite. */
-  const key = bilanKey(s.niveau, 0);
-  const b = (s.bilans && s.bilans[key]) || {};
-  const items = b.items || [];
-  const rows = bilanItems.map((t,i)=>`
-    <label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:6px;">
-      <input type="checkbox" id="bchk-${s.id}-${i}" ${items[i] ? 'checked' : ''}> ${t}
-    </label>
-  `).join('');
-  return `<div class="rec-box" style="margin-top:10px;">
-    <p class="rec-consigne" style="font-weight:700;">📝 Bilan final — ${s.prenom} ${s.nom} · Niveau ${s.niveau} · Dossier 0</p>
-    ${rows}
-    <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:10px;">Note / 20
-      <input type="number" id="bnote20-${s.id}" min="0" max="20" step="0.5" value="${b.note20 != null ? b.note20 : ''}" placeholder="ex: 15" style="display:block; width:100px; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;">
-    </label>
-    <textarea id="bnote-${s.id}" placeholder="Commentaire pour l'élève (optionnel)" style="width:100%; min-height:60px; margin-top:8px; padding:8px; border:1px solid var(--line); border-radius:7px; font-family:'Inter',sans-serif; font-size:13.5px;">${b.note || ''}</textarea>
-    <div class="teacher-entry-actions" style="margin-top:8px;">
-      <button onclick="saveBilan('${s.id}','${key}')">Enregistrer le bilan</button>
-      <button onclick="toggleBilanEditor('${s.id}')" style="background:none; color:var(--grey);">Fermer</button>
-    </div>
-  </div>`;
-}
-async function saveBilan(id, key){
-  const items = bilanItems.map((t,i)=> document.getElementById(`bchk-${id}-${i}`).checked);
-  const note = document.getElementById(`bnote-${id}`).value.trim();
-  const note20Raw = document.getElementById(`bnote20-${id}`).value;
-  const note20 = note20Raw === '' ? null : parseFloat(note20Raw);
-  try{
-    await db.collection('eleves').doc(id).update({
-      [`bilans.${key}`]: { items, note, note20, date: new Date().toISOString() }
-    });
-    openBilanId = null;
-  }catch(e){ alert("Impossible d'enregistrer le bilan pour le moment."); }
-  await loadTeacherStudents();
-}
-function completionStats(completedMap){
-  const entries = Object.values(completedMap || {});
-  const total = entries.length;
-  const weekAgo = Date.now() - 7*24*3600*1000;
-  let thisWeek = 0;
-  entries.forEach(ts=>{
-    try{
-      const d = (ts && ts.toDate) ? ts.toDate() : new Date(ts);
-      if(d.getTime() >= weekAgo) thisWeek++;
-    }catch(e){ /* ignore */ }
-  });
-  return {total, thisWeek};
-}
-/* Total toutes activités confondues, tous dossiers déjà construits (dossiersContent) —
-   recalculé sur l'objet complet plutôt que sur le seul pointeur "weeks" (qui ne
-   pointe que vers le dossier actuellement affiché ailleurs dans l'app). */
-const TOTAL_ACTIVITIES = Object.values(dossiersContent).reduce((sum,ws)=> sum + ws.reduce((s2,w)=>s2+w.days.length,0), 0);
-function reminderMailto(s){
-  const subject = "Petit rappel — cours de français";
-  const body = `Bonjour ${s.prenom},\n\nJe vois que tu n'as pas encore beaucoup avancé sur tes activités cette semaine. N'hésite pas à t'y remettre un peu avant notre prochaine séance !\n\nÀ bientôt,\nMelissa`;
-  return `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
 /* Liste riche (paiement/forfait/bilan rapide) construite ici. Le NOM
    "renderTeacherStudentsList" est volontairement laissé libre pour
    10-profils-regles-evaluations.js, qui s'en sert comme petit aiguilleur :
@@ -490,178 +389,51 @@ function reminderMailto(s){
    Sans ce partage de nom, l'un des deux fichiers écrase silencieusement
    l'autre selon l'ordre de chargement — c'est exactement le bug qu'on vient
    de trouver. */
+/* Liste des élèves : un résumé par élève et un seul bouton vers sa fiche, où se
+   trouvent toutes les modifications (niveau, rythme, forfait, liens, paiement,
+   nota, bilans). L'ancien panneau « Gérer » faisait double emploi avec la fiche. */
+const ELEVES_FILTRES = [['tous','Tous'],['anomalie','À régulariser'],['renouveler','Forfait à renouveler'],['paiement','Paiement en attente'],['sansNiveau','Sans niveau']];
+let elevesFiltre = {f:'tous', q:''};
+function uiSetStudentFilter(f){ elevesFiltre.f = f; renderStudentsFlatList(); }
+function uiSearchStudents(v){
+  elevesFiltre.q = v; renderStudentsFlatList();
+  const i = document.getElementById('ui-student-search'); if(i){ i.focus(); i.setSelectionRange(v.length, v.length); }
+}
 function renderStudentsFlatList(){
   const body = document.getElementById('teacher-body');
   if(!body) return;
-  if(studentsData.length===0){ body.innerHTML = '<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>'; return; }
-  body.innerHTML = studentsData.map(s=>{
-    const niveauOpts = ['', ...niveauxMenu.map(n=>n.code)].map(code=>
-      `<option value="${code}" ${((s.niveau||'')===code) ? 'selected' : ''}>${code || '— Non assigné —'}</option>`
-    ).join('');
-    const freqOpts = ['', 1, 2, 3, 4, 5].map(f=>
-      `<option value="${f}" ${(String(s.frequence||'')===String(f)) ? 'selected' : ''}>${f ? f+' séance'+(f>1?'s':'')+'/semaine' : '— Rythme non défini —'}</option>`
-    ).join('');
-    /* Progression Dossier 0 uniquement dans ce résumé rapide (voir la note plus haut
-       sur bilanKey(s.niveau, 0)). Gère aussi les anciennes fiches où uniteCourante
-       était encore une simple chaîne au lieu de { [numéroDossier]: tag }. */
-    let progressText = 'Pas encore commencé';
-    const uc0 = typeof s.uniteCourante === 'string' ? s.uniteCourante : (s.uniteCourante && s.uniteCourante[0]);
-    if(uc0){
-      const w = weeksD0.find(x=>x.tag===uc0);
-      if(w) progressText = `Unité ${w.id}/5 — ${w.title_fr}`;
-    }
-    const stats = completionStats(s.completed);
-    const behind = stats.thisWeek < 3;
-    const pack = s.pack || {};
-    const packTotal = pack.total || 0;
-    return `<div class="teacher-entry">
-      <div class="who">${s.prenom} ${s.nom} ${s.niveau ? '· <span style="color:var(--ok)">Niveau '+s.niveau+'</span>' : '· <span style="color:var(--bad)">non attribué</span>'}</div>
-      <div class="meta">${s.email} · ${s.telephone || '—'} · inscrit le ${fmtDate(s.createdAt)}</div>
-      <div class="meta">📍 Progression (Dossier 0) : ${progressText} ${s.niveau && s.bilans && s.bilans[bilanKey(s.niveau, 0)] ? `· <span style="color:var(--ok)">bilan Dossier 0 complété</span>${(s.bilans[bilanKey(s.niveau, 0)].note20 != null) ? ` · 📝 <b>${s.bilans[bilanKey(s.niveau, 0)].note20}/20</b>` : ''}` : ''}</div>
-      <div class="meta">✅ ${stats.total}/${TOTAL_ACTIVITIES} activités faites au total · <b style="color:${behind ? 'var(--bad)' : 'var(--ok)'}">${stats.thisWeek} cette semaine</b>${behind ? ' ⚠️ moins de la moitié' : ''}</div>
-      <div class="meta">📦 Forfait : ${packTotal ? `${forfaitResumeHTML(forfaitBilanEleve(s))} ${forfaitStatutHTML(forfaitBilanEleve(s))}` : 'aucun forfait défini'}${(pack.paymentLinks && Object.keys(pack.paymentLinks).length) ? ` · <span style="color:${pack.paymentStatus==='paid' ? 'var(--ok)' : 'var(--bad)'};">💳 ${pack.paymentStatus==='paid' ? 'Payé' : 'Paiement en attente'}</span>` : ''}</div>
-      ${(()=>{
-        if(!packTotal) return '';
-        const p = packSlotsByStudent[s.id] || {past:0, upcoming:0, nextDate:null};
-        /* Alerte de renouvellement : solde réel du forfait (anomalies et séances programmées comprises). */
-        const bf = forfaitBilanEleve(s);
-        const renewSoon = ['a_renouveler','termine','proche'].includes(bf.statut);
-        const c = p.compteurs || {effectuees:p.past, aVenir:p.upcoming, anomalies:0, zoomAttente:0};
-        return `<div class="meta">${rptCompteursHTML(c)}${p.nextDate ? ` (prochaine le ${fmtSlotDate(p.nextDate)})` : ''}${renewSoon ? ` · <span style="color:var(--bad); font-weight:700;">⚠️ ${bf.statut === 'termine' ? 'Forfait terminé : à renouveler' : 'Pense à renouveler le forfait bientôt'}</span>` : (bf.statut === 'a_regulariser' ? ` · <span style="color:var(--c-danger); font-weight:700;">À régulariser avant tout renouvellement</span>` : '')}</div>`;
-      })()}
-
-      <div class="teacher-entry-actions" style="margin-top:8px;">
-        <button onclick="toggleEditStudent('${s.id}')">${editOpenId===s.id ? 'Fermer' : '✏️ Gérer'}</button>
-        <button onclick="openAdminStudent('${s.id}')" style="background:none; color:var(--navy);">📁 Fiche complète (tous les dossiers)</button>
-        ${behind ? `<a href="${reminderMailto(s)}" class="del" style="text-decoration:none;">📧 Envoyer un rappel</a>` : ''}
-      </div>
-
-      ${editOpenId === s.id ? `
-      <div class="rec-box" style="margin-top:10px;">
-        <div class="teacher-entry-actions">
-          <select id="niv-${s.id}">${niveauOpts}</select>
-          <select id="freq-${s.id}">${freqOpts}</select>
-          <label style="font-size:12px; color:var(--grey);">Forfait (${FORFAIT_MIN}-${FORFAIT_MAX} séances) <input type="number" id="packtotal-${s.id}" min="${FORFAIT_MIN}" max="${FORFAIT_MAX}" value="${packTotal || ''}" style="width:60px; margin-left:4px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;"></label>
-        </div>
-        <div style="width:100%; margin-top:8px;">
-          ${(()=>{
-            const filledCount = PAYMENT_METHODS.filter(m=>pack.paymentLinks && pack.paymentLinks[m.key]).length
-              + CREDIT_BRANDS.reduce((sum,b)=> sum + (pack.paymentLinks && pack.paymentLinks[b.key] ? Object.keys(pack.paymentLinks[b.key]).length : 0), 0);
-            return `<button onclick="togglePackLinks('${s.id}')" style="background:none; color:var(--navy); font-size:12px;">${packLinksOpenId===s.id ? 'Fermer' : `💳 Liens de paiement du forfait (${filledCount} renseigné${filledCount>1?'s':''})`}</button>`;
-          })()}
-          ${packLinksOpenId===s.id ? `
-            <div style="margin-top:8px;">
-              <p style="font-size:12px; color:var(--grey); font-weight:700; margin:0 0 4px;">L'élève choisit celui qui lui convient parmi ceux que tu remplis</p>
-              ${PAYMENT_METHODS.map(m=>`
-                <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
-                  ${m.label}
-                  <input type="url" id="packlink-${s.id}-${m.key}" value="${(pack.paymentLinks && pack.paymentLinks[m.key]) || ''}" placeholder="https://..." style="width:100%; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
-                </label>
-              `).join('')}
-              ${CREDIT_BRANDS.map(b=>`
-                <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:6px;">${b.label}</p>
-                <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis.</p>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  ${INSTALLMENTS.map(n=>`
-                    <label style="font-size:10.5px; color:var(--grey);">
-                      ${n}x
-                      <input type="url" id="packlink-${s.id}-${b.key}-${n}" value="${(pack.paymentLinks && pack.paymentLinks[b.key] && pack.paymentLinks[b.key][n]) || ''}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:4px 6px; border:1px solid var(--line); border-radius:5px;">
-                    </label>
-                  `).join('')}
-                </div>
-              `).join('')}
-            </div>
-          ` : ''}
-        </div>
-        <div class="teacher-entry-actions" style="margin-top:8px;">
-          <button onclick="saveStudentNiveau('${s.id}')">Enregistrer</button>
-          <button onclick="toggleBilanEditor('${s.id}')">📝 Bilan final</button>
-          ${packTotal && pack.paymentStatus !== 'paid' ? `<button onclick="markPackPaid('${s.id}')" style="background:none; color:var(--ok);">✅ Forfait payé</button>` : ''}
-        </div>
-        ${
-          pack.paymentStatus === 'paid' && !pack.notaFiscalSent
-            ? `
-              <div class="rec-box" style="margin-top:8px;">
-                <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal du forfait</p>
-                ${pack.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${pack.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
-                <input type="file" id="nota-pack-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
-                <div class="teacher-entry-actions">
-                  <button onclick="sendNotaFiscalPack('${s.id}', 'nota-pack-${s.id}')">Téléverser et envoyer</button>
-                </div>
-              </div>
-            `
-            : ''
-        }
-        ${
-          pack.notaFiscalSent
-            ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal du forfait envoyée — <a href="${pack.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
-            : ''
-        }
-        ${openBilanId === s.id ? bilanEditorHTML(s) : ''}
-      </div>
-      ` : ''}
-    </div>`;
+  if(studentsData.length === 0){ body.innerHTML = profEmptyHTML('users', 'Aucun élève inscrit pour le moment', ''); return; }
+  const flags = s => uiStudentFlags(s);
+  const q = elevesFiltre.q.trim().toLowerCase();
+  const liste = studentsData.filter(s => (elevesFiltre.f === 'tous' || flags(s)[elevesFiltre.f]) && (!q || `${s.prenom||''} ${s.nom||''} ${s.email||''}`.toLowerCase().includes(q)));
+  const n = f => f === 'tous' ? studentsData.length : studentsData.filter(s => flags(s)[f]).length;
+  const now = Date.now();
+  const lignes = liste.map(s => {
+    const f = flags(s);
+    const b = s.pack && s.pack.total ? forfaitBilanEleve(s) : null;
+    const prochain = (SEANCES.liste || []).filter(x => x.reservedBy === s.id && !x.experimentalCancelled && !x.definitivelyCancelled && new Date(x.date).getTime() > now)[0];
+    const etats = [
+      f.anomalie ? '<span class="badge badge-danger">À régulariser</span>' : '',
+      f.renouveler ? '<span class="badge badge-warning">À renouveler</span>' : '',
+      f.paiement ? '<span class="badge badge-warning">Paiement en attente</span>' : '',
+      !s.niveau ? '<span class="badge">Sans niveau</span>' : ''
+    ].join(' ').trim();
+    return `<tr>
+      <td><button type="button" class="link-btn" onclick="openAdminStudent('${s.id}')">${esc(s.prenom)} ${esc(s.nom || '')}</button><br><span class="tp-dim">${esc(s.email || '')}</span></td>
+      <td>${s.niveau ? esc(s.niveau) : '—'}</td>
+      <td>${b ? `${b.utilisees}/${b.total} utilisées · <b>${b.restantes}</b> restante${b.restantes>1?'s':''}` : '<span class="tp-dim">Aucun forfait</span>'}</td>
+      <td>${prochain ? `<button type="button" class="link-btn" onclick="seanceOuvrir('${prochain.id}')">${fmtSlotDate(prochain.date)}</button>` : '—'}</td>
+      <td>${etats || '<span class="tp-dim">À jour</span>'}</td>
+      <td><button type="button" class="btn btn-secondary btn-sm" onclick="openAdminStudent('${s.id}')">Ouvrir la fiche</button></td></tr>`;
   }).join('');
-}
-async function saveStudentNiveau(id){
-  const niv = document.getElementById('niv-'+id).value;
-  const freq = document.getElementById('freq-'+id).value;
-  const packTotalRaw = document.getElementById('packtotal-'+id).value;
-  const s = studentsData.find(x=>x.id===id);
-  const updates = {
-    niveau: niv || null,
-    frequence: freq ? parseInt(freq, 10) : null
-  };
-  if(packTotalRaw !== ''){
-    const packTotalVal = parseInt(packTotalRaw, 10) || 0;
-    if(packTotalVal < FORFAIT_MIN || packTotalVal > FORFAIT_MAX){
-      alert(`Un forfait doit contenir entre ${FORFAIT_MIN} et ${FORFAIT_MAX} séances.`);
-      return;
-    }
-    updates['pack.total'] = packTotalVal;
-    if(!(s && s.pack && typeof s.pack.used === 'number')){ updates['pack.used'] = 0; }
-  }
-  /* Liens de paiement (comme pour un cours à l'unité) — l'élève choisit celui
-     qui lui convient. On ne les réenregistre (et on ne renvoie l'e-mail) que
-     si au moins un lien a effectivement changé, pour ne pas spammer l'élève à
-     chaque simple mise à jour de niveau/fréquence. Le Crédito a jusqu'à 4
-     liens par bandeira (1x/2x/3x/4x), un lien C6 correspondant à un nombre
-     de fois précis. */
-  const newLinks = {};
-  PAYMENT_METHODS.forEach(m=>{
-    const el = document.getElementById(`packlink-${id}-${m.key}`);
-    const val = el ? el.value.trim() : '';
-    if(val) newLinks[m.key] = val;
-  });
-  CREDIT_BRANDS.forEach(b=>{
-    const obj = {};
-    INSTALLMENTS.forEach(n=>{
-      const el = document.getElementById(`packlink-${id}-${b.key}-${n}`);
-      const val = el ? el.value.trim() : '';
-      if(val) obj[n] = val;
-    });
-    if(Object.keys(obj).length) newLinks[b.key] = obj;
-  });
-  const existingLinks = (s && s.pack && s.pack.paymentLinks) || {};
-  const linksChanged = JSON.stringify(newLinks) !== JSON.stringify(existingLinks);
-  if(linksChanged && Object.keys(newLinks).length){
-    updates['pack.paymentLinks'] = newLinks;
-    updates['pack.paymentStatus'] = 'pending';
-  }
-  try{
-    await db.collection('eleves').doc(id).update(updates);
-  }catch(e){ alert("Impossible d'enregistrer pour le moment."); return; }
-  if(linksChanged && Object.keys(newLinks).length && s){
-    try{
-      await callDriveScript({
-        action: 'notifyPackPayment',
-        email: s.email,
-        prenom: s.prenom,
-        paymentLinks: newLinks
-      });
-    }catch(e){ /* non bloquant — les liens restent visibles sur la plateforme même si l'e-mail échoue */ }
-  }
-  await loadTeacherStudents();
+  body.innerHTML = `
+    <div class="ui-filters" role="group" aria-label="Filtrer les élèves">
+      ${ELEVES_FILTRES.map(([id,l])=>`<button type="button" class="ui-chip" aria-pressed="${elevesFiltre.f===id}" onclick="uiSetStudentFilter('${id}')">${l}<span class="n">${n(id)}</span></button>`).join('')}
+    </div>
+    <div class="field field-search"><label for="ui-student-search">Rechercher un élève (nom, e-mail)</label><input type="search" id="ui-student-search" value="${esc(elevesFiltre.q)}" oninput="uiSearchStudents(this.value)" autocomplete="off"></div>
+    <p class="ui-results" aria-live="polite">${liste.length} élève${liste.length>1?'s':''}${elevesFiltre.f !== 'tous' || q ? ` sur ${studentsData.length}` : ''}</p>
+    ${liste.length ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Niveau</th><th scope="col">Forfait</th><th scope="col">Prochain cours</th><th scope="col">État</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${lignes}</tbody></table></div>`
+      : profEmptyHTML('users', 'Aucun élève ne correspond', '')}`;
 }
 async function markPackPaid(id){
   const s = studentsData.find(x=>x.id===id);

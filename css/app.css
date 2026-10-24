@@ -787,3 +787,94 @@ body.sans-pt .lecon-accroche-pt, body.sans-pt .pt-title{display:none!important;}
 .audit-list li.grave{color:var(--c-danger);}
 .audit-list li.grave .btn{color:var(--c-primary-ink);}
 .nouveau-forfait h4{margin:0 0 var(--sp-2);}
+
+/* =============================================================================
+   RÉORGANISATION (octobre 2026) — composants communs : listes de séances, fiche
+   séance, agenda, priorités. Mêmes jetons partout ; une couleur = un sens :
+   rouge = à faire maintenant / erreur, ambre = attente, bleu = information,
+   vert = confirmé / réalisé, rose = accent décoratif uniquement.
+   ============================================================================= */
+[hidden]{display:none!important;}
+.page-actions{display:flex; flex-wrap:wrap; gap:var(--sp-2); margin:0 0 var(--sp-5);}
+.sub-title{font-size:var(--fs-md); font-weight:650; margin:var(--sp-5) 0 var(--sp-2); color:var(--c-text);}
+.field-label{font-size:var(--fs-sm); font-weight:600; margin:var(--sp-3) 0 var(--sp-2);}
+.field-search{max-width:360px;}
+.form-grid-4{grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));}
+.count-pill{display:inline-grid; place-items:center; min-width:24px; height:24px; padding:0 8px; margin-left:var(--sp-2); border-radius:var(--r-pill); background:var(--c-surface-2); color:var(--c-text-2); font-size:var(--fs-xs); font-weight:700; vertical-align:middle;}
+.count-pill.danger{background:var(--c-danger-bg); color:var(--c-danger);}
+.link-btn{background:none; border:0; padding:0; color:var(--c-primary-ink); font-weight:600; text-align:left; text-decoration:underline; text-decoration-color:var(--c-rose); text-underline-offset:3px; min-height:0;}
+.link-btn:hover{color:var(--c-primary-hover);}
+.dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin:0 4px 0 10px; vertical-align:middle;}
+.dot-primary{background:var(--c-primary);} .dot-success{background:var(--c-success);}
+
+/* ---- Liste de séances (agenda, à traiter, historique, fiche élève, tableau de bord) ---- */
+.seance-list > li{display:flex; align-items:center; gap:var(--sp-2);}
+.seance-list > li > .seance-row{flex:1; min-width:0;}
+.seance-zoom{flex:none;}
+.seance-list,.event-list{list-style:none; margin:0 0 var(--sp-4); padding:0; display:flex; flex-direction:column; gap:var(--sp-2);}
+.seance-row,.event-row{width:100%; display:grid; grid-template-columns:minmax(150px, 220px) minmax(120px, 1fr) minmax(0, 1.4fr) 20px; align-items:center; gap:var(--sp-3);
+  padding:var(--sp-3) var(--sp-4); background:var(--c-surface); border:1px solid var(--c-border); border-radius:var(--r-md); text-align:left; font:inherit; color:inherit; box-shadow:var(--shadow-1);
+  transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);}
+.seance-row:hover,.event-row:hover{border-color:var(--c-primary); box-shadow:var(--shadow-2);}
+.seance-row:active{transform:translateY(1px);}
+.seance-row.no-who{grid-template-columns:minmax(150px, 240px) minmax(0, 1fr) 20px;}
+.seance-when{font-weight:600; font-variant-numeric:tabular-nums;}
+.seance-who{font-weight:500; overflow-wrap:anywhere;}
+.seance-meta{display:flex; flex-wrap:wrap; align-items:center; gap:6px var(--sp-2); font-size:var(--fs-sm);}
+.seance-detail{width:100%; color:var(--c-text-2); font-size:var(--fs-xs);}
+.seance-go{color:var(--c-text-2); font-size:20px; justify-self:end;}
+.event-row{display:block; font-size:var(--fs-sm);}
+.event-row .tp-dim{font-size:var(--fs-xs);}
+@media (max-width: 700px){
+  .seance-row{grid-template-columns:1fr 16px; gap:4px var(--sp-2);}
+  .seance-when,.seance-who,.seance-meta{grid-column:1;}
+  .seance-go{grid-column:2; grid-row:1 / span 3;}
+}
+
+/* ---- Agenda ---- */
+.agenda{display:grid; grid-template-columns:300px minmax(0, 1fr); gap:var(--sp-6); align-items:start;}
+.agenda-cal{position:sticky; top:var(--sp-4);}
+.agenda-legend{margin-top:var(--sp-2);}
+.agenda-day{margin-bottom:var(--sp-4);}
+.agenda-day-title{font-size:var(--fs-sm); font-weight:650; color:var(--c-text-2); margin:0 0 var(--sp-2);}
+.agenda-day-title::first-letter{text-transform:uppercase;}
+@media (max-width: 900px){ .agenda{grid-template-columns:1fr;} .agenda-cal{position:static;} }
+
+/* ---- Fiche séance (panneau latéral sur ordinateur, plein écran sur téléphone) ---- */
+dialog.sheet{position:fixed; inset:0 0 0 auto; margin:0; width:min(560px, 100vw); height:100dvh; max-height:100dvh; max-width:100vw; padding:0; border:0;
+  background:var(--c-surface); color:var(--c-text); box-shadow:var(--shadow-3); border-left:1px solid var(--c-border);}
+dialog.sheet[open]{animation:sheet-in .22s var(--ease);}
+dialog.sheet::backdrop{background:rgba(31,42,58,.38);}
+@keyframes sheet-in{from{transform:translateX(24px); opacity:0;} to{transform:none; opacity:1;}}
+.sheet-body{height:100%; overflow-y:auto; padding:var(--sp-6); padding-bottom:calc(var(--sp-10) + env(safe-area-inset-bottom));}
+.sheet-head{display:flex; justify-content:space-between; align-items:flex-start; gap:var(--sp-3); padding-bottom:var(--sp-4); margin-bottom:var(--sp-2); border-bottom:1px solid var(--c-border);}
+.sheet-head h2{font-size:var(--fs-xl); margin:0 0 var(--sp-2);}
+.sheet-section{padding:var(--sp-4) 0; border-bottom:1px solid var(--c-border);}
+.sheet-section:last-child{border-bottom:0;}
+.sheet-section h3{font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.07em; color:var(--c-rose-ink); margin:0 0 var(--sp-3);}
+.sheet-line{margin:0 0 var(--sp-2);}
+.sheet-callout{background:var(--c-surface-2); border-radius:var(--r-md); padding:var(--sp-3) var(--sp-4); margin:0 0 var(--sp-3); border-left:4px solid var(--c-info);}
+.sheet-callout.warning{border-left-color:#C08A2E; background:var(--c-warning-bg);}
+.sheet-callout.danger{border-left-color:var(--c-danger); background:var(--c-danger-bg);}
+.sheet-callout p{margin:0 0 var(--sp-2);}
+.choice-list{list-style:none; padding:0; margin:var(--sp-2) 0; display:flex; flex-direction:column; gap:var(--sp-2);}
+.choice-list li{display:flex; justify-content:space-between; align-items:center; gap:var(--sp-3); background:var(--c-surface); border:1px solid var(--c-border); border-radius:var(--r-sm); padding:var(--sp-2) var(--sp-3);}
+.btn-icon{display:inline-grid; place-items:center; width:var(--tap); height:var(--tap); border:1px solid var(--c-border); border-radius:var(--r-sm); background:var(--c-surface); color:var(--c-text-2); flex:none;}
+.btn-icon:hover{background:var(--c-surface-2); color:var(--c-text);}
+@media (max-width: 700px){ dialog.sheet{width:100vw; border-left:0;} .sheet-body{padding:var(--sp-4);} }
+
+/* ---- Tableau de bord par priorité ---- */
+.dash-urgent{margin-bottom:var(--sp-5); border-left:4px solid var(--c-success);}
+.dash-urgent.has-items{border-left-color:var(--c-danger);}
+.dash-urgent h2{display:flex; align-items:center; gap:var(--sp-2);}
+.dash-calm{display:flex; align-items:center; gap:var(--sp-2); margin:0; color:var(--c-success);}
+
+/* ---- Formulaires de création ---- */
+.pack-dates{display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--sp-2) var(--sp-4); margin-bottom:var(--sp-3);}
+.pack-date-row{display:flex; align-items:center; gap:var(--sp-2); flex-wrap:wrap;}
+.pack-date-n{width:24px; color:var(--c-text-2); font-size:var(--fs-sm); font-variant-numeric:tabular-nums;}
+.profil-faits{margin:0 0 var(--sp-5); color:var(--c-text);}
+
+.dash-cols.dash-main-cols{grid-template-columns:minmax(0,2fr) minmax(280px,1fr);}
+.dash-main-cols .dash-wide{grid-column:auto;}
+@media (max-width: 1000px){ .dash-cols.dash-main-cols{grid-template-columns:1fr;} }

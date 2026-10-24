@@ -53,7 +53,7 @@ function navRole(){
   return 'eleve';
 }
 /* Compteurs affichés dans le menu (calculés ailleurs, lus ici). */
-const navCounts = {aTraiter:0, notifs:0, demandes:0};
+const navCounts = {aTraiter:0, notifs:0};
 function navUnreadProf(){ return typeof teacherUnreadTotal === 'function' ? teacherUnreadTotal() : 0; }
 function navUnreadEleve(){ return typeof studentUnreadCount !== 'undefined' ? studentUnreadCount : 0; }
 
@@ -62,12 +62,12 @@ const NAV_MODEL = {
     {id:'accueil', label:'Tableau de bord', icon:'home', tabs:[{tab:'accueil', label:"Vue d'ensemble"}]},
     {id:'eleves', label:'Élèves', icon:'users', tabs:[
       {tab:'eleves', label:'Tous les élèves'},
-      {tab:'experimental', label:'Cours expérimental'}]},
-    {id:'cours', label:'Cours', icon:'calendar', badge:()=>navCounts.aTraiter + navCounts.demandes, tabs:[
-      {tab:'dispo', label:'Planning & disponibilités'},
-      {tab:'confirmations', label:'Confirmations & demandes', badge:()=>navCounts.demandes},
-      {tab:'anomalies', label:'Reports & anomalies', badge:()=>navCounts.aTraiter},
-      {tab:'historique', label:'Historique & récapitulatifs'}]},
+      {tab:'experimental', label:"Cours d'essai"}]},
+    {id:'cours', label:'Cours', icon:'calendar', badge:()=>navCounts.aTraiter, tabs:[
+      {tab:'dispo', label:'Agenda'},
+      {tab:'atraiter', label:'À traiter', badge:()=>navCounts.aTraiter},
+      {tab:'historique', label:'Historique'},
+      {tab:'disponibilites', label:'Disponibilités'}]},
     {id:'pedagogie', label:'Pédagogie', icon:'book', tabs:[
       {tab:'temas', label:'Thèmes de la semaine'},
       {screen:'temas', also:['dossiers','week','bilan'], label:'Aperçu élève', apercu:true},
@@ -75,16 +75,18 @@ const NAV_MODEL = {
       {tab:'rec', label:'Enregistrements'},
       {tab:'ressources', label:'Ressources'},
       {screen:'survie', label:'Phrases de survie'}]},
-    {id:'finances', label:'Finances', icon:'wallet', tabs:[{tab:'finances', label:'Forfaits & paiements'}]},
+    {id:'finances', label:'Forfaits & paiements', icon:'wallet', tabs:[
+      {tab:'finances', label:"Vue d'ensemble"},
+      {tab:'forfait-nouveau', label:'Nouveau forfait'},
+      {tab:'controle', label:'Contrôle des forfaits'}]},
     {id:'communication', label:'Communication', icon:'chat', badge:()=>navUnreadProf() + navCounts.notifs, tabs:[
-      {tab:'messages', label:'Messages', badge:navUnreadProf},
       {tab:'notifications', label:'Notifications', badge:()=>navCounts.notifs},
+      {tab:'messages', label:'Messages', badge:navUnreadProf},
       {tab:'annonces', label:'Annonces'},
       {screen:'forum', label:'Forum'}]},
     {id:'parametres', label:'Paramètres', icon:'settings', tabs:[
       {tab:'parametres', label:'Réglages'},
       {screen:'regles', label:'Règles affichées'},
-      {tab:'controle', label:'Contrôle des forfaits'},
       {tab:'journal', label:"Journal d'activité"}]}
   ],
   eleve: [

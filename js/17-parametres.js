@@ -4,7 +4,7 @@
 
    config/plateforme = {
      tarifs:    {prixCours, remise (0–0,5), forfaitMin, forfaitMax},
-     apparence: {palette: "sauge" | "bleu-rose" | "perso", primaire, accent,
+     apparence: {palette: "bleu-rose" (défaut) | "sauge" | "perso", primaire, accent,
                  saison: {actif, nom, accent, debut, fin}},
      regles:    [{titre, texte}],          // texte de la page « Règles & fonctionnement »
      profil:    {nomAffiche, presentation, avatar}
@@ -14,7 +14,7 @@
 
 const PLATEFORME_DEFAUTS = {
   tarifs: {prixCours: 87, remise: 0.10, forfaitMin: 5, forfaitMax: 16},
-  apparence: {palette: 'sauge', primaire: '', accent: '', saison: {actif:false, nom:'', accent:'', debut:'', fin:''}},
+  apparence: {palette: 'bleu-rose', primaire: '', accent: '', saison: {actif:false, nom:'', accent:'', debut:'', fin:''}},
   profil: {nomAffiche: 'Melissa Radde', presentation: '', avatar: ''}
 };
 const plateforme = {charge:false, chargement:null, data:{}, erreur:null};
@@ -68,7 +68,7 @@ function apparenceThemeUtilisateur(){
 function apparenceAppliquer(app){
   app = app || {};
   const root = document.documentElement;
-  const palette = app.palette === 'bleu-rose' ? 'bleu-rose' : 'sauge';
+  const palette = app.palette === 'sauge' ? 'sauge' : 'bleu-rose';
   root.setAttribute('data-palette', palette);
   let theme = (student && student.apparence) || apparenceThemeUtilisateur();
   if(!['clair','sombre','auto'].includes(theme)) theme = 'clair';
@@ -146,7 +146,7 @@ async function plateformeEnregistrer(patch, libelle){
 const REGLES_DEFAUT = [
   {titre:'Réservation et replanification', texte:'Les cours sont réservés depuis la plateforme selon les créneaux disponibles. Une demande de déplacement peut être faite tant que le cours est à plus d’une heure de son début.'},
   {titre:'Annulation tardive et absence', texte:'Une annulation ou une absence à moins d’une heure du cours est considérée comme tardive. Deux tolérances sont prévues sur une période de 30 jours.'},
-  {titre:'Forfaits', texte:'Les forfaits contiennent entre {FORFAIT_MIN} et {FORFAIT_MAX} séances. Le nombre de séances utilisées et restantes est visible dans « Mon profil ».'},
+  {titre:'Forfaits', texte:'Les forfaits contiennent entre {FORFAIT_MIN} et {FORFAIT_MAX} séances. Le nombre de séances utilisées et restantes est visible sur ton accueil et dans « Mes cours › Historique ».'},
   {titre:'Suivi pédagogique', texte:'Chaque dossier possède son propre bilan. Lorsqu’un dossier est terminé et évalué, il apparaît comme « Accompli ».'},
   {titre:'Communication', texte:'La messagerie de la plateforme est le point de contact privilégié pour les questions liées aux cours et à l’organisation.'}
 ];
@@ -201,20 +201,21 @@ async function reglesReinitialiser(){
 
 /* ---- Onglet Paramètres › Réglages ---- */
 let paramSection = 'tarifs';
-const PARAM_SECTIONS = [['tarifs','Tarifs & forfaits'],['relances','Relances'],['apparence','Apparence'],['profil','Mon profil'],['integrations','Intégrations']];
+const PARAM_SECTIONS = [['tarifs','Tarifs & forfaits'],['automatisations','Annulations & automatisations'],['apparence','Apparence'],['profil','Mon profil'],['integrations','Intégrations']];
 async function paramLoad(){
   const body = profBody(); if(!body) return;
   await plateformeCharger(true);
   if(profOnTab('parametres')) paramRender();
 }
-function paramSetSection(id){ paramSection = id; paramRender(); }
+function paramSetSection(id){ paramSection = ['relances','confirmation'].includes(id) ? 'automatisations' : id; paramRender(); }
 function paramRender(){
   const body = profBody(); if(!body) return;
   const nav = `<div class="ui-filters" role="group" aria-label="Sections des réglages">${PARAM_SECTIONS.map(([id,l])=>`<button type="button" class="ui-chip" aria-pressed="${paramSection===id}" onclick="paramSetSection('${id}')">${l}</button>`).join('')}</div>`;
   let html = '';
   if(plateforme.erreur) html += `<p class="tp-warn">Lecture de config/plateforme impossible (${esc(plateforme.erreur)}). Les valeurs par défaut sont utilisées.</p>`;
   if(paramSection === 'tarifs') html += paramTarifsHTML();
-  if(paramSection === 'relances') html += paramRelancesHTML();
+  if(['relances','confirmation'].includes(paramSection)) paramSection = 'automatisations';
+  if(paramSection === 'automatisations') html += paramAutomatisationsHTML() + paramConfirmationHTML() + paramRelancesHTML();
   if(paramSection === 'apparence') html += paramApparenceHTML();
   if(paramSection === 'profil') html += paramProfilHTML();
   if(paramSection === 'integrations') html += paramIntegrationsHTML();
@@ -269,7 +270,7 @@ async function paramTarifsEnregistrer(){
 function paramRelancesHTML(){
   const r = Object.assign({actif:true, delaiJours:2, max:2}, plateforme.data.relances || {});
   return `<section class="settings-card" aria-labelledby="rel-t"><h2 id="rel-t">Relances des propositions de report</h2>
-    <p class="page-intro">Quand un élève ne répond pas à une proposition de nouvelle date, l'Apps Script lui renvoie le même e-mail (mêmes boutons Accepter / Refuser). Une absence de réponse n'est jamais considérée comme une acceptation. Tu peux aussi relancer à la main depuis Cours › Reports & anomalies (au plus une fois toutes les 12 h).</p>
+    <p class="page-intro">Quand un élève ne répond pas à une proposition de nouvelle date, l'Apps Script lui renvoie le même e-mail (mêmes boutons Accepter / Refuser). Une absence de réponse n'est jamais considérée comme une acceptation. Tu peux aussi relancer à la main depuis la fiche de la séance (au plus une fois toutes les 12 h).</p>
     <label class="check-row"><input type="checkbox" id="rel-actif" ${r.actif !== false ? 'checked' : ''}> Relancer automatiquement</label>
     <div class="form-grid">
       <div class="field"><label for="rel-delai">Après combien de jours sans réponse</label><input id="rel-delai" type="number" min="1" max="14" value="${Number(r.delaiJours)||2}"></div>
@@ -292,8 +293,8 @@ function paramApparenceHTML(){
   return `<section class="settings-card" aria-labelledby="app-t"><h2 id="app-t">Palette de la plateforme</h2>
     <p class="page-intro">Appliquée à tous les élèves. Les couleurs dont le contraste serait insuffisant sont refusées.</p>
     <div class="choice-grid" role="radiogroup" aria-label="Palette">
-      ${choix('sauge','Sauge (par défaut)','Ivoire, sauge, vert doux, rose poudré')}
-      ${choix('bleu-rose','Bleu profond & rose','Bleu profond, bleu clair, rose doux, blanc cassé')}
+      ${choix('bleu-rose','Bleu & rose (par défaut)','Bleu profond, bleu clair, rose doux, blanc cassé')}
+      ${choix('sauge','Sauge','Ivoire, sauge, vert doux, rose poudré')}
       ${choix('perso','Personnalisée','Tes propres couleurs principale et d\'accent')}
     </div>
     <div class="form-grid" id="app-perso" ${a.palette==='perso' ? '' : 'hidden'}>
@@ -319,7 +320,7 @@ function paramApparenceHTML(){
       </div></section>`;
 }
 function paramApparenceLire(){
-  const pal = (document.querySelector('input[name="app-palette"]:checked') || {}).value || 'sauge';
+  const pal = (document.querySelector('input[name="app-palette"]:checked') || {}).value || 'bleu-rose';
   const v = id => (document.getElementById(id) || {}).value || '';
   return {palette: pal, primaire: pal === 'perso' ? v('app-prim') : '', accent: pal === 'perso' ? v('app-acc') : '',
     saison: {actif: !!(document.getElementById('sai-actif') || {}).checked, nom: v('sai-nom').slice(0,40), accent: v('sai-acc'), debut: v('sai-debut'), fin: v('sai-fin')}};
@@ -371,14 +372,7 @@ function paramIntegrationsHTML(){
       <div class="status-row" id="int-zoom"><b>Synchronisations Zoom</b><span class="badge">Vérification…</span></div>
     </div>
     <p class="page-intro">Zoom n'est jamais appelé depuis le navigateur : les identifiants restent dans les propriétés de ton Apps Script. Les profils, niveaux et réponses vivent dans Firestore (protégés par les règles de sécurité) ; les fichiers audio et les notas fiscais dans ton Google Drive.</p>
-    <h3 class="dash-sub-title">Automatisations de l'Apps Script</h3>
-    <ul class="tp-list">
-      <li>Rappel par e-mail 24 h avant chaque cours, avec confirmer / annuler / reporter.</li>
-      <li>Annulation automatique des cours non payés.</li>
-      <li>Propositions de report et confirmations par e-mail, déplacement de la réunion Zoom.</li>
-      <li>Nouvelle tentative de synchronisation Zoom toutes les 10 minutes (déclencheur <code>retryZoomSyncs</code>).</li>
-    </ul>
-    <p class="tp-dim">Pour modifier ces automatismes (horaires, textes), il faut changer l'Apps Script puis déployer une nouvelle version : voir apps-script/README.md.</p></section>`;
+    <p class="tp-dim">Les e-mails et tâches automatiques sont décrits dans Annulations & automatisations.</p></section>`;
 }
 async function paramIntegrationsVerifier(){
   const set = (id, ok, txt) => { const el = document.getElementById(id); if(el) el.querySelector('.badge').outerHTML = `<span class="badge ${ok===true?'badge-success':ok===false?'badge-danger':'badge-warning'}">${txt}</span>`; };
@@ -424,11 +418,10 @@ registerTeacherTab('journal', ()=>journalLoad());
 
 
 /* ---- Paramètres › Confirmation des cours (rappel 24 h, H-1) ---- */
-PARAM_SECTIONS.splice(2, 0, ['confirmation', 'Confirmation des cours']);
 function paramConfirmationHTML(){
   const c = Object.assign({annulationAuto:false}, plateforme.data.confirmation || {});
-  return `<section class="settings-card" aria-labelledby="conf-t"><h2 id="conf-t">Confirmation des cours</h2>
-    <p class="page-intro">L'élève reçoit un rappel 24 h avant son cours, avec trois boutons : Confirmer, Annuler, Demander à déplacer. Il peut aussi confirmer depuis son espace. Chaque réponse apparaît dans Cours › Confirmations & demandes et dans la fiche de l'élève.</p>
+  return `<section class="settings-card" aria-labelledby="conf-t"><h2 id="conf-t">Confirmation des cours et annulation à H-1</h2>
+    <p class="page-intro">L'élève reçoit un rappel 24 h avant son cours, avec trois boutons : Confirmer, Annuler, Demander à déplacer. Il peut aussi confirmer depuis son espace. Chaque réponse apparaît dans Cours › À traiter, dans la fiche de la séance et dans celle de l'élève.</p>
     <label class="check-row"><input type="checkbox" id="conf-auto" ${c.annulationAuto === true ? 'checked' : ''}> Annuler automatiquement un cours non confirmé 1 h avant le début</label>
     <p class="field-help">Désactivé : tu reçois seulement une notification « cours non confirmé » et le cours est maintenu. Activé : le créneau est libéré et l'annulation compte comme une annulation tardive (2 tolérances sur 30 jours glissants, au-delà la séance est décomptée). Jamais d'annulation automatique si le rappel n'a pas été envoyé, si l'élève a demandé un déplacement ou pour un cours expérimental.</p>
     <p class="field-help">Nécessite le déclencheur <code>annulerCoursNonConfirmes</code> (toutes les 10 minutes) dans l'Apps Script (voir apps-script/README.md).</p>
@@ -440,11 +433,20 @@ async function paramConfirmationEnregistrer(){
   try{ await plateformeEnregistrer({confirmation: {annulationAuto: actif}}, actif ? 'Annulation automatique à H-1 activée' : 'Annulation automatique à H-1 désactivée'); uiNotify('Réglage enregistré.', 'success'); paramRender(); }
   catch(e){ uiNotify("Enregistrement impossible pour le moment.", 'error'); }
 }
-{
-  const _paramRender = paramRender;
-  paramRender = function(){
-    _paramRender();
-    if(paramSection !== 'confirmation') return;
-    const body = profBody(); if(body) body.insertAdjacentHTML('beforeend', paramConfirmationHTML());
-  };
+
+/* Vue d'ensemble de tout ce que l'Apps Script fait seul : un seul endroit pour comprendre
+   et régler les automatisations (auparavant décrites dans Annonces, Relances et Intégrations). */
+function paramAutomatisationsHTML(){
+  const c = plateforme.data.confirmation || {}, r = Object.assign({actif:true, delaiJours:2, max:2}, plateforme.data.relances || {});
+  const ligne = (titre, quand, etat, ton) => `<div class="status-row"><span><b>${titre}</b><br><span class="tp-dim">${quand}</span></span><span class="badge ${ton ? 'badge-' + ton : ''}">${etat}</span></div>`;
+  return `<section class="settings-card" aria-labelledby="auto-t"><h2 id="auto-t">E-mails et tâches automatiques</h2>
+    <p class="page-intro">Ce que la plateforme fait seule, sans action de ta part. Les réglages modifiables sont juste en dessous ; les autres demandent une nouvelle version de l'Apps Script (voir apps-script/README.md).</p>
+    <div class="status-list">
+      ${ligne('Rappel 24 h avant chaque cours', 'E-mail avec Confirmer / Annuler / Demander à déplacer', 'Toujours actif', 'success')}
+      ${ligne('Cours non confirmé à H-1', c.annulationAuto === true ? 'Le cours est annulé (tolérances appliquées)' : 'Tu es seulement prévenue, le cours est maintenu', c.annulationAuto === true ? 'Annulation automatique' : 'Notification seulement', c.annulationAuto === true ? 'warning' : '')}
+      ${ligne('Relance des propositions de report', `Après ${r.delaiJours} jour${r.delaiJours>1?'s':''} sans réponse, au plus ${r.max} fois`, r.actif !== false ? 'Actif' : 'Désactivé', r.actif !== false ? 'success' : '')}
+      ${ligne('Cours à l\'unité non payés', 'Annulés environ 1 h avant le début si le paiement n\'est pas reçu', 'Toujours actif', 'success')}
+      ${ligne('Synchronisation Zoom', 'Nouvelle tentative toutes les 10 minutes en cas d\'échec', 'Toujours actif', 'success')}
+    </div>
+    <p class="field-help">Règle d'annulation : jusqu'à 1 h avant le cours, l'annulation est libre et la séance est rendue au forfait. Moins d'1 h avant (ou cours non confirmé à H-1 si l'annulation automatique est active) : 2 tolérances sur 30 jours glissants, puis la séance est décomptée.</p></section>`;
 }

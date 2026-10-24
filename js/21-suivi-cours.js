@@ -61,170 +61,6 @@ function suiviEvenementHTML(e){
 }
 
 /* ---------------------------------------------------------------------------
-   ONGLET PROFESSEURE : Cours › Confirmations et demandes
-   --------------------------------------------------------------------------- */
-let suiviCentre = {filtre:'tous', recherche:'', ouvert:null, data:null};
-const SUIVI_FILTRES = [['tous','Tous'],['confirme','Confirmations'],['annulations','Annulations'],['deplacements','Demandes de déplacement'],['attente','En attente'],['auto','Annulations automatiques'],['erreurs','Erreurs de synchronisation']];
-async function suiviCentreLoad(){
-  const body = profBody(); if(!body) return;
-  const now = Date.now();
-  const depuis = new Date(now - 14*24*3600000).toISOString();
-  if(typeof plateformeCharger === 'function'){ try{ await plateformeCharger(); }catch(e){} }
-  try{
-    const [snapS, snapE] = await Promise.all([
-      db.collection('disponibilites').where('date', '>=', depuis).get(),
-      db.collection('evenementsCours').where('at', '>=', new Date(now - 60*24*3600000).toISOString()).get().catch(()=>({docs:[]}))
-    ]);
-    const slots = snapS.docs.map(d=>({id:d.id, ...d.data()})).filter(s => s.date >= depuis);
-    const events = snapE.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=> String(b.at).localeCompare(String(a.at)));
-    suiviCentre.data = {slots, events, now};
-  }catch(e){
-    if(profOnTab('confirmations')) body.innerHTML = `<p class="tp-warn">Lecture impossible pour le moment (${esc(e.message || e)}).</p>`;
-    return;
-  }
-  if(profOnTab('confirmations')) suiviCentreRender();
-}
-function suiviCentreLignes(){
-  const {slots, events, now} = suiviCentre.data;
-  const lignes = [];
-  slots.forEach(s=>{
-    if(!s.reservedBy) return;
-    const debut = new Date(s.date).getTime();
-    const statut = suiviStatutCli(s);
-    if(debut < now - 2*3600000 && String(statut).indexOf('annule') !== 0) return;   /* cours passés : suivis dans Reports & anomalies */
-    const v = (s.suivi && s.suivi.date === s.date) ? s.suivi : null;
-    lignes.push({id:s.id, slot:s, eleveId:s.reservedBy, nom:s.reservedName || 'Élève', date:s.date, statut,
-      reponse: v ? `${SUIVI_CANAUX[v.canal] || v.canal}${v.par === 'administratrice' ? ' (Melissa)' : ''}` : (s.confirmed && s.confirmedAt ? 'e-mail' : '—'),
-      reponduLe: v ? v.at : (s.confirmed && s.confirmedAt ? (s.confirmedAt.toDate ? s.confirmedAt.toDate().toISOString() : s.confirmedAt) : null),
-      erreur: s.zoomSync && ['error','retry'].includes(s.zoomSync.status)});
-  });
-  /* Annulations dont le créneau a été libéré : la trace vient de l'événement. */
-  events.filter(e => ['lesson_cancelled','lesson_auto_cancelled'].includes(e.type) && e.coursDate && new Date(e.coursDate).getTime() >= now - 7*24*3600000).forEach(e=>{
-    if(lignes.some(l => l.id === e.seanceId && l.date === e.coursDate && l.eleveId === e.eleveId)) return;
-    lignes.push({id:e.seanceId, slot:null, eleveId:e.eleveId, nom:e.eleveNom || 'Élève', date:e.coursDate, statut:e.nouveauStatut || 'annule',
-      reponse: SUIVI_CANAUX[e.canal] || e.canal, reponduLe: e.at, erreur:false});
-  });
-  return lignes;
-}
-function suiviCentreFiltrer(l, f){
-  if(f === 'tous') return true;
-  if(f === 'confirme') return l.statut === 'confirme';
-  if(f === 'annulations') return l.statut.indexOf('annule') === 0;
-  if(f === 'deplacements') return ['deplacement_demande','report_propose','proposition_refusee'].includes(l.statut);
-  if(f === 'attente') return l.statut === 'en_attente' || l.statut === 'sans_rappel';
-  if(f === 'auto') return l.statut === 'annule_auto';
-  if(f === 'erreurs') return l.erreur;
-  return true;
-}
-function suiviCentreRender(){
-  const body = profBody(); if(!body || !suiviCentre.data) return;
-  const now = suiviCentre.data.now;
-  const toutes = suiviCentreLignes();
-  const q = suiviCentre.recherche.trim().toLowerCase();
-  const prio = l => (l.statut === 'deplacement_demande' ? 0 : l.statut === 'en_attente' ? 1 : 2);
-  const lignes = toutes.filter(l => suiviCentreFiltrer(l, suiviCentre.filtre) && (!q || l.nom.toLowerCase().includes(q)))
-    .sort((a,b)=>{
-      const fa = new Date(a.date).getTime() < now, fb = new Date(b.date).getTime() < now;
-      if(fa !== fb) return fa ? 1 : -1;
-      return (new Date(a.date) - new Date(b.date)) || (prio(a) - prio(b));
-    });
-  const n = f => toutes.filter(l => suiviCentreFiltrer(l, f)).length;
-  const filtres = `<div class="ui-filters" role="group" aria-label="Filtrer les réponses">${SUIVI_FILTRES.map(([id,l])=>`<button type="button" class="ui-chip" aria-pressed="${suiviCentre.filtre===id}" onclick="suiviCentreFiltre('${id}')">${l}<span class="n">${n(id)}</span></button>`).join('')}</div>`;
-  const recherche = `<div class="field" style="max-width:340px;"><label for="suivi-q">Rechercher un élève</label><input id="suivi-q" type="search" value="${esc(suiviCentre.recherche)}" oninput="suiviCentreRecherche(this.value)" autocomplete="off"></div>`;
-  const rows = lignes.map(l=>{
-    const cle = l.id + '|' + l.date;
-    const ouvert = suiviCentre.ouvert === cle;
-    const s = l.slot;
-    const futur = new Date(l.date).getTime() > now;
-    const actions = [`<button type="button" class="btn btn-secondary btn-sm" aria-expanded="${ouvert}" onclick="suiviCentreOuvrir('${esc(cle)}')">${ouvert ? 'Fermer' : 'Voir'}</button>`];
-    if(s && futur && l.statut === 'en_attente' && s.reservedEmail && new Date(l.date).getTime() - now > 3600000) actions.push(`<button type="button" class="btn btn-ghost btn-sm" onclick="suiviRelancer('${s.id}')">Relancer</button>`);
-    const ligne = `<tr><td>${esc(l.nom)}${s && s.isExperimental ? ' <span class="badge">Expérimental</span>' : ''}</td><td>${fmtSlotDate(l.date)}</td><td>${esc(l.reponse || '—')}</td>
-      <td>${suiviBadgeHTML(l.statut)}${l.erreur ? ' <span class="badge badge-danger">Zoom à synchroniser</span>' : ''}</td><td>${l.reponduLe ? suiviFmt(l.reponduLe) : '—'}</td>
-      <td><div class="btn-row" style="margin:0;">${actions.join('')}</div></td></tr>`;
-    return ligne + (ouvert ? `<tr class="suivi-detail"><td colspan="6">${suiviDetailHTML(l)}</td></tr>` : '');
-  }).join('');
-  const reglage = (typeof plateforme !== 'undefined' && plateforme.data && plateforme.data.confirmation && plateforme.data.confirmation.annulationAuto === true)
-    ? 'Annulation automatique à H-1 : <b>activée</b>.' : 'Annulation automatique à H-1 : <b>désactivée</b> (tu es seulement prévenue).';
-  body.innerHTML = `<p class="page-intro">Réponses aux e-mails de rappel et aux boutons de l'espace élève. Les données viennent directement de Firestore ; rien n'est simulé. ${reglage} <a href="#" onclick="paramSection='confirmation'; goTeacherTab('parametres'); return false;">Régler</a></p>
-    ${filtres}${recherche}
-    ${lignes.length ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Cours prévu</th><th scope="col">Réponse reçue</th><th scope="col">Statut</th><th scope="col">Date de réponse</th><th scope="col">Action</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      : profEmptyHTML('check', 'Rien à afficher', suiviCentre.filtre === 'tous' ? 'Aucun cours réservé dans les 14 derniers jours ni à venir.' : 'Aucun cours ne correspond à ce filtre.')}`;
-}
-function suiviDetailHTML(l){
-  const s = l.slot;
-  const evs = suiviCentre.data.events.filter(e => e.seanceId === l.id && (!e.eleveId || e.eleveId === l.eleveId));
-  let html = '';
-  if(s){
-    const rq = s.rescheduleRequest || {};
-    const futur = new Date(s.date).getTime() > Date.now();
-    if(rq.by === 'student' && rq.status === 'pending'){
-      const av = [rq.availability1, rq.availability2, rq.availability3].filter(Boolean);
-      html += `<p><b>Disponibilités proposées par l'élève</b> (le cours reste prévu le ${fmtSlotDate(s.date)} tant que tu n'as pas choisi) :</p>
-        <ul class="tp-list">${av.map(a=>`<li>${fmtSlotDate(a)} <button type="button" class="btn btn-sm" onclick="suiviAccepterDispo('${s.id}','${esc(a)}')">Choisir ce créneau</button></li>`).join('')}</ul>
-        <div class="field"><label for="suivi-motif-${s.id}">Message à l'élève (si tu refuses)</label><input id="suivi-motif-${s.id}" type="text" maxlength="300"></div>
-        <div class="btn-row"><button type="button" class="btn btn-secondary btn-sm" onclick="suiviRefuserDemande('${s.id}')">Refuser la demande (cours maintenu)</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="suiviProposerAutre('${s.id}')">Proposer une autre date</button></div>`;
-    } else if(futur && !s.definitivelyCancelled && !s.experimentalCancelled && suiviStatutCli(s) !== 'confirme'){
-      html += `<div class="btn-row"><button type="button" class="btn btn-secondary btn-sm" onclick="suiviMarquerConfirme('${s.id}')">Marquer comme confirmé</button></div>`;
-    }
-    if(s.zoomSync && ['error','retry'].includes(s.zoomSync.status)) html += `<p class="tp-warn">Réunion Zoom non synchronisée${s.zoomSync.lastError ? ' : ' + esc(s.zoomSync.lastError) : ''}. <button type="button" class="btn btn-ghost btn-sm" onclick="rptRelancerZoom('${s.id}').then(suiviCentreLoad)">Réessayer</button></p>`;
-  }
-  html += evs.length ? `<p><b>Historique</b></p><ul class="tp-list">${evs.map(suiviEvenementHTML).join('')}</ul>` : '<p class="tp-dim">Aucun événement enregistré pour ce cours (les réponses antérieures à cette mise à jour n\'ont pas d\'historique).</p>';
-  if(l.eleveId) html += `<div class="btn-row"><button type="button" class="btn btn-ghost btn-sm" onclick="openAdminStudentSection('${l.eleveId}','reponses')">Fiche de l'élève</button></div>`;
-  return html;
-}
-function suiviCentreFiltre(f){ suiviCentre.filtre = f; suiviCentreRender(); }
-function suiviCentreRecherche(v){
-  suiviCentre.recherche = v; suiviCentreRender();
-  const el = document.getElementById('suivi-q'); if(el){ el.focus(); el.setSelectionRange(v.length, v.length); }
-}
-function suiviCentreOuvrir(cle){ suiviCentre.ouvert = suiviCentre.ouvert === cle ? null : cle; suiviCentreRender(); }
-async function suiviAppel(payload, succes){
-  try{
-    const r = await rptCall(payload);
-    if(!r.ok) throw new Error(r.error || 'Action impossible.');
-    uiNotify(r.already ? 'Déjà enregistré.' : succes, 'success');
-    return r;
-  }catch(e){ uiNotify(e.message, 'error'); return null; }
-  finally{ if(profOnTab('confirmations')) suiviCentreLoad(); }
-}
-function suiviRelancer(slotId){
-  if(!confirm("Renvoyer à l'élève l'e-mail de rappel (mêmes boutons Confirmer / Annuler / Déplacer) ?")) return;
-  suiviAppel({action:'resendReminder', slotId}, 'Rappel renvoyé.');
-}
-function suiviMarquerConfirme(slotId){
-  if(!confirm("Marquer ce cours comme confirmé (par exemple si l'élève t'a répondu par message) ?")) return;
-  suiviAppel({action:'lessonAction', slotId, type:'confirm'}, 'Cours marqué comme confirmé.');
-}
-function suiviRefuserDemande(slotId){
-  if(!confirm("Refuser la demande de déplacement ? Le cours reste à sa date d'origine et l'élève est prévenu(e) par e-mail.")) return;
-  const el = document.getElementById('suivi-motif-' + slotId);
-  suiviAppel({action:'refuseRescheduleRequest', slotId, motif: el ? el.value : ''}, 'Demande refusée, élève prévenu(e).');
-}
-async function suiviAccepterDispo(slotId, iso){
-  const s = (suiviCentre.data.slots || []).find(x => x.id === slotId); if(!s) return;
-  if(!confirm(`Déplacer le cours au ${fmtSlotDate(iso)} ? La réunion Zoom sera synchronisée et l'élève prévenu(e).`)) return;
-  try{
-    const r = await rptAppliquer(s, iso, s.duree || 45, 'student_availability');
-    if(r.ok) uiNotify(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`, 'success');
-  }catch(e){ uiNotify(e.message, 'error'); }
-  suiviCentreLoad();
-}
-async function suiviProposerAutre(slotId){
-  const s = (suiviCentre.data.slots || []).find(x => x.id === slotId); if(!s) return;
-  const v = prompt('Nouvelle date proposée (format AAAA-MM-JJ HH:MM, ton heure locale) :');
-  if(!v) return;
-  const d = new Date(v.trim().replace(' ', 'T'));
-  if(isNaN(d.getTime())){ uiNotify('Date non reconnue.', 'warning'); return; }
-  try{
-    const r = await rptProposer(s, d.toISOString(), s.duree || 45);
-    if(r.ok) uiNotify("Proposition envoyée à l'élève.", 'success');
-  }catch(e){ uiNotify(e.message, 'error'); }
-  suiviCentreLoad();
-}
-registerTeacherTab('confirmations', ()=>{ suiviCentre.data = null; suiviCentreLoad(); });
-
-/* ---------------------------------------------------------------------------
    NOTIFICATIONS DE LA PROFESSEURE (temps réel)
    --------------------------------------------------------------------------- */
 let suiviNotifs = {liste:[], unsub:null, erreur:null};
@@ -235,10 +71,9 @@ function suiviNotifsDemarrer(){
       suiviNotifs.liste = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=> String(b.at).localeCompare(String(a.at)));
       suiviNotifs.erreur = null;
       navCounts.notifs = suiviNotifs.liste.filter(n => !n.lu).length;
-      navCounts.demandes = suiviNotifs.liste.filter(n => n.actionRequise === true).length;
-      if(typeof updateNavChrome === 'function') updateNavChrome();
+            if(typeof updateNavChrome === 'function') updateNavChrome();
       if(profOnTab('notifications')) suiviNotifsRender();
-      if(profOnTab('confirmations') && suiviCentre.data) suiviCentreLoad();
+      if(typeof seancesNotifsChangees === 'function') seancesNotifsChangees();
     }, err=>{ suiviNotifs.erreur = err && err.message; suiviNotifs.unsub = null; });
   }catch(e){ suiviNotifs.unsub = null; }
 }
@@ -276,27 +111,14 @@ async function suiviNotifsToutLu(){
 function suiviNotifOuvrir(id){
   const n = suiviNotifs.liste.find(x => x.id === id); if(!n) return;
   if(!n.lu) suiviNotifLu(id);
-  suiviCentre.ouvert = n.seanceId + '|' + n.coursDate;
-  suiviCentre.filtre = 'tous'; suiviCentre.recherche = '';
-  goTeacherTab('confirmations');
+  if(n.seanceId) seanceOuvrir(n.seanceId);
 }
 registerTeacherTab('notifications', ()=>{ suiviNotifsDemarrer(); suiviNotifsRender(); });
 
 /* ---------------------------------------------------------------------------
    FICHE ÉLÈVE : Historique des réponses et confirmations
    --------------------------------------------------------------------------- */
-if(typeof FICHE_SECTIONS !== 'undefined' && !FICHE_SECTIONS.some(x => x[0] === 'reponses')){
-  const i = FICHE_SECTIONS.findIndex(x => x[0] === 'forfait');
-  FICHE_SECTIONS.splice(i >= 0 ? i + 1 : FICHE_SECTIONS.length, 0, ['reponses', 'Réponses & confirmations']);
-}
-if(typeof ficheSectionHTML === 'function'){
-  const _ficheSectionHTML = ficheSectionHTML;
-  ficheSectionHTML = function(section, s){
-    if(section !== 'reponses') return _ficheSectionHTML(section, s);
-    setTimeout(()=>suiviFicheCharger(s, false), 0);
-    return `<div id="fiche-reponses" aria-live="polite"><p class="teacher-empty" role="status">Chargement…</p></div>`;
-  };
-}
+/* Affiché dans la section « Cours & confirmations » de la fiche (16-pilotage-professeure.js). */
 async function suiviFicheCharger(s, complet){
   const el = document.getElementById('fiche-reponses'); if(!el) return;
   try{

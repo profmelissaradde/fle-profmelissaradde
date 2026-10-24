@@ -179,19 +179,11 @@ async function renderProfilEleve(){
   await eleveChargerProfil(true);
   if(screen !== 'profil') return;
   const s = student, pack = s.pack || {}, prefs = s.preferences || {}, notif = s.notifications || {};
-  const total = Number(pack.total) || 0;
   const opts = (liste, v) => liste.map(([k,l]) => `<option value="${k}" ${v===k?'selected':''}>${l}</option>`).join('');
-  const tema = niveau ? eleveThemeCourant() : null;
-  const prog = tema ? eleveProgression(tema) : null;
   const theme = s.apparence || apparenceThemeUtilisateur();
   c.innerHTML = `
     <div class="hello">${profilAvatarHTML(s, 'lg')}<div><p class="eyebrow">Mon espace</p><h1 class="page-title">Mon profil</h1></div></div>
-    <section class="dash-grid" aria-label="Mon parcours">
-      <article class="dash-card"><h2>Niveau</h2><p class="dash-main">${s.niveau ? esc(s.niveau) : 'En cours d\'attribution'}</p><p class="dash-sub">Attribué par ta professeure.</p></article>
-      ${prog ? `<article class="dash-card"><h2>Thème en cours</h2><p class="dash-main">${prog.done} / ${prog.total}</p><p class="dash-sub">${tema.titre_fr}</p></article>` : ''}
-      <article class="dash-card" id="profil-forfait-card"><h2>Forfait</h2>${total ? '<div class="ui-skeleton" style="height:40px"></div>' : '<p class="dash-sub">Aucun forfait en cours.</p>'}</article>
-      ${s.frequence ? `<article class="dash-card"><h2>Rythme</h2><p class="dash-main">${s.frequence} séance${s.frequence>1?'s':''} / semaine</p></article>` : ''}
-    </section>
+    <p class="profil-faits">${s.niveau ? `Niveau <b>${esc(s.niveau)}</b>` : 'Niveau en cours d\'attribution'}${s.frequence ? ` · ${s.frequence} séance${s.frequence>1?'s':''} par semaine` : ''} <span class="tp-dim">— ton forfait et ta progression sont sur ton accueil.</span></p>
     <form class="settings-card" id="profil-form" onsubmit="event.preventDefault(); profilEnregistrer()" novalidate>
       <h2>Mes informations</h2>
       <fieldset class="avatar-picker"><legend>Avatar</legend>${avatarChoixHTML('pf-avatar', s.avatar || '')}</fieldset>
@@ -221,10 +213,7 @@ async function renderProfilEleve(){
     <section class="settings-card"><h2>Mot de passe</h2>
       <p class="page-intro">Pour ta sécurité, le changement se fait par e-mail : tu recevras un lien pour choisir un nouveau mot de passe.</p>
       <button type="button" class="btn btn-secondary" onclick="profilMotDePasse()">Recevoir le lien par e-mail</button></section>
-    <h2 class="section-title">Mes dossiers</h2>
-    <div id="profil-dossiers"></div>`;
-  if(typeof window.profilDossiersHTML === 'function') document.getElementById('profil-dossiers').innerHTML = window.profilDossiersHTML(s);
-  if(total){ const fb = await eleveForfaitBilan(); const el = document.getElementById('profil-forfait-card'); if(el && fb) el.innerHTML = eleveForfaitCarteHTML(fb) + (pack.paymentStatus === 'paid' ? '<p class="dash-sub">Paiement reçu.</p>' : ''); }
+`;
 }
 registerScreen('profil', ()=>{ if(!isTeacher) renderProfilEleve(); });
 
