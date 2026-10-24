@@ -421,3 +421,30 @@ async function journalLoad(){
         </tbody></table></div>` : profEmptyHTML('check', 'Aucun événement', ''))}`;
 }
 registerTeacherTab('journal', ()=>journalLoad());
+
+
+/* ---- Paramètres › Confirmation des cours (rappel 24 h, H-1) ---- */
+PARAM_SECTIONS.splice(2, 0, ['confirmation', 'Confirmation des cours']);
+function paramConfirmationHTML(){
+  const c = Object.assign({annulationAuto:false}, plateforme.data.confirmation || {});
+  return `<section class="settings-card" aria-labelledby="conf-t"><h2 id="conf-t">Confirmation des cours</h2>
+    <p class="page-intro">L'élève reçoit un rappel 24 h avant son cours, avec trois boutons : Confirmer, Annuler, Demander à déplacer. Il peut aussi confirmer depuis son espace. Chaque réponse apparaît dans Cours › Confirmations & demandes et dans la fiche de l'élève.</p>
+    <label class="check-row"><input type="checkbox" id="conf-auto" ${c.annulationAuto === true ? 'checked' : ''}> Annuler automatiquement un cours non confirmé 1 h avant le début</label>
+    <p class="field-help">Désactivé : tu reçois seulement une notification « cours non confirmé » et le cours est maintenu. Activé : le créneau est libéré et l'annulation compte comme une annulation tardive (2 tolérances sur 30 jours glissants, au-delà la séance est décomptée). Jamais d'annulation automatique si le rappel n'a pas été envoyé, si l'élève a demandé un déplacement ou pour un cours expérimental.</p>
+    <p class="field-help">Nécessite le déclencheur <code>annulerCoursNonConfirmes</code> (toutes les 10 minutes) dans l'Apps Script (voir apps-script/README.md).</p>
+    <div class="btn-row"><button type="button" class="btn" onclick="paramConfirmationEnregistrer()">Enregistrer</button></div></section>`;
+}
+async function paramConfirmationEnregistrer(){
+  const actif = !!(document.getElementById('conf-auto') || {}).checked;
+  if(actif && !confirm("Activer l'annulation automatique des cours non confirmés à H-1 ? Les élèves qui ne répondent pas perdront leur créneau (et, au-delà de 2 fois en 30 jours, la séance).")) return;
+  try{ await plateformeEnregistrer({confirmation: {annulationAuto: actif}}, actif ? 'Annulation automatique à H-1 activée' : 'Annulation automatique à H-1 désactivée'); uiNotify('Réglage enregistré.', 'success'); paramRender(); }
+  catch(e){ uiNotify("Enregistrement impossible pour le moment.", 'error'); }
+}
+{
+  const _paramRender = paramRender;
+  paramRender = function(){
+    _paramRender();
+    if(paramSection !== 'confirmation') return;
+    const body = profBody(); if(body) body.insertAdjacentHTML('beforeend', paramConfirmationHTML());
+  };
+}

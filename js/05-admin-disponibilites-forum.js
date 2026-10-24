@@ -123,6 +123,7 @@ async function loadNextCourseBanner(){
                 3. ${fmtSlotDate(s.rescheduleRequest.availability3)}
               </div>` : ''}
           </div>` : ''}
+        ${!pendingFromTeacher && typeof suiviEleveBlocHTML === 'function' ? suiviEleveBlocHTML(s) : ''}
         ${!pendingFromTeacher ? zoomButtonHTML(s.id, s.date, s.duree, s.zoomJoinUrl, s) : ''}
         ${canModify ? `<button class="rec-btn" style="background:none; color:var(--bad); margin-top:8px; margin-left:10px;" onclick="${cancelFn}('${s.id}')">Annuler ${s.isExperimental ? 'mon cours expérimental' : 'ma réservation'}</button>` : ''}
         ${canModify && !pendingFromMe && !pendingFromTeacher ? `<button class="rec-btn" style="background:none; color:var(--navy); margin-top:8px; margin-left:10px;" onclick="toggleStudentReschedule('${s.id}')">${studentRescheduleId===s.id ? "Fermer" : "🔁 Demander une replanification"}</button>` : ''}

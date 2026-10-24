@@ -484,6 +484,22 @@ async function proposeCustomReschedule(id){
     return;
   }
 
+  /* Service central (même règle et même historique que le bouton de l'e-mail).
+     Si le script n'est pas encore à jour ou injoignable : ancien circuit. */
+  try{
+    const r = typeof suiviEleveDemanderDeplacement === 'function' ? await suiviEleveDemanderDeplacement(id, dates) : {ok:false};
+    if(r.ok){
+      studentRescheduleId = null;
+      alert(r.message || 'Tes 3 disponibilités ont été envoyées à ta professeure.');
+      await loadDispoEleve();
+      if(document.getElementById('next-course-banner')) await loadNextCourseBanner();
+      return;
+    }
+  }catch(e){
+    alert(e.message || "Impossible d'envoyer la demande pour le moment.");
+    return;
+  }
+
   try{
     await db.collection('disponibilites').doc(id).update({
       rescheduleRequest: {
@@ -575,14 +591,23 @@ async function cancelExperimentalTrial(id){
     const doc = await db.collection('disponibilites').doc(id).get();
     if(doc.exists) dateStr = fmtSlotDate(doc.data().date);
   }catch(e){ /* non bloquant */ }
+  /* Passage par le serveur (règle unique + historique) ; si le script est
+     injoignable, repli sur l'écriture directe autorisée par les règles. */
+  let viaServeur = false;
   try{
-    await db.collection('disponibilites').doc(id).update({
-      experimentalCancelled: true,
-      zoomJoinUrl: null
-    });
-  }catch(e){
-    alert("Impossible d'annuler pour le moment.");
-    return;
+    const r = await callDriveScript({ action:'cancelReservation', slotId:id });
+    viaServeur = !!(r && r.ok);
+  }catch(e){ viaServeur = false; }
+  if(!viaServeur){
+    try{
+      await db.collection('disponibilites').doc(id).update({
+        experimentalCancelled: true,
+        zoomJoinUrl: null
+      });
+    }catch(e){
+      alert("Impossible d'annuler pour le moment.");
+      return;
+    }
   }
   try{
     await notifyTeacherOfCancellation(`${student.prenom} ${student.nom}`, dateStr);
@@ -622,6 +647,7 @@ function renderReserverBody(){
       <div class="slot-card slot-mine">
         <div class="slot-date">📌 ${fmtSlotDate(s.date)} <span class="slot-dur">(${s.duree} min)</span></div>
         ${timezoneLineHTML(s.date)}
+        ${!pendingFromTeacher && typeof suiviEleveBlocHTML === 'function' ? suiviEleveBlocHTML(s) : ''}
         ${pendingFromTeacher ? `
           <div class="storage-note" style="background:var(--c-warning-bg);">
             📅 Ta professeure propose de déplacer ce cours au <b>${fmtSlotDate(s.rescheduleRequest.proposedDate)}</b>.

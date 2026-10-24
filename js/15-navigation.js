@@ -53,7 +53,7 @@ function navRole(){
   return 'eleve';
 }
 /* Compteurs affichés dans le menu (calculés ailleurs, lus ici). */
-const navCounts = {aTraiter:0};
+const navCounts = {aTraiter:0, notifs:0, demandes:0};
 function navUnreadProf(){ return typeof teacherUnreadTotal === 'function' ? teacherUnreadTotal() : 0; }
 function navUnreadEleve(){ return typeof studentUnreadCount !== 'undefined' ? studentUnreadCount : 0; }
 
@@ -63,8 +63,9 @@ const NAV_MODEL = {
     {id:'eleves', label:'Élèves', icon:'users', tabs:[
       {tab:'eleves', label:'Tous les élèves'},
       {tab:'experimental', label:'Cours expérimental'}]},
-    {id:'cours', label:'Cours', icon:'calendar', badge:()=>navCounts.aTraiter, tabs:[
+    {id:'cours', label:'Cours', icon:'calendar', badge:()=>navCounts.aTraiter + navCounts.demandes, tabs:[
       {tab:'dispo', label:'Planning & disponibilités'},
+      {tab:'confirmations', label:'Confirmations & demandes', badge:()=>navCounts.demandes},
       {tab:'anomalies', label:'Reports & anomalies', badge:()=>navCounts.aTraiter},
       {tab:'historique', label:'Historique & récapitulatifs'}]},
     {id:'pedagogie', label:'Pédagogie', icon:'book', tabs:[
@@ -75,8 +76,9 @@ const NAV_MODEL = {
       {tab:'ressources', label:'Ressources'},
       {screen:'survie', label:'Phrases de survie'}]},
     {id:'finances', label:'Finances', icon:'wallet', tabs:[{tab:'finances', label:'Forfaits & paiements'}]},
-    {id:'communication', label:'Communication', icon:'chat', badge:navUnreadProf, tabs:[
+    {id:'communication', label:'Communication', icon:'chat', badge:()=>navUnreadProf() + navCounts.notifs, tabs:[
       {tab:'messages', label:'Messages', badge:navUnreadProf},
+      {tab:'notifications', label:'Notifications', badge:()=>navCounts.notifs},
       {tab:'annonces', label:'Annonces'},
       {screen:'forum', label:'Forum'}]},
     {id:'parametres', label:'Paramètres', icon:'settings', tabs:[

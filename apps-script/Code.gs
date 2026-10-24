@@ -607,6 +607,9 @@ function doPost(e) {
     if (data.action === "applyTeacherReschedule") { return handleApplyTeacherReschedule(data, authCtx); }
     if (data.action === "retryZoomSync") { return handleRetryZoomSync(data, authCtx); }
     if (data.action === "remindProposal") { return handleRemindProposal(data, authCtx); }
+    if (data.action === "lessonAction") { return handleLessonAction(data, authCtx); }
+    if (data.action === "resendReminder") { return handleResendReminder(data, authCtx); }
+    if (data.action === "refuseRescheduleRequest") { return handleRefuseRescheduleRequest(data, authCtx); }
     if (data.action === "notifyPackPayment") { requireTeacher_(authCtx); return handleNotifyPackPayment(data); }
     if (data.action === "notifyPackBooked") { requireTeacher_(authCtx); return handleNotifyPackBooked(data); }
     if (data.action === "notifyPaymentReceived") { requireTeacher_(authCtx); return handleNotifyPaymentReceived(data); }
@@ -1745,9 +1748,11 @@ function sendReminders24h() {
       reminderActionToken: { stringValue: actionToken },
       reminderSentAt: { timestampValue: new Date().toISOString() }
     });
-
+    try {
+      const sl = { reservedBy: reservedBy, reservedName: reservedName, date: dateStr, packId: fields.packId && fields.packId.stringValue, isPack: !!(fields.isPack && fields.isPack.booleanValue === true) };
+      suiviJournaliser_(token, suiviEvenement_(docId, sl, "lesson_reminder_sent", "automatisation", "email", "en_attente", "en_attente", null, "rappel|" + dateStr), null);
+    } catch (e) { console.warn(e); }
   });
-
 }
 
 /* ============================================================================
@@ -1957,71 +1962,21 @@ function handleListAvailableSlots(data, authCtx) {
 }
 
 function handleCancelReservation(data, authCtx) {
+  /* Annulation depuis la plateforme (élève ou professeure) : même règle que
+     l'e-mail et l'automatisation (coursAnnuler_), sous verrou, avec événement. */
   try {
     if (!data.slotId) throw new Error("slotId manquant");
-    const projectId = "fle-profmelissaradde";
-    const token = getFirestoreAccessToken_();
-    const baseUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-    const slotDoc = getFirestoreDocument_(baseUrl, "disponibilites", data.slotId, token);
-    const slot = firestoreFieldsToJs_(slotDoc.fields || {});
-    if (!slot.reservedBy) return jsonResponse({ ok: true, excessive: false, refundDue: false });
-
+    if (!authCtx || !authCtx.uid) throw new Error("Authentification requise.");
     const by = isTeacherAuth_(authCtx) ? "teacher" : "student";
-    if (by === "student" && slot.reservedBy !== authCtx.uid) throw new Error("Cette réservation ne t'appartient pas.");
-
-    const studentDoc = getFirestoreDocument_(baseUrl, "eleves", slot.reservedBy, token);
-    const studentData = firestoreFieldsToJs_(studentDoc.fields || {});
-    const log = Array.isArray(studentData.noShowLog) ? studentData.noShowLog : [];
-    const start = new Date(slot.date).getTime();
-    const isLate = Number.isFinite(start) && (start - Date.now()) < 3600000;
-    let excessive = false;
-    let refundDue = false;
-
-    if (isLate) {
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000;
-      const recentCount = log.filter(x => x && x.by === by && x.late === true && new Date(x.ts).getTime() >= thirtyDaysAgo).length;
-      log.push({ ts: new Date().toISOString(), by: by, late: true });
-      patchFirestoreFields_(baseUrl, "eleves", slot.reservedBy, token, { noShowLog: jsToFirestoreValue_(log) });
-      excessive = recentCount + 1 > 2;
-    }
-
-    if (excessive) {
-      patchFirestoreFields_(baseUrl, "disponibilites", data.slotId, token, {
-        definitivelyCancelled: { booleanValue: true },
-        cancelledBy: { stringValue: by }
-      });
-      if (by === "teacher") {
-        refundDue = true;
-        patchFirestoreFields_(baseUrl, "eleves", slot.reservedBy, token, { refundDue: { booleanValue: true } });
-      }
-    } else {
-      patchFirestoreFields_(baseUrl, "disponibilites", data.slotId, token, {
-        reservedBy: { nullValue: null },
-        reservedName: { nullValue: null },
-        reservedEmail: { nullValue: null },
-        reservedPhone: { nullValue: null },
-        zoomJoinUrl: { nullValue: null },
-        zoomTopic: { nullValue: null },
-        paymentStatus: { nullValue: null },
-        cpfNaNota: { nullValue: null },
-        reminderSent: { booleanValue: false },
-        reminderSentForDate: { nullValue: null },
-        reminderActionToken: { nullValue: null },
-        reminderSentAt: { nullValue: null },
-        clickedByStudent: { nullValue: null },
-        clickedByTeacher: { nullValue: null },
-        confirmed: { booleanValue: false },
-        rescheduleRequest: { nullValue: null },
-        rescheduleRequested: { nullValue: null }
-      });
-      if (slot.isPack === true) {
-        const pack = studentData.pack && typeof studentData.pack === "object" ? studentData.pack : {};
-        pack.used = Math.max(0, Number(pack.used || 0) - 1);
-        patchFirestoreFields_(baseUrl, "eleves", slot.reservedBy, token, { pack: jsToFirestoreValue_(pack) });
-      }
-    }
-
-    return jsonResponse({ ok: true, excessive: excessive, refundDue: refundDue });
+    const r = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(data.slotId, token);
+      if (!slot.reservedBy || slot.definitivelyCancelled || slot.experimentalCancelled) return { ok: true, already: true, excessive: false, refundDue: false };
+      if (by === "student" && slot.reservedBy !== authCtx.uid) throw new Error("Cette réservation ne t'appartient pas.");
+      return coursAnnuler_(token, data.slotId, slot, by, "plateforme", {});
+    });
+    /* L'e-mail à Melissa est déjà envoyé par l'application (notifyTeacherCancel). */
+    return jsonResponse({ ok: true, excessive: r.excessive === true, refundDue: r.refundDue === true, statut: r.statut || null, message: r.message || null });
   } catch (err) {
     return jsonResponse({ ok: false, error: err && err.message ? err.message : String(err) });
   }
@@ -2353,905 +2308,23 @@ function jsonResponse(obj) {
 }
 
 /* ============================================================================
-
-   TRAITEMENT DES 3 ACTIONS (boutons de l'e-mail) — VERSION RÉELLEMENT UTILISÉE
-
+   TRAITEMENT DES 3 ACTIONS (boutons de l'e-mail de rappel)
+   La page affichée par doGet demande un clic explicite (un aperçu de lien ou un
+   antivirus qui « ouvre » l'e-mail ne déclenche rien). Le traitement passe par le
+   service central coursAction_ : mêmes règles que la plateforme, verrou,
+   idempotence, événement + notification. Un message de succès n'est renvoyé que
+   si Firestore a confirmé l'écriture ; sinon une erreur est levée.
    ============================================================================ */
-
-function processReminderAction(
-
-  action,
-
-  slotId,
-
-  actionToken,
-
-  availability
-
-) {
-
-  try {
-
-    if (!action || !slotId || !actionToken) {
-
-      throw new Error("Lien incomplet.");
-
-    }
-
-    if (!["confirm", "cancel", "reschedule"].includes(action)) {
-
-      throw new Error("Action inconnue.");
-
-    }
-
-    const projectId = "fle-profmelissaradde";
-
-    const token =
-
-      getFirestoreAccessToken_();
-
-    const baseUrl =
-
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-
-    /* =========================
-
-       RÉCUPÉRER LE COURS
-
-       ========================= */
-
-    const url =
-
-      `${baseUrl}/disponibilites/${encodeURIComponent(slotId)}`;
-
-    const response =
-
-      UrlFetchApp.fetch(url, {
-
-        method: "get",
-
-        headers: {
-
-          Authorization: "Bearer " + token
-
-        },
-
-        muteHttpExceptions: true
-
-      });
-
-    if (response.getResponseCode() !== 200) {
-
-      throw new Error(
-
-        "Ce cours n'existe plus."
-
-      );
-
-    }
-
-    const doc =
-
-      JSON.parse(response.getContentText());
-
-    const fields =
-
-      doc.fields || {};
-
-    /* =========================
-
-       VÉRIFIER LE TOKEN
-
-       ========================= */
-
-    const storedToken =
-
-      fields.reminderActionToken &&
-
-      fields.reminderActionToken.stringValue;
-
-    if (!storedToken || storedToken !== actionToken) {
-
-      throw new Error(
-
-        "Ce lien n'est plus valide. Utilise le dernier e-mail reçu."
-
-      );
-
-    }
-
-    /* =========================
-
-       DONNÉES DU COURS
-
-       ========================= */
-
-    const dateStr =
-
-      fields.date &&
-
-      fields.date.stringValue;
-
-    const reservedBy =
-
-      fields.reservedBy &&
-
-      fields.reservedBy.stringValue;
-
-    const reservedName =
-
-      fields.reservedName &&
-
-      fields.reservedName.stringValue;
-
-    const reservedEmail =
-
-      fields.reservedEmail &&
-
-      fields.reservedEmail.stringValue;
-
-    /* CORRECTION : il manquait la lecture de isExperimental ici — sans elle,
-
-       l'annulation ci-dessous ne pouvait pas savoir qu'il s'agissait d'un
-
-       cours expérimental, et effaçait toujours l'identité du prospect. */
-
-    const isExperimental =
-
-      fieldBool_(fields, "isExperimental");
-
-    if (!dateStr) {
-
-      throw new Error(
-
-        "La date du cours est introuvable."
-
-      );
-
-    }
-
-    if (!reservedBy) {
-
-      throw new Error(
-
-        "Ce cours n'est plus réservé."
-
-      );
-
-    }
-
-    const courseDate =
-
-      new Date(dateStr);
-
-    const now =
-
-      new Date();
-
-    if (
-
-      courseDate.getTime() <=
-
-      now.getTime()
-
-    ) {
-
-      throw new Error(
-
-        "Ce cours est déjà passé."
-
-      );
-
-    }
-
-    const hoursBefore =
-
-      (
-
-        courseDate.getTime() -
-
-        now.getTime()
-
-      )
-
-      /
-
-      (1000 * 60 * 60);
-
-    /* ==========================================================
-
-       CONFIRMATION
-
-       ========================================================== */
-
-    if (action === "confirm") {
-
-      patchFirestoreFields_(
-
-        baseUrl,
-
-        "disponibilites",
-
-        slotId,
-
-        token,
-
-        {
-
-          confirmed: {
-
-            booleanValue: true
-
-          },
-
-          confirmedAt: {
-
-            timestampValue:
-
-              new Date().toISOString()
-
-          }
-
-        }
-
-      );
-
-      return (
-
-        "Ton cours est bien confirmé. À bientôt !"
-
-      );
-
-    }
-
-    /* ==========================================================
-
-       ANNULATION
-
-       Possible jusqu'à 1 heure avant.
-
-       CORRECTION : cette branche effaçait reservedBy / reservedName /
-
-       reservedEmail / reservedPhone pour TOUT cours annulé, y compris un
-
-       cours expérimental — ce qui faisait perdre la trace du prospect et
-
-       ne marquait jamais experimentalCancelled (incohérent avec
-
-       cancelExperimentalTrial() côté application, et avec
-
-       experimentalSlotStatus() côté admin qui s'attend à ce champ pour
-
-       afficher "Annulé"). Un cours expérimental garde maintenant son
-
-       identité et n'a que son accès Zoom coupé.
-
-       ========================================================== */
-
-    if (action === "cancel") {
-
-      if (hoursBefore < 1) {
-
-        throw new Error(
-
-          "Le délai d'une heure est dépassé. " +
-
-          "Le cours ne peut plus être annulé."
-
-        );
-
-      }
-
-      const cancelPatch = {
-
-        confirmed: {
-
-          booleanValue: false
-
-        },
-
-        reminderSent: {
-
-          booleanValue: false
-
-        },
-
-        reminderActionToken: {
-
-          nullValue: null
-
-        },
-
-        rescheduleRequest: {
-
-          nullValue: null
-
-        },
-
-        cancelledAt: {
-
-          timestampValue:
-
-            new Date().toISOString()
-
-        },
-
-        zoomJoinUrl: {
-
-          nullValue: null
-
-        }
-
-      };
-
-      if (isExperimental) {
-
-        cancelPatch.experimentalCancelled = { booleanValue: true };
-
-        cancelPatch.experimentalCancelledBy = { stringValue: reservedBy };
-
-      } else {
-
-        cancelPatch.reservedBy = { nullValue: null };
-
-        cancelPatch.reservedName = { nullValue: null };
-
-        cancelPatch.reservedEmail = { nullValue: null };
-
-        cancelPatch.reservedPhone = { nullValue: null };
-
-      }
-
-      patchFirestoreFields_(
-
-        baseUrl,
-
-        "disponibilites",
-
-        slotId,
-
-        token,
-
-        cancelPatch
-
-      );
-
-      /* Notification professeure */
-
-      MailApp.sendEmail({
-
-        to: TEACHER_EMAIL,
-
-        subject:
-
-          "Cours annulé — " +
-
-          (reservedName || "Élève") +
-
-          (isExperimental ? " (cours expérimental)" : ""),
-
-        htmlBody:
-
-          "<p><strong>" +
-
-          escapeHtml_(
-
-            reservedName || "Un élève"
-
-          )
-
-          +
-
-          "</strong> vient d'annuler son cours" +
-
-          (isExperimental ? " expérimental" : "") +
-
-          ".</p>"
-
-          +
-
-          "<p><strong>E-mail :</strong> " +
-
-          escapeHtml_(
-
-            reservedEmail ||
-
-            "Non renseigné"
-
-          )
-
-          +
-
-          "</p>"
-
-      });
-
-      return isExperimental
-
-        ? "Ton cours expérimental a bien été annulé."
-
-        : "Ton cours a bien été annulé.";
-
-    }
-
-    /* ==========================================================
-
-       REPLANIFICATION
-
-       ========================================================== */
-
-    if (action === "reschedule") {
-
-      /* ---------- Limite 1 heure ---------- */
-
-      if (hoursBefore < 1) {
-
-        throw new Error(
-
-          "Le délai d'une heure est dépassé. " +
-
-          "Il n'est plus possible de demander " +
-
-          "le déplacement de ce cours."
-
-        );
-
-      }
-
-      /* ---------- Vérifier les 3 disponibilités ---------- */
-
-      if (
-
-        !Array.isArray(availability) ||
-
-        availability.length !== 3
-
-      ) {
-
-        throw new Error(
-
-          "Tu dois proposer exactement 3 disponibilités."
-
-        );
-
-      }
-
-      availability =
-
-        availability.map(function(value) {
-
-          return String(value || "").trim();
-
-        });
-
-      if (
-
-        availability.some(
-
-          function(value) {
-
-            return !value;
-
-          }
-
-        )
-
-      ) {
-
-        throw new Error(
-
-          "Les 3 disponibilités sont obligatoires."
-
-        );
-
-      }
-
-      if (
-
-        new Set(availability).size !== 3
-
-      ) {
-
-        throw new Error(
-
-          "Les 3 disponibilités doivent être différentes."
-
-        );
-
-      }
-
-      /* ---------- Convertir les dates ---------- */
-
-      const availabilityDates =
-
-        availability.map(function(value) {
-
-          const date =
-
-            new Date(value);
-
-          if (
-
-            isNaN(date.getTime())
-
-          ) {
-
-            throw new Error(
-
-              "Une des disponibilités n'est pas valide."
-
-            );
-
-          }
-
-          return date.toISOString();
-
-        });
-
-      /* ---------- Vérifier qu'elles sont futures ---------- */
-
-      availabilityDates.forEach(
-
-        function(value) {
-
-          if (
-
-            new Date(value).getTime() <=
-
-            Date.now()
-
-          ) {
-
-            throw new Error(
-
-              "Les disponibilités proposées doivent être dans le futur."
-
-            );
-
-          }
-
-        }
-
-      );
-
-      /* ======================================================
-
-         ENREGISTRER DANS FIRESTORE
-
-         ====================================================== */
-
-      patchFirestoreFields_(
-
-        baseUrl,
-
-        "disponibilites",
-
-        slotId,
-
-        token,
-
-        {
-
-          rescheduleRequested: {
-
-            booleanValue: true
-
-          },
-
-          rescheduleRequestedAt: {
-
-            timestampValue:
-
-              new Date().toISOString()
-
-          },
-
-          rescheduleAvailability1: {
-
-            stringValue:
-
-              availabilityDates[0]
-
-          },
-
-          rescheduleAvailability2: {
-
-            stringValue:
-
-              availabilityDates[1]
-
-          },
-
-          rescheduleAvailability3: {
-
-            stringValue:
-
-              availabilityDates[2]
-
-          },
-
-          rescheduleRequest: {
-
-            mapValue: {
-
-              fields: {
-
-                by: {
-
-                  stringValue:
-
-                    "student"
-
-                },
-
-                status: {
-
-                  stringValue:
-
-                    "pending"
-
-                },
-
-                availability1: {
-
-                  stringValue:
-
-                    availabilityDates[0]
-
-                },
-
-                availability2: {
-
-                  stringValue:
-
-                    availabilityDates[1]
-
-                },
-
-                availability3: {
-
-                  stringValue:
-
-                    availabilityDates[2]
-
-                },
-
-                proposedDate: {
-
-                  nullValue: null
-
-                },
-
-                proposedDuree: {
-
-                  nullValue: null
-
-                }
-
-              }
-
-            }
-
-          }
-
-        }
-
-      );
-
-      /* ======================================================
-
-         FORMATER LES DATES POUR MELISSA
-
-         ====================================================== */
-
-      const studentTimezone =
-
-        getStudentTimezone_(
-
-          baseUrl,
-
-          reservedBy,
-
-          token
-
-        )
-
-        ||
-
-        "America/Sao_Paulo";
-
-      const formattedCurrent =
-
-        formatDateInTimezone_(
-
-          courseDate,
-
-          studentTimezone
-
-        );
-
-      const formatted1 =
-
-        formatDateInTimezone_(
-
-          new Date(availabilityDates[0]),
-
-          studentTimezone
-
-        );
-
-      const formatted2 =
-
-        formatDateInTimezone_(
-
-          new Date(availabilityDates[1]),
-
-          studentTimezone
-
-        );
-
-      const formatted3 =
-
-        formatDateInTimezone_(
-
-          new Date(availabilityDates[2]),
-
-          studentTimezone
-
-        );
-
-      /* ======================================================
-
-         E-MAIL À MELISSA
-
-         ====================================================== */
-
-      MailApp.sendEmail({
-
-        to: TEACHER_EMAIL,
-
-        subject:
-
-          "Demande de replanification — " +
-
-          (
-
-            reservedName ||
-
-            "Élève"
-
-          ),
-
-        htmlBody:
-
-          "<p><strong>" +
-
-          escapeHtml_(
-
-            reservedName ||
-
-            "Un élève"
-
-          )
-
-          +
-
-          "</strong> souhaite déplacer son cours.</p>"
-
-          +
-
-          "<p><strong>Cours actuel :</strong><br>" +
-
-          escapeHtml_(
-
-            formattedCurrent
-
-          )
-
-          +
-
-          "</p>"
-
-          +
-
-          "<p><strong>3 disponibilités proposées :</strong></p>"
-
-          +
-
-          "<ol>" +
-
-          "<li>" +
-
-          escapeHtml_(formatted1) +
-
-          "</li>" +
-
-          "<li>" +
-
-          escapeHtml_(formatted2) +
-
-          "</li>" +
-
-          "<li>" +
-
-          escapeHtml_(formatted3) +
-
-          "</li>" +
-
-          "</ol>"
-
-          +
-
-          "<p><strong>E-mail de l'élève :</strong> " +
-
-          escapeHtml_(
-
-            reservedEmail ||
-
-            "Non renseigné"
-
-          )
-
-          +
-
-          "</p>"
-
-          +
-
-          "<p>Le cours actuel reste réservé " +
-
-          "tant qu'un nouveau créneau " +
-
-          "n'a pas été validé.</p>"
-
-      });
-
-      return (
-
-        "Tes 3 disponibilités ont bien été envoyées à Melissa. " +
-
-        "Ton cours actuel reste réservé en attendant la validation " +
-
-        "d'un nouveau créneau."
-
-      );
-
-    }
-
-    throw new Error(
-
-      "Action impossible."
-
-    );
-
-  } catch (err) {
-
-    console.error(
-
-      "processReminderAction :",
-
-      err
-
-    );
-
-    throw new Error(
-
-      err &&
-
-      err.message
-
-        ?
-
-        err.message
-
-        :
-
-        String(err)
-
-    );
-
+function processReminderAction(action, slotId, actionToken, availability) {
+  if (!action || !slotId || !actionToken) throw new Error("Lien incomplet.");
+  const type = { confirm: "confirm", cancel: "cancel", reschedule: "reschedule_request" }[action];
+  if (!type) throw new Error("Action inconnue.");
+  const r = coursAction_(String(slotId), type, { role: "eleve", via: "email", token: String(actionToken) }, { availability: availability });
+  if (!r || !r.ok) {
+    console.warn("processReminderAction refusée : " + (r && r.error));
+    throw new Error((r && r.error) || "Ta réponse n'a pas pu être enregistrée. Réessaie dans quelques minutes.");
   }
-
+  return r.message;
 }
 /* ============================================================================
 
@@ -3392,8 +2465,13 @@ function handleProposeReschedule(data, authCtx) {
       rptPatch_(data.slotId, token, {
         rescheduleRequest: proposal,
         rescheduleHistory: rptHistory_(slot, { type: "proposed", by: "teacher", from: slot.date, to: proposal.proposedDate, proposalId: proposal.id,
-          replaced: previous ? (previous.id || previous.by) : null })
+          replaced: previous ? (previous.id || previous.by) : null }),
+        suivi: { statut: "report_propose", at: new Date().toISOString(), canal: "plateforme", par: "administratrice", eleveId: slot.reservedBy, date: slot.date }
       });
+      const ev = suiviEvenement_(data.slotId, slot, "lesson_reschedule_proposed", "administratrice", "plateforme", suiviStatut_(slot), "proposition_envoyee",
+        { from: slot.date, to: proposal.proposedDate, remplaceDemandeEleve: !!(previous && previous.by === "student") }, "prop|" + proposal.id);
+      suiviJournaliser_(token, ev, null);
+      suiviCloreDemandes_(token, data.slotId);
       return { ok: true, proposal: proposal, slot: slot };
     });
     if (!res.ok) return jsonResponse(res);
@@ -3451,8 +2529,12 @@ function rptRespond_(slotId, proposalId, decision, actor, via, emailToken) {
       if (decision === "refuse") {
         rptPatch_(slotId, token, {
           rescheduleRequest: Object.assign({}, req, { status: "refused", refusedAt: new Date().toISOString(), via: via }),
+          suivi: { statut: "proposition_refusee", at: new Date().toISOString(), canal: via === "email" ? "email" : "plateforme", par: actor.isTeacher ? "administratrice" : "eleve", eleveId: slot.reservedBy, date: slot.date },
           rescheduleHistory: rptHistory_(slot, { type: "refused", via: via, to: req.proposedDate, proposalId: req.id || null })
         });
+        const evR = suiviEvenement_(slotId, slot, "lesson_reschedule_refused", actor.isTeacher ? "administratrice" : "eleve", via === "email" ? "email" : "plateforme",
+          "proposition_envoyee", suiviStatut_(slot), { proposition: req.proposedDate, refuseePar: actor.isTeacher ? "administratrice" : "eleve" }, "refus|" + (req.id || req.proposedDate));
+        suiviJournaliser_(token, evR, actor.isTeacher ? null : suiviNotification_(evR, `${slot.reservedName || "Un élève"} a refusé la nouvelle date proposée (${suiviDateFr_(req.proposedDate)}). Propose une autre date.`, true));
         return { ok: true, refused: true, slot: slot, req: req };
       }
 
@@ -3525,6 +2607,7 @@ function rptApplyNewDate_(token, slotId, slot, newDateISO, duree, event, req) {
     reminderSent: false,
     reminderSentForDate: null,
     reminderActionToken: null,
+    suivi: null,
     zoomSync: {
       status: "pending", targetDate: newDateISO, attempts: 0,
       requestedAt: new Date().toISOString(),
@@ -3536,6 +2619,16 @@ function rptApplyNewDate_(token, slotId, slot, newDateISO, duree, event, req) {
     ? Object.assign({}, req, { status: "accepted", acceptedAt: new Date().toISOString() })   /* jeton conservé : un 2e clic sur le lien répond « déjà confirmé » */
     : null;
   rptPatch_(slotId, token, patch);
+  try {
+    const parEleve = event && event.by === "student";
+    const canal = event && event.via === "email" ? "email" : "plateforme";
+    const details = { from: slot.date, to: newDateISO, motif: event && event.type, zoom: "synchronisation en cours", forfait: "aucun décompte supplémentaire" };
+    const cle = "move|" + slot.date + ">" + newDateISO;
+    if (req && req.by === "student") suiviJournaliser_(token, suiviEvenement_(slotId, slot, "lesson_reschedule_accepted", "administratrice", canal, "deplacement_demande", "deplace", details, cle), null);
+    const ev = suiviEvenement_(slotId, slot, "lesson_rescheduled", parEleve ? "eleve" : "administratrice", canal, suiviStatut_(slot), "deplace", details, cle);
+    suiviJournaliser_(token, ev, parEleve ? suiviNotification_(ev, `${slot.reservedName || "Un élève"} a accepté le nouvel horaire : ${suiviDateFr_(newDateISO)}.`, false) : null);
+    suiviCloreDemandes_(token, slotId);
+  } catch (e) { console.warn(e); }
 }
 
 /* ---------- 4. Synchronisation Zoom (idempotente) ---------- */
@@ -3755,6 +2848,7 @@ function rptLastFromDate_(slot) {
 /* Déclencheur (toutes les 10 min) : reprend les synchronisations en attente
    ou en échec temporaire, et supprime les anciennes réunions restées actives. */
 function retryZoomSyncs() {
+  try { reprendreSuivi_(); } catch (e) { console.warn("reprise des événements : " + rptErrMsg_(e)); }
   const token = getFirestoreAccessToken_();
   const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
     method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
@@ -3948,4 +3042,411 @@ function relancerPropositionsAuto() {
     try { rptRelancer_(id, "auto"); sent++; } catch (e) { console.warn("Relance automatique impossible pour " + id + " : " + rptErrMsg_(e)); }
   });
   return { sent: sent };
+}
+
+
+/* ============================================================================
+   SUIVI DES COURS — SERVICE CENTRAL DES CHANGEMENTS DE STATUT
+   Toutes les réponses (e-mail de rappel, espace élève, espace professeure,
+   automatisations) passent par coursAction_ / coursAnnuler_ :
+   - même contrôle et même résultat quel que soit le canal ;
+   - verrou (LockService) + vérification de l'état : un double clic ou un
+     événement reçu deux fois ne produit qu'une seule action ;
+   - chaque action crée un ÉVÉNEMENT (collection evenementsCours, ajout seul,
+     identifiant déterministe → jamais de doublon) et, pour les actions des
+     élèves et des automatisations, une NOTIFICATION pour Melissa
+     (collection notificationsProf) ;
+   - « enregistré » n'est affiché que si Firestore a confirmé l'écriture de la
+     séance ; si l'événement ne peut pas être écrit, il est mis en file et
+     repris par le déclencheur retryZoomSyncs (toutes les 10 minutes).
+   Le statut de suivi d'une séance est dans disponibilites/{id}.suivi :
+     { statut, at, canal, par, eleveId, date }  — valable seulement pour la
+     réservation en cours (même élève, même date).
+   ============================================================================ */
+const SUIVI_LIBELLES_ = {
+  confirme: "Confirmé", annule: "Annulé", annule_tardif: "Annulé tardivement", annule_auto: "Annulé automatiquement (non confirmé)",
+  deplacement_demande: "Déplacement demandé", en_attente: "En attente de réponse",
+  report_propose: "Nouvelle date proposée", proposition_refusee: "Proposition refusée par l'élève"
+};
+function suiviHash_(s) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822519) >>> 0; }
+  return ("00000000" + h1.toString(16)).slice(-8) + ("00000000" + h2.toString(16)).slice(-8);
+}
+function suiviStatut_(slot) {
+  const s = slot.suivi || {};
+  const annule = String(s.statut || "").indexOf("annule") === 0;
+  if (s.statut && s.eleveId === slot.reservedBy && s.date === slot.date && (!annule || slot.definitivelyCancelled || slot.experimentalCancelled)) return s.statut;
+  if (slot.rescheduleRequest && slot.rescheduleRequest.by === "student" && slot.rescheduleRequest.status === "pending") return "deplacement_demande";
+  return slot.confirmed === true ? "confirme" : "en_attente";
+}
+function suiviDocName_(coll, id) { return `projects/${FS_PROJECT_}/databases/(default)/documents/${coll}/${id}`; }
+function suiviFields_(obj) { const f = {}; Object.keys(obj).forEach(k => f[k] = jsToFirestoreValue_(obj[k])); return f; }
+/* Écrit l'événement (et la notification) en une seule opération ; un identifiant déjà
+   présent signifie « déjà enregistré » (idempotence), pas une erreur. */
+function suiviEcrire_(token, ev, notif) {
+  const writes = [{ update: { name: suiviDocName_("evenementsCours", ev.id), fields: suiviFields_(ev) }, currentDocument: { exists: false } }];
+  if (notif) writes.push({ update: { name: suiviDocName_("notificationsProf", notif.id), fields: suiviFields_(notif) }, currentDocument: { exists: false } });
+  const res = UrlFetchApp.fetch(`${fsBase_()}:commit`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ writes: writes }), muteHttpExceptions: true
+  });
+  const code = res.getResponseCode();
+  if (code >= 200 && code < 300) return { ok: true };
+  if (code === 409 || /ALREADY_EXISTS|FAILED_PRECONDITION/.test(res.getContentText())) return { ok: true, doublon: true };
+  throw new Error("Firestore commit " + code);
+}
+function suiviFile_() { return PropertiesService.getScriptProperties(); }
+function suiviJournaliser_(token, ev, notif) {
+  try { return suiviEcrire_(token, ev, notif); }
+  catch (e) {
+    console.warn("Événement mis en file pour reprise : " + rptErrMsg_(e));
+    try {
+      const p = suiviFile_();
+      const file = JSON.parse(p.getProperty("SUIVI_A_REPRENDRE") || "[]");
+      if (!file.some(x => x.ev.id === ev.id)) file.push({ ev: ev, notif: notif || null });
+      p.setProperty("SUIVI_A_REPRENDRE", JSON.stringify(file.slice(-200)));
+    } catch (e2) { console.warn("File de reprise indisponible : " + rptErrMsg_(e2)); }
+    return { ok: false, enFile: true };
+  }
+}
+function reprendreSuivi_() {
+  let p, file;
+  try { p = suiviFile_(); file = JSON.parse(p.getProperty("SUIVI_A_REPRENDRE") || "[]"); } catch (e) { return 0; }
+  if (!file.length) return 0;
+  const token = getFirestoreAccessToken_();
+  const reste = [];
+  file.forEach(x => { try { suiviEcrire_(token, x.ev, x.notif); } catch (e) { reste.push(x); } });
+  p.setProperty("SUIVI_A_REPRENDRE", JSON.stringify(reste));
+  return file.length - reste.length;
+}
+/* Construit l'événement normalisé (champs demandés) et, si utile, la notification. */
+function suiviEvenement_(slotId, slot, type, auteur, canal, ancien, nouveau, details, cle) {
+  const at = new Date().toISOString();
+  const id = (type + "_" + suiviHash_([slotId, type, cle || "", slot.date || ""].join("|"))).slice(0, 120);
+  return {
+    id: id, type: type, at: at,
+    eleveId: slot.reservedBy || (details && details.eleveId) || null,
+    eleveNom: slot.reservedName || (details && details.eleveNom) || null,
+    seanceId: slotId, packId: slot.packId || null, isPack: slot.isPack === true,
+    coursDate: (details && details.coursDate) || slot.date || null,
+    canal: canal, auteur: auteur,
+    ancienStatut: ancien || null, nouveauStatut: nouveau || null,
+    resultat: "ok",
+    details: details ? JSON.stringify(details).slice(0, 1500) : ""
+  };
+}
+function suiviNotification_(ev, message, actionRequise) {
+  return { id: "n_" + ev.id, eventId: ev.id, type: ev.type, message: message, seanceId: ev.seanceId,
+    eleveId: ev.eleveId, eleveNom: ev.eleveNom, coursDate: ev.coursDate, at: ev.at, lu: false, actionRequise: actionRequise === true };
+}
+function suiviDateFr_(iso) { try { return formatDateInTimezone_(new Date(iso), "Europe/Paris"); } catch (e) { return iso; } }
+
+/* ---- Point d'entrée unique : confirmer, demander un déplacement, annuler ----
+   actor = { role: "eleve" | "administratrice", uid, via: "email" | "plateforme", token } */
+function coursAction_(slotId, type, actor, extra) {
+  extra = extra || {};
+  let r;
+  try {
+    r = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      let slot;
+      try { slot = rptLoadSlot_(slotId, token); } catch (e) { throw new Error("Ce cours est introuvable ou le service est momentanément indisponible. Réessaie dans quelques minutes : rien n'a été modifié."); }
+      const canal = actor.via === "email" ? "email" : "plateforme";
+      /* Lien d'e-mail : jeton propre au rappel ET à la date du cours (un cours déplacé invalide l'ancien lien). */
+      if (actor.via === "email") {
+        const s = slot.suivi || {};
+        if (s.token && s.token === actor.token && String(s.statut || "").indexOf("annule") === 0) return { ok: true, already: true, message: "Ce cours est déjà annulé. Ta réponse avait bien été enregistrée." };
+        if (!slot.reminderActionToken || slot.reminderActionToken !== actor.token || (slot.reminderSentForDate && slot.reminderSentForDate !== slot.date)) {
+          throw new Error("Ce lien n'est plus valide (le cours a peut-être été déplacé, annulé ou un rappel plus récent a été envoyé). Utilise le dernier e-mail reçu ou ton espace de cours.");
+        }
+      }
+      if (!slot.reservedBy || slot.experimentalCancelled || slot.definitivelyCancelled) return { ok: true, already: true, message: "Ce cours est déjà annulé." };
+      if (actor.role === "eleve" && actor.via !== "email" && slot.reservedBy !== actor.uid) throw new Error("Ce cours ne t'appartient pas.");
+      const start = new Date(slot.date).getTime();
+      if (!(start > Date.now())) throw new Error("Ce cours a déjà commencé ou est passé : il ne peut plus être modifié ici.");
+      const hoursBefore = (start - Date.now()) / 3600000;
+      const ancien = suiviStatut_(slot);
+      const par = actor.role === "administratrice" ? "administratrice" : "eleve";
+      const auteur = par === "administratrice" ? "administratrice" : "eleve";
+
+      if (type === "confirm") {
+        if (ancien === "confirme") return { ok: true, already: true, message: "Ton cours était déjà confirmé. À bientôt !" };
+        const at = new Date().toISOString();
+        rptPatch_(slotId, token, { confirmed: true, confirmedAt: at, suivi: { statut: "confirme", at: at, canal: canal, par: par, eleveId: slot.reservedBy, date: slot.date, token: actor.token || null } });
+        const ev = suiviEvenement_(slotId, slot, par === "administratrice" ? "lesson_status_corrected" : "lesson_confirmed", auteur, canal, ancien, "confirme", null, "confirm|" + slot.reservedBy);
+        suiviJournaliser_(token, ev, par === "eleve" ? suiviNotification_(ev, `${slot.reservedName || "Un élève"} a confirmé son cours du ${suiviDateFr_(slot.date)}.`, false) : null);
+        return { ok: true, statut: "confirme", message: "Ton cours est bien confirmé. À bientôt !" };
+      }
+
+      if (type === "reschedule_request") {
+        if (hoursBefore < 1) throw new Error("Le délai d'une heure est dépassé : il n'est plus possible de demander le déplacement de ce cours.");
+        const req = slot.rescheduleRequest || {};
+        if (req.status === "pending" && req.by === "student") return { ok: true, already: true, message: "Ta demande de déplacement avait déjà été envoyée. Melissa te répondra." };
+        if (req.status === "pending" && req.by === "teacher") throw new Error("Melissa t'a déjà proposé une nouvelle date pour ce cours : réponds à sa proposition dans ton espace ou dans son e-mail.");
+        let av = Array.isArray(extra.availability) ? extra.availability.map(v => String(v || "").trim()) : [];
+        if (av.length !== 3 || av.some(v => !v)) throw new Error("Tu dois proposer exactement 3 disponibilités.");
+        if (new Set(av).size !== 3) throw new Error("Les 3 disponibilités doivent être différentes.");
+        av = av.map(v => { const d = new Date(v); if (isNaN(d.getTime())) throw new Error("Une des disponibilités n'est pas valide."); if (d.getTime() <= Date.now()) throw new Error("Les disponibilités proposées doivent être dans le futur."); return d.toISOString(); });
+        if (new Set(av).size !== 3) throw new Error("Les 3 disponibilités doivent être différentes.");
+        const at = new Date().toISOString();
+        rptPatch_(slotId, token, {
+          rescheduleRequested: true, rescheduleRequestedAt: at,
+          rescheduleAvailability1: av[0], rescheduleAvailability2: av[1], rescheduleAvailability3: av[2],
+          rescheduleRequest: { by: "student", status: "pending", availability1: av[0], availability2: av[1], availability3: av[2], proposedDate: null, proposedDuree: slot.duree || 45, requestedAt: at, via: canal },
+          rescheduleHistory: rptHistory_(slot, { type: "student_request", via: canal, availability: av }),
+          suivi: { statut: "deplacement_demande", at: at, canal: canal, par: par, eleveId: slot.reservedBy, date: slot.date, token: actor.token || null }
+        });
+        const ev = suiviEvenement_(slotId, slot, "lesson_reschedule_requested", auteur, canal, ancien, "deplacement_demande", { disponibilites: av }, "resched|" + av.join(","));
+        suiviJournaliser_(token, ev, suiviNotification_(ev, `${slot.reservedName || "Un élève"} demande à déplacer son cours du ${suiviDateFr_(slot.date)} (3 disponibilités proposées).`, true));
+        return { ok: true, statut: "deplacement_demande", slot: slot, av: av, message: "Ta demande de déplacement est enregistrée. Ton cours reste réservé tant que Melissa n'a pas validé un nouveau créneau." };
+      }
+
+      if (type === "cancel") {
+        if (actor.via === "email" && hoursBefore < 1) throw new Error("Le délai d'une heure est dépassé. Le cours ne peut plus être annulé.");
+        return coursAnnuler_(token, slotId, slot, par === "administratrice" ? "teacher" : "student", canal, { token: actor.token || null });
+      }
+      throw new Error("Action inconnue.");
+    });
+  } catch (err) {
+    return { ok: false, error: rptErrMsg_(err) };
+  }
+  /* E-mails après le verrou (non bloquants). */
+  try {
+    if (r.statut === "deplacement_demande" && !r.already) suiviMailDeplacement_(r.slot, r.av);
+    if (r.mailAnnulation) MailApp.sendEmail({ to: TEACHER_EMAIL, subject: "Cours annulé — " + (r.mailAnnulation.nom || "Élève"), htmlBody: `<p><strong>${escapeHtml_(r.mailAnnulation.nom || "Un élève")}</strong> a annulé son cours du ${escapeHtml_(suiviDateFr_(r.mailAnnulation.date))} (${escapeHtml_(r.mailAnnulation.canal)}).</p>` });
+  } catch (e) { console.warn(e); }
+  return r;
+}
+function suiviMailDeplacement_(slot, av) {
+  const token = getFirestoreAccessToken_();
+  const tz = getStudentTimezone_(fsBase_(), slot.reservedBy, token) || "America/Sao_Paulo";
+  const f = iso => formatDateInTimezone_(new Date(iso), tz);
+  MailApp.sendEmail({
+    to: TEACHER_EMAIL, subject: "Demande de replanification — " + (slot.reservedName || "Élève"),
+    htmlBody: `<p><strong>${escapeHtml_(slot.reservedName || "Un élève")}</strong> souhaite déplacer son cours.</p>` +
+      `<p><strong>Cours actuel :</strong><br>${escapeHtml_(f(slot.date))}</p><p><strong>3 disponibilités proposées :</strong></p>` +
+      `<ol>${av.map(x => "<li>" + escapeHtml_(f(x)) + "</li>").join("")}</ol><p>Réponds depuis ta plateforme (Cours › Confirmations et demandes).</p>`
+  });
+}
+
+/* ---- Annulation (règle unique pour l'e-mail, la plateforme, la professeure et l'automatisation) ----
+   Annulation à moins d'une heure (ou automatique faute de confirmation) = tardive : deux
+   tolérances sur 30 jours glissants ; au-delà, la séance est décomptée si c'est l'élève
+   (definitivelyCancelled + cancelledBy "student"), remboursement dû si c'est la professeure. */
+function coursAnnuler_(token, slotId, slot, by, canal, opts) {
+  opts = opts || {};
+  const ancien = suiviStatut_(slot);
+  const at = new Date().toISOString();
+  const start = new Date(slot.date).getTime();
+  const auto = opts.auto === true;
+  const auteur = auto ? "automatisation" : (by === "teacher" ? "administratrice" : "eleve");
+  if (slot.isExperimental === true) {
+    patchFirestoreFields_(fsBase_(), "disponibilites", slotId, token, {
+      experimentalCancelled: { booleanValue: true }, experimentalCancelledBy: { stringValue: by === "teacher" ? "teacher" : (slot.reservedBy || "") },
+      confirmed: { booleanValue: false }, reminderActionToken: { nullValue: null }, zoomJoinUrl: { nullValue: null }, cancelledAt: { stringValue: at },
+      suivi: jsToFirestoreValue_({ statut: "annule", at: at, canal: canal, par: auteur, eleveId: slot.reservedBy, date: slot.date, token: opts.token || null })
+    });
+    const ev = suiviEvenement_(slotId, slot, "lesson_cancelled", auteur, canal, ancien, "annule", { coursExperimental: true }, "cancel");
+    suiviJournaliser_(token, ev, auteur === "administratrice" ? null : suiviNotification_(ev, `${slot.reservedName || "Un élève"} a annulé son cours expérimental du ${suiviDateFr_(slot.date)}.`, false));
+    return { ok: true, statut: "annule", message: "Ton cours expérimental a bien été annulé.", excessive: false, refundDue: false, mailAnnulation: auteur === "eleve" ? { nom: slot.reservedName, date: slot.date, canal: canal } : null };
+  }
+  const studentDoc = getFirestoreDocument_(fsBase_(), "eleves", slot.reservedBy, token);
+  const studentData = firestoreFieldsToJs_(studentDoc.fields || {});
+  const log = Array.isArray(studentData.noShowLog) ? studentData.noShowLog : [];
+  const isLate = auto || (Number.isFinite(start) && (start - Date.now()) < 3600000);
+  let excessive = false, refundDue = false, recentCount = 0;
+  if (isLate) {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000;
+    recentCount = log.filter(x => x && x.by === by && x.late === true && new Date(x.ts).getTime() >= thirtyDaysAgo).length;
+    log.push({ ts: at, by: by, late: true, seance: slotId, coursDate: slot.date, motif: auto ? "non_confirme" : "annulation_tardive" });
+    patchFirestoreFields_(fsBase_(), "eleves", slot.reservedBy, token, { noShowLog: jsToFirestoreValue_(log) });
+    excessive = recentCount + 1 > 2;
+  }
+  const statut = auto ? "annule_auto" : (isLate ? "annule_tardif" : "annule");
+  const suivi = { statut: statut, at: at, canal: canal, par: auteur, eleveId: slot.reservedBy, date: slot.date, token: opts.token || null };
+  if (excessive) {
+    const patch = { definitivelyCancelled: true, cancelledBy: by, cancelledAt: at, confirmed: false, reminderActionToken: null, zoomJoinUrl: null, suivi: suivi };
+    if (by === "student") patch.consommation = { statut: "decomptee", motif: auto ? "Cours non confirmé à H-1, tolérances épuisées (2 sur 30 jours)" : "Annulation tardive, tolérances épuisées (2 sur 30 jours)", par: "automatisation", at: at, etatAvant: "programmee" };
+    rptPatch_(slotId, token, patch);
+    if (by === "teacher") {
+      refundDue = true;
+      patchFirestoreFields_(fsBase_(), "eleves", slot.reservedBy, token, { refundDue: { booleanValue: true } });
+    }
+  } else {
+    patchFirestoreFields_(fsBase_(), "disponibilites", slotId, token, {
+      reservedBy: { nullValue: null }, reservedName: { nullValue: null }, reservedEmail: { nullValue: null }, reservedPhone: { nullValue: null },
+      zoomJoinUrl: { nullValue: null }, zoomTopic: { nullValue: null }, paymentStatus: { nullValue: null }, cpfNaNota: { nullValue: null },
+      reminderSent: { booleanValue: false }, reminderSentForDate: { nullValue: null }, reminderActionToken: { nullValue: null }, reminderSentAt: { nullValue: null },
+      clickedByStudent: { nullValue: null }, clickedByTeacher: { nullValue: null }, confirmed: { booleanValue: false },
+      rescheduleRequest: { nullValue: null }, rescheduleRequested: { nullValue: null }, cancelledAt: { stringValue: at },
+      packId: { nullValue: null }, isPack: { booleanValue: false }, consommation: { nullValue: null }, anomalie: { booleanValue: false },
+      suivi: jsToFirestoreValue_(suivi)
+    });
+    if (slot.isPack === true) {
+      const pack = studentData.pack && typeof studentData.pack === "object" ? studentData.pack : {};
+      pack.used = Math.max(0, Number(pack.used || 0) - 1);
+      patchFirestoreFields_(fsBase_(), "eleves", slot.reservedBy, token, { pack: jsToFirestoreValue_(pack) });
+    }
+  }
+  const tolerances = isLate ? { utilisees: Math.min(2, recentCount + 1), restantes: Math.max(0, 2 - (recentCount + 1)) } : null;
+  const details = { tardive: isLate, decomptee: excessive && by === "student", remboursementDu: refundDue, tolerances: tolerances, forfait: slot.isPack === true ? (excessive && by === "student" ? "séance décomptée" : "séance rendue au forfait") : null };
+  const ev = suiviEvenement_(slotId, slot, auto ? "lesson_auto_cancelled" : "lesson_cancelled", auteur, auto ? "automatisation" : canal, ancien, statut, details, "cancel");
+  const nom = slot.reservedName || "Un élève";
+  const msg = auto
+    ? `Le cours de ${nom} du ${suiviDateFr_(slot.date)} a été automatiquement annulé faute de confirmation${excessive ? " (tolérances épuisées : séance décomptée)" : ` (tolérance ${Math.min(2, recentCount + 1)}/2 utilisée)`}.`
+    : `${nom} a annulé son cours du ${suiviDateFr_(slot.date)}${isLate ? " moins d'une heure avant" + (excessive ? " — tolérances épuisées, séance décomptée" : ` — tolérance ${Math.min(2, recentCount + 1)}/2 utilisée`) : ""}.`;
+  suiviJournaliser_(token, ev, auteur === "administratrice" ? null : suiviNotification_(ev, msg, false));
+  const message = excessive && by === "student"
+    ? "Ton cours est annulé. Tu as déjà utilisé les 2 tolérances d'annulation tardive des 30 derniers jours : cette séance est décomptée de ton forfait."
+    : "Ton cours a bien été annulé.";
+  return { ok: true, statut: statut, excessive: excessive, refundDue: refundDue, message: message,
+    mailAnnulation: auteur === "eleve" ? { nom: slot.reservedName, date: slot.date, canal: canal } : null };
+}
+
+/* ---- Annulation automatique à H-1 des cours non confirmés ----
+   Déclencheur : annulerCoursNonConfirmes toutes les 10 minutes.
+   Activée seulement si config/plateforme.confirmation.annulationAuto === true ;
+   sinon, une notification « cours non confirmé » est créée (une seule fois).
+   Jamais si : rappel non envoyé pour cette date, cours confirmé, déplacement demandé
+   ou proposé, cours expérimental, anomalie. */
+function annulerCoursNonConfirmes() {
+  const token = getFirestoreAccessToken_();
+  let actif = false;
+  try {
+    const doc = getFirestoreDocument_(fsBase_(), "config", "plateforme", token);
+    const c = (firestoreFieldsToJs_(doc.fields || {}).confirmation) || {};
+    actif = c.annulationAuto === true;
+  } catch (e) { /* désactivée par défaut */ }
+  const now = Date.now();
+  const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+    method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+    payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "disponibilites" }], where: { compositeFilter: { op: "AND", filters: [
+      { fieldFilter: { field: { fieldPath: "date" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: new Date(now).toISOString() } } },
+      { fieldFilter: { field: { fieldPath: "date" }, op: "LESS_THAN_OR_EQUAL", value: { stringValue: new Date(now + 3600000).toISOString() } } }
+    ] } } } }),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) throw new Error("annulerCoursNonConfirmes : " + res.getContentText());
+  const out = { annules: 0, signales: 0 };
+  (JSON.parse(res.getContentText()) || []).filter(r => r.document).forEach(r => {
+    const id = r.document.name.split("/").pop();
+    const s = firestoreFieldsToJs_(r.document.fields || {});
+    if (!s.reservedBy || s.isExperimental === true || s.experimentalCancelled || s.definitivelyCancelled || s.anomalie) return;
+    if (s.reminderSentForDate !== s.date) return;
+    const st = suiviStatut_(s);
+    if (st !== "en_attente") return;
+    if (s.rescheduleRequest && s.rescheduleRequest.status === "pending") return;
+    if (!actif) {
+      const ev = suiviEvenement_(id, s, "lesson_unconfirmed", "automatisation", "automatisation", st, st, { annulationAutomatique: "désactivée" }, "h-1");
+      suiviJournaliser_(token, ev, suiviNotification_(ev, `${s.reservedName || "Un élève"} n'a pas confirmé son cours du ${suiviDateFr_(s.date)} (H-1). Annulation automatique désactivée : le cours est maintenu.`, false));
+      out.signales++;
+      return;
+    }
+    try {
+      rptWithLock_(() => {
+        const frais = rptLoadSlot_(id, token);
+        if (frais.reservedBy !== s.reservedBy || frais.date !== s.date || suiviStatut_(frais) !== "en_attente") return null;
+        const r2 = coursAnnuler_(token, id, frais, "student", "automatisation", { auto: true });
+        if (frais.reservedEmail) { try { sendCancellationEmail(frais.reservedEmail, (frais.reservedName || "").split(" ")[0], suiviDateFr_(frais.date)); } catch (e) {} }
+        return r2;
+      });
+      out.annules++;
+    } catch (e) { console.warn("Annulation automatique impossible pour " + id + " : " + rptErrMsg_(e)); }
+  });
+  return out;
+}
+
+/* ---- Actions appelées depuis l'application ---- */
+function handleLessonAction(data, authCtx) {
+  try {
+    if (!authCtx || !authCtx.uid) throw new Error("Authentification requise.");
+    if (!data.slotId || !["confirm", "reschedule_request"].includes(data.type)) throw new Error("Action inconnue.");
+    const actor = { role: isTeacherAuth_(authCtx) ? "administratrice" : "eleve", uid: authCtx.uid, via: "plateforme" };
+    return jsonResponse(coursAction_(data.slotId, data.type, actor, { availability: data.availability }));
+  } catch (err) { return jsonResponse({ ok: false, error: rptErrMsg_(err) }); }
+}
+/* Relance du rappel (même lien) — professeure, au plus une fois toutes les 6 h. */
+function handleResendReminder(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    const res = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const s = rptLoadSlot_(data.slotId, token);
+      if (!s.reservedBy || !s.reservedEmail) throw new Error("Pas d'élève ou pas d'e-mail pour ce cours.");
+      if (new Date(s.date).getTime() - Date.now() < 3600000) throw new Error("Le cours commence dans moins d'une heure.");
+      if (suiviStatut_(s) !== "en_attente") throw new Error("L'élève a déjà répondu (" + (SUIVI_LIBELLES_[suiviStatut_(s)] || suiviStatut_(s)) + ").");
+      if (s.reminderLastResentAt && Date.now() - new Date(s.reminderLastResentAt).getTime() < 6 * 3600000) throw new Error("Un rappel a déjà été renvoyé il y a moins de 6 heures.");
+      let actionToken = s.reminderSentForDate === s.date ? s.reminderActionToken : null;
+      if (!actionToken) actionToken = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, "");
+      const tz = getStudentTimezone_(fsBase_(), s.reservedBy, token) || "America/Sao_Paulo";
+      sendReminderEmail(s.reservedEmail, (s.reservedName || "").split(" ")[0], formatDateInTimezone_(new Date(s.date), tz), data.slotId, actionToken);
+      const at = new Date().toISOString();
+      rptPatch_(data.slotId, token, { reminderSent: true, reminderSentForDate: s.date, reminderActionToken: actionToken, reminderSentAt: s.reminderSentAt || at, reminderLastResentAt: at, reminderResends: Number(s.reminderResends || 0) + 1 });
+      const ev = suiviEvenement_(data.slotId, s, "lesson_reminder_resent", "administratrice", "email", "en_attente", "en_attente", null, "resend|" + at);
+      suiviJournaliser_(token, ev, null);
+      return { ok: true };
+    });
+    return jsonResponse(res);
+  } catch (err) { return jsonResponse({ ok: false, error: rptErrMsg_(err) }); }
+}
+
+
+/* Clôt les notifications « intervention requise » d'une séance une fois que
+   Melissa a traité la demande (proposition, acceptation ou refus). */
+function suiviCloreDemandes_(token, slotId) {
+  try {
+    const res = UrlFetchApp.fetch(`${fsBase_()}:runQuery`, {
+      method: "post", contentType: "application/json", headers: { Authorization: "Bearer " + token },
+      payload: JSON.stringify({ structuredQuery: { from: [{ collectionId: "notificationsProf" }], where: { fieldFilter: { field: { fieldPath: "seanceId" }, op: "EQUAL", value: { stringValue: slotId } } } } }),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() < 200 || res.getResponseCode() >= 300) return;
+    const at = new Date().toISOString();
+    (JSON.parse(res.getContentText()) || []).filter(r => r.document).forEach(r => {
+      const n = firestoreFieldsToJs_(r.document.fields || {});
+      if (n.seanceId === slotId && n.actionRequise === true && !n.traiteeAt) {
+        patchFirestoreFields_(fsBase_(), "notificationsProf", r.document.name.split("/").pop(), token, { actionRequise: { booleanValue: false }, traiteeAt: { stringValue: at } });
+      }
+    });
+  } catch (e) { console.warn("suiviCloreDemandes_ : " + rptErrMsg_(e)); }
+}
+
+/* Refus, par Melissa, d'une demande de déplacement de l'élève : le cours reste
+   à sa date d'origine (rien n'est décompté) et l'élève est prévenu(e). */
+function handleRefuseRescheduleRequest(data, authCtx) {
+  try {
+    requireTeacher_(authCtx);
+    if (!data.slotId) throw new Error("slotId manquant");
+    const res = rptWithLock_(() => {
+      const token = getFirestoreAccessToken_();
+      const slot = rptLoadSlot_(data.slotId, token);
+      const req = slot.rescheduleRequest || null;
+      if (!req || req.by !== "student" || req.status !== "pending") return { ok: true, already: true };
+      const at = new Date().toISOString();
+      const motif = String(data.motif || "").slice(0, 300);
+      const apres = slot.confirmed === true ? "confirme" : "en_attente";
+      rptPatch_(data.slotId, token, {
+        rescheduleRequest: Object.assign({}, req, { status: "refused", refusedAt: at, refusedBy: "teacher", motif: motif }),
+        rescheduleRequested: false,
+        rescheduleHistory: rptHistory_(slot, { type: "student_request_refused", by: "teacher", via: "plateforme" }),
+        suivi: { statut: apres, at: at, canal: "plateforme", par: "administratrice", eleveId: slot.reservedBy, date: slot.date }
+      });
+      const ev = suiviEvenement_(data.slotId, slot, "lesson_reschedule_refused", "administratrice", "plateforme", "deplacement_demande", apres,
+        { motif: motif || null, coursMaintenu: slot.date }, "refusdemande|" + (req.requestedAt || ""));
+      suiviJournaliser_(token, ev, null);
+      suiviCloreDemandes_(token, data.slotId);
+      return { ok: true, slot: slot, motif: motif };
+    });
+    if (res.ok && res.slot && res.slot.reservedEmail) {
+      try {
+        const token = getFirestoreAccessToken_();
+        const tz = getStudentTimezone_(fsBase_(), res.slot.reservedBy, token) || "America/Sao_Paulo";
+        MailApp.sendEmail({ to: res.slot.reservedEmail, subject: "Ta demande de déplacement de cours",
+          htmlBody: `<p>Bonjour ${escapeHtml_((res.slot.reservedName || "").split(" ")[0])},</p><p>Melissa n'a pas pu accepter le déplacement demandé. Ton cours reste prévu le <strong>${escapeHtml_(formatDateInTimezone_(new Date(res.slot.date), tz))}</strong>.</p>` +
+            (res.motif ? `<p>Message de Melissa : ${escapeHtml_(res.motif)}</p>` : "") + `<p>Tu peux répondre depuis ton espace de cours.</p>` });
+      } catch (e) { console.warn(e); }
+    }
+    return jsonResponse({ ok: true, already: res.already === true });
+  } catch (err) { return jsonResponse({ ok: false, error: rptErrMsg_(err) }); }
 }

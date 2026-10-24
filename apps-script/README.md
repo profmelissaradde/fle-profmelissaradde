@@ -44,3 +44,30 @@ Si l'application est mise en ligne avant le nouveau script, une acceptation affi
 À faire :
 1. Coller `Code.gs`, puis **Nouvelle version** du déploiement existant (l'URL ne change pas).
 2. Ajouter un déclencheur : fonction `relancerPropositionsAuto`, basé sur le temps, **tous les jours** (par exemple entre 9 h et 10 h).
+
+## Mise à jour du 24/10/2026 — réponses aux e-mails de rappel synchronisées
+Toutes les réponses (Confirmer / Annuler / Demander à déplacer), qu'elles viennent de l'e-mail, de l'espace élève, de Melissa ou d'une automatisation, passent par un **service central** (`coursAction_` / `coursAnnuler_`).
+- **Même règle partout** : délais, 2 tolérances d'annulation tardive sur 30 jours glissants, forfait rendu ou décompté.
+- **Fiabilité** : verrou, idempotence (double clic ou événement rejoué = une seule action), jeton lié à la date du cours, message « enregistré » uniquement après confirmation de Firestore.
+- **Statut** de la réservation : `disponibilites/{id}.suivi`.
+- **Historique** en ajout seul : collection `evenementsCours`. Un événement non écrit est mis en file et repris par `retryZoomSyncs`.
+- **Notifications** pour Melissa : collection `notificationsProf` (lu / intervention requise).
+- **Nouvelles actions** :
+  - `lessonAction` (confirmer / demander un déplacement depuis la plateforme) ;
+  - `resendReminder` (relance du rappel, au plus toutes les 6 h) ;
+  - `refuseRescheduleRequest`.
+- **Nouvelle fonction** `annulerCoursNonConfirmes` (annulation à H-1 des cours non confirmés).
+  - **Désactivée par défaut** : sans activation, Melissa est seulement prévenue.
+  - Elle s'active dans Paramètres › Réglages › Confirmation des cours.
+
+À faire, dans cet ordre :
+1. Coller `Code.gs`, puis **Nouvelle version** du déploiement existant (l'URL ne change pas).
+2. Ajouter un déclencheur : fonction `annulerCoursNonConfirmes`, basé sur le temps, **toutes les 10 minutes**.
+3. Firebase Console › Firestore › Règles : coller `firestore.rules` › **Publier** (nouvelles collections `evenementsCours` et `notificationsProf`).
+4. Fusionner la pull request.
+
+Si l'application est en ligne avant le nouveau script :
+- la demande de déplacement depuis la plateforme repasse par l'ancien circuit ;
+- le bouton « Confirmer mon cours » affiche un message d'indisponibilité.
+
+Rien n'est perdu.
