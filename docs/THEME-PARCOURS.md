@@ -3,6 +3,7 @@
 ## Fichiers
 - `js/11-theme-parcours.js` — moteur : rendu élève, exercices, correction automatique, sauvegarde/reprise, bilan, espace enseignante (aperçu, correction, publication, vidéo, éditeur, création de thème).
 - `js/12-theme-entretien-embauche.js` — thème « Vous voulez ce poste ? » (A0, A1, A2, B1, B2).
+- `js/23-theme-conseil.js` — thème « Un petit conseil ! » (26 octobre → 1er novembre 2026, A0 à B2).
 - Modifications ciblées : `js/03-donnees-themes-semaine.js` (visibilité brouillon, aiguillage v2, certificat), `js/00-config-etat.js` (lecture de `niveauTheme`), `index.html` (CSS `tp-*`, 2 balises script).
 
 Les anciens thèmes (sans `version: 2`) gardent exactement leur rendu et leurs données.
