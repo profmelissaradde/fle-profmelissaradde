@@ -1669,7 +1669,7 @@ function renderTeacherTemas(){
     return;
   }
   body.innerHTML = `<div class="tema-week-tabs">${weeksHTML}</div>
-    <div class="storage-note">🍅 Thème affiché : <b>${tema.titre_fr}</b> (${tema.periode}). Le niveau utilisé pour chaque élève est celui attribué dans l'onglet « Élèves & niveaux ».</div>` +
+    <div class="storage-note">Thème affiché : <b>${tema.titre_fr}</b> (${tema.periode}). Le niveau utilisé pour chaque élève est celui de sa fiche (Élèves › fiche › Profil & niveau).</div>` +
     studentsData.map(s=>{
       const t = (s.temas && s.temas[teacherTemaSelectedId]) || {};
       const doneCount = ['co','ce','ee','eo'].filter(k=> t[k] && t[k].done).length;

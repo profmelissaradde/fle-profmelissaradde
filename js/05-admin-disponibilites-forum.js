@@ -248,46 +248,7 @@ async function saveCpfNaNotaPack(){
 let adminCalDate = new Date();
 let adminSelectedDay = null;
 
-function selectAdminDayNav(delta){
-  adminCalDate = new Date(
-    adminCalDate.getFullYear(),
-    adminCalDate.getMonth()+delta,
-    1
-  );
-  renderAdminDispo();
-}
 
-function selectAdminDay(key){
-  adminSelectedDay = (adminSelectedDay === key) ? null : key;
-  renderAdminDispo();
-}
-
-async function loadAdminDispo(){
-  const body = document.getElementById('teacher-body');
-
-  if(body){
-    body.innerHTML = '<p class="teacher-empty">Chargement…</p>';
-  }
-
-  try{
-    const snap = await db.collection('disponibilites').orderBy('date').get();
-    dispoData = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  }catch(e){
-    dispoData = [];
-  }
-
-  if(studentsData.length===0){
-    await loadTeacherStudentsQuiet();
-  }
-  /* Soldes de forfait réels pour le formulaire « Réserver un forfait ». */
-  if(typeof loadPackSlotsByStudent === 'function') await loadPackSlotsByStudent();
-
-  await loadPaymentLinks();
-
-  renderAdminDispo();
-}
-
-let adminRescheduleFormOpenId = null;
 let paymentLinksEditorOpen = false;
 
 async function regenerateMissingZoomLinks(){
@@ -437,102 +398,10 @@ async function sendNotaFiscal(id, inputElId){
   await loadAdminDispo();
 }
 
-function toggleAdminRescheduleForm(id){
-  adminRescheduleFormOpenId =
-    (adminRescheduleFormOpenId === id) ? null : id;
-
-  renderAdminDispo();
-}
-
-function adminRescheduleFormHTML(s){
-  return `
-    <div class="rec-box" style="margin-top:10px;">
-      <p class="rec-consigne" style="font-weight:700;">
-        🔁 Demander une replanification à ${s.reservedName || "l'élève"}
-      </p>
-
-      <p style="font-size:12.5px; color:var(--grey);">
-        Propose un nouveau créneau. L'élève devra l'accepter ou le refuser dans son espace.
-      </p>
-
-      <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:8px;">
-        Nouvelle date et heure
-
-        <input
-          type="datetime-local"
-          id="admin-reschedule-date-${s.id}"
-          oninput="previewTZ('admin-reschedule-date-${s.id}','admin-reschedule-tz-${s.id}')"
-          style="display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;"
-        >
-      </label>
-
-      <div id="admin-reschedule-tz-${s.id}"></div>
-
-      <div class="teacher-entry-actions" style="margin-top:8px;">
-        <button onclick="submitAdminRescheduleRequest('${s.id}')">
-          Envoyer la demande
-        </button>
-
-        <button
-          onclick="toggleAdminRescheduleForm('${s.id}')"
-          style="background:none; color:var(--grey);"
-        >
-          Fermer
-        </button>
-      </div>
-
-      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--line);">
-        <button onclick="directRescheduleAdmin('${s.id}')" style="background:none; color:var(--bad);">
-          ⚡ Changer directement, sans attendre de confirmation (cas exceptionnel)
-        </button>
-        <p style="font-size:11px; color:var(--grey); margin-top:4px;">La date change tout de suite et un nouveau lien Zoom est régénéré immédiatement — à utiliser quand c'est urgent et que tu n'as pas le temps d'attendre que l'élève confirme.</p>
-      </div>
-    </div>
-  `;
-}
-
-async function directRescheduleAdmin(id){
-  const slot = dispoData.find(s=>s.id===id);
-  const input = document.getElementById('admin-reschedule-date-'+id);
-  if(!slot || !input || !input.value){
-    alert('Choisis une date et une heure.');
-    return;
-  }
-  const newDate = new Date(input.value).toISOString();
-  try{
-    const r = await rptAppliquer(slot, newDate, slot.duree, 'direct');
-    if(!r.ok) return;
-    adminRescheduleFormOpenId = null;
-    alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
-  }catch(e){ alert(e.message); return; }
-  await loadAdminDispo();
-}
 
 /* Proposition de déplacement d'un cours à venir : enregistrée côté serveur (avec un
    lien sécurisé Accepter / Refuser dans l'e-mail) ; le cours ne bouge qu'après
    l'accord de l'élève. */
-async function submitAdminRescheduleRequest(id){
-  const slot = dispoData.find(s=>s.id===id);
-  const input = document.getElementById('admin-reschedule-date-'+id);
-  if(!slot || !input || !input.value){
-    alert('Choisis une date et une heure.');
-    return;
-  }
-  const proposedDate = new Date(input.value).toISOString();
-  try{
-    const r = await rptProposer(slot, proposedDate, slot.duree || 45);
-    if(!r.ok) return;
-    alert("Proposition envoyée" + (r.emailed ? " par e-mail" : "") + ". Le cours actuel reste réservé jusqu'à la réponse de l'élève.");
-  }catch(e){ alert(e.message); return; }
-  adminRescheduleFormOpenId = null;
-  await postSystemMessage(
-    slot.reservedBy,
-    slot.reservedName,
-    `📅 Je te propose de déplacer ton cours du ${fmtSlotDate(slot.date)} au ${fmtSlotDate(proposedDate)}. Tu peux accepter ou refuser depuis l'e-mail reçu ou dans « Réserver un cours ».`,
-    true
-  );
-  await loadAdminDispo();
-}
 
 
 /* ---- Récurrence par jours de la semaine (créneaux + forfaits) ---- */
@@ -896,593 +765,68 @@ function refreshRecurrencePreview(prefix){
     </div>
   `;
 }
-function renderAdminDispo(){
-  const body = document.getElementById('teacher-body');
-  if(!body) return;
-
-  const now = Date.now();
-
-  let upcoming = dispoData.filter(
-    s => new Date(s.date).getTime() >= now - 3600000
-  );
-
-  const markers = {};
-
-  upcoming.forEach(s=>{
-    markers[toDateKey(new Date(s.date))] = {
-      color: s.reservedBy ? 'var(--c-primary)' : 'var(--c-success)'
-    };
-  });
-
-  const studentOptions = studentsData.map(s=>`
-    <option value="${esc(s.id)}">
-      ${esc(s.prenom)} ${esc(s.nom)}${s.niveau ? ' · '+esc(s.niveau) : ''}
-    </option>
-  `).join('');
-
+/* ---- Formulaires de création (mêmes identifiants qu'avant : addDisponibilite et
+   reserverPack les lisent). Affichés dans Cours › Disponibilités et
+   Forfaits & paiements › Nouveau forfait (js/22-seances.js). ---- */
+function dispoFormHTML(){
+  const studentOptions = studentsData.map(s=>`<option value="${esc(s.id)}">${esc(s.prenom)} ${esc(s.nom || '')}${s.niveau ? ' · ' + esc(s.niveau) : ''}</option>`).join('');
+  return `<section class="settings-card" aria-labelledby="dispo-form-t">
+    <h2 id="dispo-form-t">Ouvrir des créneaux</h2>
+    <p class="page-intro">Choisis les jours et une heure précise, ou une plage « de / à » pour enchaîner plusieurs cours. Les créneaux libres apparaissent aussitôt dans l'espace des élèves.</p>
+    <div class="form-grid">
+      <div class="field"><label for="dispo-start">À partir du</label><input type="date" id="dispo-start" onchange="refreshRecurrencePreview('dispo')"></div>
+      <div class="field"><label for="dispo-duree">Durée (minutes)</label><input type="number" id="dispo-duree" value="45" min="15" step="5" onchange="refreshRecurrencePreview('dispo')"></div>
+      <div class="field"><label for="dispo-weeks">Nombre de semaines</label><input type="number" id="dispo-weeks" value="1" min="1" max="26" onchange="refreshRecurrencePreview('dispo')"></div>
+      <div class="field"><label for="dispo-eleve">Réserver directement pour (facultatif)</label><select id="dispo-eleve"><option value="">— Laisser libre —</option>${studentOptions}</select></div>
+    </div>
+    <p class="field-label">Jours de la semaine</p>
+    ${weekdayPickerHTML('dispo')}
+    <div id="dispo-preview"></div>
+    <div class="btn-row"><button type="button" class="btn" onclick="addDisponibilite()">${uiIcon('plus')} Créer les créneaux</button></div>
+    <p class="field-help">Exemple : lundi de 9 h à 13 h avec des cours de 45 min → 5 créneaux à la suite ce jour-là.</p>
+  </section>`;
+}
+function packFormHTML(){
   const packStudentOptions = studentsData.map(s=>{
-    const pack = s.pack || {};
-    /* Solde réel (20-forfaits.js) : séances réservables = restantes − programmées − à régulariser. */
-    const b = pack.total ? forfaitBilanEleve(s) : null;
-
-    return `
-      <option value="${esc(s.id)}">
-        ${esc(s.prenom)} ${esc(s.nom)}${s.niveau ? ' · '+esc(s.niveau) : ''}
-        — forfait ${
-          b
-            ? `${b.utilisees}/${b.total} utilisées, ${b.reservables} à réserver${b.anomalies ? `, ${b.anomalies} en anomalie` : ''}`
-            : 'non défini'
-        }
-      </option>
-    `;
+    const b = s.pack && s.pack.total ? forfaitBilanEleve(s) : null;
+    return `<option value="${esc(s.id)}">${esc(s.prenom)} ${esc(s.nom || '')}${s.niveau ? ' · ' + esc(s.niveau) : ''} — forfait : ${b ? `${b.utilisees}/${b.total} utilisées, ${b.reservables} à réserver${b.anomalies ? `, ${b.anomalies} en anomalie` : ''}` : 'aucun'}</option>`;
   }).join('');
-
-  const packRows =
-    Array.from(
-      {length: FORFAIT_MAX},
-      (_,i)=>i+1
-    ).map(i => `
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-        <span style="font-size:12px; color:var(--grey); width:22px;">
-          ${i}.
-        </span>
-
-        <input
-          type="datetime-local"
-          id="pack-date-${i}"
-          oninput="previewTZ('pack-date-${i}','pack-tz-${i}'); updatePackPriceHint();"
-          style="padding:6px 8px; border:1px solid var(--line); border-radius:6px;"
-        >
-
-        <div
-          id="pack-tz-${i}"
-          style="font-size:11.5px; color:var(--grey);"
-        ></div>
-      </div>
-    `).join('');
-
-  const pendingFromStudents =
-    dispoData.filter(
-      s =>
-        s.rescheduleRequest &&
-        s.rescheduleRequest.by==='student' &&
-        s.rescheduleRequest.status==='pending'
-    );
-
-  const pendingHTML =
-    pendingFromStudents.length
-      ? `
-        <div class="rec-box" style="border-color:var(--c-primary);">
-          <p class="rec-consigne" style="font-weight:700;">
-            📅 Demandes de replanification des élèves
-          </p>
-
-          ${
-            pendingFromStudents.map(s=>{
-              const r = s.rescheduleRequest || {};
-
-              const avails = [
-                r.availability1,
-                r.availability2,
-                r.availability3
-              ].filter(Boolean);
-
-              return `
-                <div class="teacher-entry">
-                  <div class="who">
-                    ${s.reservedName}
-                    — cours actuel :
-                    ${fmtSlotDate(s.date)}
-                  </div>
-
-                  ${
-                    avails.length
-                      ? `
-                        <div class="meta" style="margin-top:7px;">
-                          <b>Disponibilités proposées :</b>
-
-                          ${
-                            avails.map((d,i)=>`
-                              <div style="margin-top:6px;">
-                                ${i+1}. ${fmtSlotDate(d)}
-
-                                <button
-                                  class="rec-btn"
-                                  style="margin-left:8px;"
-                                  onclick="acceptStudentAvailability('${s.id}','${d}')"
-                                >
-                                  Accepter
-                                </button>
-                              </div>
-                            `).join('')
-                          }
-                        </div>
-                      `
-                      : `
-                        <div class="meta">
-                          ${
-                            r.proposedDate
-                              ? `Propose : <b>${fmtSlotDate(r.proposedDate)}</b>`
-                              : "Demande un changement d'horaire."
-                          }
-                        </div>
-
-                        <div class="teacher-entry-actions">
-                          ${
-                            r.proposedDate
-                              ? `<button onclick="acceptStudentReschedule('${s.id}')">Accepter</button>`
-                              : ''
-                          }
-                        </div>
-                      `
-                  }
-
-                  <div
-                    class="teacher-entry-actions"
-                    style="margin-top:8px;"
-                  >
-                    <button
-                      onclick="toggleAdminRescheduleForm('${s.id}')"
-                      style="background:none; color:var(--navy);"
-                    >
-                      Proposer un autre créneau
-                    </button>
-
-                    <button
-                      onclick="rejectStudentReschedule('${s.id}')"
-                      style="background:none; color:var(--bad);"
-                    >
-                      Refuser
-                    </button>
-                  </div>
-
-                  ${
-                    adminRescheduleFormOpenId === s.id
-                      ? adminRescheduleFormHTML(s)
-                      : ''
-                  }
-                </div>
-              `;
-            }).join('')
-          }
-        </div>
-      `
-      : '';
-
-  body.innerHTML = `
-    <div class="teacher-entry-actions" style="margin-bottom:10px;">
-      <button onclick="toggleAnnouncementForm()">${announcementFormOpen ? 'Fermer' : "📣 Faire une annonce"}</button>
-      <button onclick="togglePaymentLinksEditor()">${paymentLinksEditorOpen ? 'Fermer' : '💳 Liens de paiement'}</button>
-      <button onclick="regenerateMissingZoomLinks()" style="background:none; color:var(--navy);">🔧 Régénérer les liens Zoom manquants</button>
+  const packRows = Array.from({length: FORFAIT_MAX}, (_,i)=>i+1).map(i => `
+    <div class="pack-date-row"><span class="pack-date-n">${i}.</span>
+      <input type="datetime-local" id="pack-date-${i}" aria-label="Séance ${i}" oninput="previewTZ('pack-date-${i}','pack-tz-${i}'); updatePackPriceHint();">
+      <span id="pack-tz-${i}" class="tp-dim"></span></div>`).join('');
+  const lien = (id, label) => `<div class="field"><label for="${id}">${label}</label><input type="url" id="${id}" placeholder="https://…"></div>`;
+  return `<section class="settings-card" aria-labelledby="pack-form-t">
+    <h2 id="pack-form-t">Nouveau forfait ou renouvellement</h2>
+    <p class="page-intro">Les séances sont réservées directement pour l'élève et rattachées à son forfait en cours. Laisse vides les dates que tu n'utilises pas.</p>
+    <div class="form-grid">
+      <div class="field"><label for="pack-eleve">Élève</label><select id="pack-eleve" onchange="prefillPackCount()"><option value="">— Choisir un élève —</option>${packStudentOptions}</select></div>
+      <div class="field"><label for="pack-duree">Durée par séance (minutes)</label><input type="number" id="pack-duree" value="45" min="15" step="5" onchange="refreshRecurrencePreview('pack')"></div>
     </div>
-    ${announcementFormOpen ? announcementFormHTML() : ''}
-    ${paymentLinksEditorOpen ? paymentLinksEditorHTML() : ''}
-
-    ${pendingHTML}
-
-    <div class="rec-box">
-      <p class="rec-consigne" style="font-weight:700;">
-        ➕ Ajouter un créneau
-      </p>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          À partir du
-
-          <input
-            type="date"
-            id="dispo-start"
-            onchange="refreshRecurrencePreview('dispo')"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px;"
-          >
-        </label>
-
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          Durée (minutes)
-
-          <input
-            type="number"
-            id="dispo-duree"
-            value="45"
-            min="15"
-            step="5"
-            onchange="refreshRecurrencePreview('dispo')"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;"
-          >
-        </label>
-
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          Nombre de semaines
-
-          <input
-            type="number"
-            id="dispo-weeks"
-            value="1"
-            min="1"
-            max="26"
-            onchange="refreshRecurrencePreview('dispo')"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:90px;"
-          >
-        </label>
-
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          Réserver directement pour (optionnel)
-
-          <select
-            id="dispo-eleve"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:180px;"
-          >
-            <option value="">
-              — Laisser libre —
-            </option>
-
-            ${studentOptions}
-          </select>
-        </label>
-      </div>
-
-      <label style="font-size:12.5px; font-weight:700; color:var(--navy); display:block; margin-top:12px;">
-        Jours de la semaine — une heure précise, ou une plage « de / à » pour une demi-journée de créneaux à la suite
-      </label>
-
-      <div style="margin-top:6px;">
-        ${weekdayPickerHTML('dispo')}
-      </div>
-
-      <div id="dispo-preview"></div>
-
-      <button
-        class="rec-btn"
-        style="margin-top:12px;"
-        onclick="addDisponibilite()"
-      >
-        Créer le(s) créneau(x)
-      </button>
-
-      <p style="font-size:12px; color:var(--grey); margin:8px 0 0;">
-        💡 Une heure de « à » optionnelle : par ex. Lundi de 9h à 13h avec des cours de 45 min → 5 créneaux à la suite ce jour-là. Ajoute « Nombre de semaines » pour répéter tout ça sur plusieurs semaines. En général jusqu'à 4 jours par semaine, exceptionnellement 6.
-      </p>
+    <h3 class="sub-title">1. Choisir le rythme</h3>
+    <div class="form-grid">
+      <div class="field"><label for="pack-quick-start">À partir du</label><input type="date" id="pack-quick-start" onchange="refreshRecurrencePreview('pack')"></div>
+      <div class="field"><label for="pack-quick-count">Nombre de séances</label><input type="number" id="pack-quick-count" value="1" min="1" max="${FORFAIT_MAX}" onchange="refreshRecurrencePreview('pack')"></div>
     </div>
-
-    <div class="rec-box" style="margin-top:16px;">
-      <p class="rec-consigne" style="font-weight:700;">
-        📦 Réserver un forfait (plusieurs dates, un seul élève)
-      </p>
-
-      <p style="font-size:12.5px; color:var(--grey); margin:4px 0 10px;">
-        Ces séances sont réservées directement pour l'élève — il ne les choisit pas lui-même dans la liste des créneaux libres. Laisse vides les dates que tu n'utilises pas.
-      </p>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px;">
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          Élève
-
-          <select
-            id="pack-eleve"
-            onchange="prefillPackCount()"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; min-width:260px;"
-          >
-            <option value="">
-              — Choisir un élève —
-            </option>
-
-            ${packStudentOptions}
-          </select>
-        </label>
-
-        <label style="font-size:12.5px; font-weight:700; color:var(--navy);">
-          Durée par séance (minutes)
-
-          <input
-            type="number"
-            id="pack-duree"
-            value="45"
-            min="15"
-            step="5"
-            onchange="refreshRecurrencePreview('pack')"
-            style="display:block; margin-top:4px; padding:8px; border:1px solid var(--line); border-radius:6px; width:100px;"
-          >
-        </label>
-      </div>
-
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; background:var(--cream); border:1px solid var(--line); border-radius:8px; padding:10px 12px;">
-        <label style="font-size:12px; font-weight:700; color:var(--navy);">
-          ⚡ Remplissage rapide — à partir du
-
-          <input
-            type="date"
-            id="pack-quick-start"
-            onchange="refreshRecurrencePreview('pack')"
-            style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;"
-          >
-        </label>
-
-        <label style="font-size:12px; font-weight:700; color:var(--navy);">
-          Nombre de séances
-
-          <input
-            type="number"
-            id="pack-quick-count"
-            value="1"
-            min="1"
-            max="${FORFAIT_MAX}"
-            onchange="refreshRecurrencePreview('pack')"
-            style="display:block; margin-top:4px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:70px;"
-          >
-        </label>
-      </div>
-
-      <label style="font-size:12px; font-weight:700; color:var(--navy);">
-        Jours de la semaine — une heure précise, ou une plage « de / à » pour une demi-journée
-      </label>
-
-      <div style="margin-top:6px;">
-        ${weekdayPickerHTML('pack')}
-      </div>
-
-      <div id="pack-preview"></div>
-
-      <p style="font-size:11.5px; color:var(--grey); margin:8px 0 10px;">
-        Ça pré-remplit les champs ci-dessous, dans l'ordre chronologique en combinant les jours cochés — tu peux ensuite corriger ou vider une date ponctuellement (vacances, jour férié…) avant de créer les séances.
-      </p>
-
-      <button
-        class="rec-btn"
-        onclick="fillPackDatesQuick()"
-        type="button"
-      >
-        Remplir les dates ci-dessous
-      </button>
-
-      ${packRows}
-
-      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
-        <div id="pack-price-hint"></div>
-        <p style="font-size:12px; font-weight:700; color:var(--navy); margin:8px 0 6px;">💳 Liens de paiement du forfait (l'élève choisira parmi ceux que tu remplis)</p>
-        ${PAYMENT_METHODS.map(m=>`
-          <label style="font-size:11.5px; color:var(--grey); display:block; margin-top:4px;">
-            ${m.label}
-            <input type="url" id="pack-paylink-${m.key}" placeholder="https://..." style="width:100%; margin-top:2px; padding:6px 8px; border:1px solid var(--line); border-radius:5px;">
-          </label>
-        `).join('')}
-        ${CREDIT_BRANDS.map(b=>`
-          <p style="font-size:11.5px; font-weight:700; color:var(--navy); margin-top:8px;">${b.label}</p>
-          <p style="font-size:10.5px; color:var(--grey); margin:0 0 4px;">Un lien C6 = un nombre de fois précis — remplis selon la modalité calculée ci-dessus.</p>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            ${INSTALLMENTS.map(n=>`
-              <label style="font-size:10.5px; color:var(--grey);">
-                ${n}x
-                <input type="url" id="pack-paylink-${b.key}-${n}" placeholder="https://..." style="display:block; width:150px; margin-top:2px; padding:5px 6px; border:1px solid var(--line); border-radius:5px;">
-              </label>
-            `).join('')}
-          </div>
-        `).join('')}
-        <p style="font-size:11px; color:var(--grey); margin-top:6px;">Laisse-les vides si tu préfères les remplir plus tard, dans « Élèves & niveaux » — mais l'élève ne verra rien à payer tant qu'aucun lien n'est renseigné quelque part.</p>
-      </div>
-
-      <button
-        class="rec-btn"
-        style="margin-top:8px;"
-        onclick="reserverPack()"
-      >
-        📦 Créer les séances du forfait
-      </button>
-    </div>
-
-    <h2 class="section-title">
-      Calendrier
-    </h2>
-
-    <p style="font-size:12.5px; color:var(--grey); margin:-6px 0 10px;">
-      🟢 créneau libre · 🟠 réservé — clique sur un jour pour filtrer la liste
-    </p>
-
-    ${
-      buildCalendarHTML(
-        adminCalDate.getFullYear(),
-        adminCalDate.getMonth(),
-        markers,
-        adminSelectedDay,
-        'selectAdminDay'
-      )
-    }
-
-    <h2 class="section-title">
-      Créneaux à venir
-      ${
-        adminSelectedDay
-          ? `
-            <button
-              onclick="selectAdminDay('${adminSelectedDay}')"
-              style="background:none; color:var(--c-primary); font-size:12px; font-weight:700; vertical-align:middle;"
-            >
-              ✕ voir tous les jours
-            </button>
-          `
-          : ''
-      }
-    </h2>
-
-    <div id="admin-dispo-list"></div>
-  `;
-
-  if(adminSelectedDay){
-    upcoming = upcoming.filter(
-      s =>
-        toDateKey(new Date(s.date)) ===
-        adminSelectedDay
-    );
-  }
-
-  const list =
-    document.getElementById(
-      'admin-dispo-list'
-    );
-
-  if(upcoming.length===0){
-    list.innerHTML = `
-      <p class="teacher-empty">
-        ${
-          adminSelectedDay
-            ? 'Aucun créneau ce jour-là.'
-            : 'Aucun créneau à venir. Ajoutes-en un ci-dessus pour que tes élèves puissent réserver.'
-        }
-      </p>
-    `;
-  }else{
-    list.innerHTML =
-      upcoming.map(s=>`
-        <div class="teacher-entry">
-          <div class="who">
-            🗓️ ${fmtSlotDate(s.date)}
-            <span style="font-weight:400; color:var(--grey);">
-              (${s.duree} min)
-            </span>
-          </div>
-
-          ${timezoneLineHTML(s.date)}
-
-          <div class="meta">
-            ${
-              s.reservedBy
-                ? `✅ Réservé par <b>${s.reservedName}</b>${s.isPack ? ' <span style="color:var(--grey);">(séance de forfait — paiement suivi dans « Élèves &amp; niveaux »)</span>' : ''}`
-                : '⬜ Libre'
-            }
-            ${
-              s.reservedBy && !s.isExperimental && !s.isPack
-                ? (s.paymentStatus === 'paid'
-                    ? ' · <span style="color:var(--ok);">💳 Payé</span>'
-                    : ' · <span style="color:var(--bad);">💳 Paiement en attente</span>')
-                : ''
-            }
-          </div>
-
-          ${
-            s.reservedBy
-              ? rptBadgeHTML(s, true) + zoomButtonHTML(
-                  s.id,
-                  s.date,
-                  s.duree,
-                  s.zoomJoinUrl,
-                  s
-                )
-              : ''
-          }
-
-          <div class="teacher-entry-actions">
-            ${
-              s.reservedBy && !s.isExperimental && !s.isPack && s.paymentStatus !== 'paid'
-                ? `
-                  <button
-                    onclick="markPaymentReceived('${s.id}')"
-                    style="background:none; color:var(--ok);"
-                  >
-                    ✅ Paiement reçu
-                  </button>
-                `
-                : ''
-            }
-          </div>
-
-          ${
-            s.reservedBy && !s.isExperimental && !s.isPack && s.paymentStatus === 'paid' && !s.notaFiscalSent
-              ? `
-                <div class="rec-box" style="margin-top:8px;">
-                  <p class="rec-consigne" style="font-weight:700;">📎 Envoyer la nota fiscal</p>
-                  ${s.cpfNaNota ? `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">CPF demandé sur la note : <b>${s.cpfNaNota}</b></p>` : `<p style="font-size:12px; color:var(--grey); margin:2px 0 8px;">L'élève n'a pas demandé de CPF sur la note.</p>`}
-                  <input type="file" id="nota-file-${s.id}" accept="application/pdf,image/*" style="margin-bottom:8px;">
-                  <div class="teacher-entry-actions">
-                    <button onclick="sendNotaFiscal('${s.id}', 'nota-file-${s.id}')">Téléverser et envoyer</button>
-                  </div>
-                </div>
-              `
-              : ''
-          }
-          ${
-            s.notaFiscalSent
-              ? `<p style="font-size:12px; color:var(--ok); margin-top:6px;">✅ Nota fiscal envoyée — <a href="${s.notaFiscalUrl}" target="_blank" rel="noopener">voir le fichier</a></p>`
-              : ''
-          }
-
-          <div class="teacher-entry-actions">
-            ${
-              s.reservedBy &&
-              !(
-                s.rescheduleRequest &&
-                s.rescheduleRequest.status==='pending'
-              )
-                ? `
-                  <button
-                    onclick="toggleAdminRescheduleForm('${s.id}')"
-                    style="background:none; color:var(--navy);"
-                  >
-                    🔁 Demander une replanification
-                  </button>
-                `
-                : ''
-            }
-
-            ${
-              s.reservedBy
-                ? `
-                  <button
-                    onclick="adminCancelReservation('${s.id}')"
-                    style="background:none; color:var(--bad);"
-                  >
-                    Annuler la réservation
-                  </button>
-                `
-                : ''
-            }
-
-            <button
-              onclick="deleteDisponibilite('${s.id}')"
-              style="background:none; color:var(--grey);"
-            >
-              🗑 Supprimer le créneau
-            </button>
-          </div>
-
-          ${
-            adminRescheduleFormOpenId === s.id
-              ? adminRescheduleFormHTML(s)
-              : ''
-          }
-        </div>
-      `).join('');
-  }
+    <p class="field-label">Jours de la semaine</p>
+    ${weekdayPickerHTML('pack')}
+    <div id="pack-preview"></div>
+    <div class="btn-row"><button type="button" class="btn btn-secondary" onclick="fillPackDatesQuick()">Remplir les dates</button></div>
+    <h3 class="sub-title">2. Vérifier les dates</h3>
+    <p class="field-help">Tu peux corriger ou vider une date (vacances, jour férié…) avant de créer les séances.</p>
+    <div class="pack-dates">${packRows}</div>
+    <div id="pack-price-hint"></div>
+    <h3 class="sub-title">3. Liens de paiement (facultatif)</h3>
+    <p class="field-help">L'élève choisit parmi les liens que tu remplis. Tu peux aussi les ajouter plus tard depuis sa fiche (onglet Forfait).</p>
+    <div class="form-grid">${PAYMENT_METHODS.map(m => lien('pack-paylink-' + m.key, m.label)).join('')}</div>
+    ${CREDIT_BRANDS.map(b=>`<p class="field-label">${b.label} <span class="tp-dim">— un lien C6 par nombre de fois</span></p>
+      <div class="form-grid form-grid-4">${INSTALLMENTS.map(n => lien(`pack-paylink-${b.key}-${n}`, n + 'x')).join('')}</div>`).join('')}
+    <div class="btn-row"><button type="button" class="btn" onclick="reserverPack()">Créer les séances du forfait</button></div>
+  </section>`;
 }
 
 let openRecapId = null;
 
-function toggleRecap(id){
-  openRecapId =
-    (openRecapId === id)
-      ? null
-      : id;
-
-  renderPastSessions();
-}
 
 function recapEditorHTML(s, saveFn, toggleFn){
   saveFn = saveFn || 'saveSessionRecap';
@@ -1567,254 +911,10 @@ async function saveSessionRecap(id){
   await loadAdminDispo();
 }
 
-function renderPastSessions(){
-  const el =
-    document.getElementById(
-      'admin-past-list'
-    );
-
-  if(!el) return;
-
-  const now = Date.now();
-
-  const past =
-    dispoData
-      .filter(
-        s =>
-          s.reservedBy &&
-          new Date(s.date).getTime() <
-            now - 3600000
-      )
-      .sort(
-        (a,b) =>
-          new Date(b.date) -
-          new Date(a.date)
-      );
-
-  if(past.length===0){
-    el.innerHTML =
-      `<p class="teacher-empty">Aucun cours passé pour le moment.</p>`;
-    return;
-  }
-
-  el.innerHTML =
-    past.map(s => `
-      <div class="teacher-entry">
-        <div class="who">
-          🗓️ ${fmtSlotDate(s.date)}
-          <span style="font-weight:400; color:var(--grey);">
-            — ${esc(s.reservedName || 'Élève')}
-          </span>
-        </div>
-
-        <div class="meta">
-          ${
-            s.anomalie
-              ? '<b style="color:var(--bad);">⚠️ Anomalie : pas rejoint par les deux — non comptée comme effectuée</b> · '
-              : ''
-          }
-          ${rptBadgeHTML(s, true)}
-
-          ${
-            s.isExperimental
-              ? ''
-              : `
-                ${s.vocab ? '✅ Vocabulaire ajouté' : '⬜ Pas encore de vocabulaire'}
-                ·
-                ${s.recordingUrl ? "🎥 Enregistrement disponible" : "⬜ Pas encore d'enregistrement"}
-              `
-          }
-        </div>
-
-        <div class="teacher-entry-actions">
-          ${
-            s.anomalie
-              ? `
-                <button
-                  onclick="toggleRescheduleForm('${s.id}')"
-                  style="background:none; color:var(--bad);"
-                >
-                  📅 ${rptPropositionEnAttente(s) ? 'Proposer une autre date' : 'Proposer un nouveau créneau'}
-                </button>
-                <button
-                  onclick="dismissAnomalie('${s.id}')"
-                  style="background:none; color:var(--ok);"
-                  title="À utiliser si vous avez bien rejoint le cours tous les deux — l'anomalie vient alors d'un bug de suivi, pas d'une absence."
-                >
-                  ✅ On a bien rejoint tous les deux
-                </button>
-              `
-              : ''
-          }
-
-          ${
-            s.isExperimental
-              ? ''
-              : `
-                <button onclick="toggleRecap('${s.id}')">
-                  ${openRecapId===s.id ? 'Fermer' : '📝 Ajouter vocabulaire / enregistrement'}
-                </button>
-              `
-          }
-        </div>
-
-        ${
-          !s.isExperimental && openRecapId === s.id
-            ? recapEditorHTML(s)
-            : ''
-        }
-
-        ${
-          rescheduleFormOpenId === s.id
-            ? rescheduleFormHTML(s)
-            : ''
-        }
-      </div>
-    `).join('');
-}
-
-async function loadTeacherHistorique(){
-  const body =
-    document.getElementById(
-      'teacher-body'
-    );
-
-  if(body){
-    body.innerHTML =
-      '<p class="teacher-empty">Chargement…</p>';
-  }
-
-  try{
-    const snap =
-      await db
-        .collection('disponibilites')
-        .orderBy('date')
-        .get();
-
-    dispoData =
-      snap.docs.map(
-        d=>({
-          id:d.id,
-          ...d.data()
-        })
-      );
-  }catch(e){
-    dispoData = [];
-  }
-
-  detectAnomalies();
-  renderTeacherHistorique();
-}
-
-function renderTeacherHistorique(){
-  const body =
-    document.getElementById(
-      'teacher-body'
-    );
-
-  if(!body) return;
-
-  const anomalies =
-    dispoData.filter(
-      s =>
-        s.anomalie &&
-        s.reservedBy
-    );
-
-  body.innerHTML = `
-    ${
-      anomalies.length
-        ? `
-          <div
-            class="storage-note"
-            style="background:var(--bad-bg); color:var(--bad);"
-          >
-            ⚠️ ${anomalies.length} cours en anomalie
-            (toi et l'élève n'avez pas tous les deux cliqué sur le lien Zoom)
-            — à replanifier ci-dessous.
-          </div>
-        `
-        : ''
-    }
-
-    <p style="font-size:12.5px; color:var(--grey); margin:-6px 0 16px;">
-      Ajoute le vocabulaire vu et le lien de l'enregistrement
-      (téléversé sur ton Drive) pour chaque cours donné.
-    </p>
-
-    <div id="admin-past-list"></div>
-  `;
-
-  renderPastSessions();
-}
-
-async function detectAnomalies(){
-  const now = Date.now();
-
-  for(const s of dispoData){
-    if(!s.reservedBy) continue;
-    if(s.vocab && s.recordingUrl) continue;
-
-    const endsAt =
-      new Date(s.date).getTime() +
-      (s.duree||45)*60000;
-
-    const isPast =
-      now > endsAt + 30*60000;
-
-    const noShow =
-      !(s.clickedByStudent && s.clickedByTeacher);
-
-    if(
-      isPast &&
-      noShow &&
-      !s.anomalie &&
-      !s.anomalieHandled
-    ){
-      s.anomalie = true;
-
-      try{
-        await db
-          .collection('disponibilites')
-          .doc(s.id)
-          .update({
-            anomalie: true
-          });
-      }catch(e){ /* non bloquant */ }
-    }
-  }
-}
-
-async function dismissAnomalie(id){
-  try{
-    await db
-      .collection('disponibilites')
-      .doc(id)
-      .update({
-        anomalie: false,
-        anomalieHandled: true,
-        clickedByTeacher: true,
-        clickedByStudent: true
-      });
-  }catch(e){
-    alert("Impossible de corriger l'anomalie pour le moment.");
-    return;
-  }
-  await loadTeacherHistorique();
-}
-
 
 /* ---- Replanification (avec confirmation de l'autre partie) ---- */
 let rescheduleFormOpenId = null;
 
-function toggleRescheduleForm(id){
-  rescheduleFormOpenId =
-    (rescheduleFormOpenId === id)
-      ? null
-      : id;
-
-  renderPastSessions();
-}
 
 function rescheduleFormHTML(s, submitFn, toggleFn, directFn){
   submitFn = submitFn || 'submitRescheduleProposal';
@@ -1864,22 +964,6 @@ function rescheduleFormHTML(s, submitFn, toggleFn, directFn){
 
 /* Proposition de report d'une séance en anomalie : la séance reste en anomalie
    (date initiale, réunion Zoom conservées) jusqu'à l'acceptation de l'élève. */
-async function submitRescheduleProposal(id){
-  const val = document.getElementById('reschedule-date-'+id).value;
-  if(!val){ alert('Choisis une date et une heure.'); return; }
-  const slot = dispoData.find(s=>s.id===id);
-  if(!slot) return;
-  const proposedDate = new Date(val).toISOString();
-  try{
-    const r = await rptProposer(slot, proposedDate, slot.duree || 45);
-    if(!r.ok) return;
-    alert("Proposition envoyée" + (r.emailed ? " par e-mail (boutons Accepter / Refuser)" : "") + " — la séance reste en anomalie jusqu'à la réponse de l'élève.");
-  }catch(e){ alert(e.message); return; }
-  rescheduleFormOpenId = null;
-  await postSystemMessage(slot.reservedBy, slot.reservedName,
-    `📅 Ta séance du ${fmtSlotDate(slot.date)} n'a pas pu avoir lieu. Je te propose de la reporter au ${fmtSlotDate(proposedDate)} : tu peux accepter ou refuser depuis l'e-mail reçu ou sur la page d'accueil.`, true);
-  await loadTeacherHistorique();
-}
 
 async function toggleExperimentalReschedule(id){
   rescheduleFormOpenId = (rescheduleFormOpenId === id) ? null : id;
@@ -1931,50 +1015,6 @@ async function cancelExperimentalSlotAdmin(id){
   await loadExperimentalAdmin();
 }
 
-async function acceptStudentReschedule(id){
-  const slot = dispoData.find(s=>s.id===id);
-  if(!slot || !slot.rescheduleRequest) return;
-  const newDate = slot.rescheduleRequest.proposedDate;
-  try{
-    const r = await rptAppliquer(slot, newDate, slot.duree, 'student_availability');
-    if(!r.ok) return;
-    alert(`Cours déplacé au ${fmtSlotDate(r.newDate)}. ${rptMessageZoom(r)}`);
-    await postSystemMessage(slot.reservedBy, slot.reservedName, `✅ J'ai confirmé ton cours au ${fmtSlotDate(r.newDate)}.`, true);
-  }catch(e){ alert(e.message); }
-  await loadAdminDispo();
-}
-
-async function rejectStudentReschedule(id){
-  const slot =
-    dispoData.find(
-      s=>s.id===id
-    );
-
-  try{
-    await db
-      .collection('disponibilites')
-      .doc(id)
-      .update({
-        rescheduleRequest: null
-      });
-  }catch(e){
-    alert(
-      "Impossible de refuser pour le moment."
-    );
-    return;
-  }
-
-  if(slot){
-    await postSystemMessage(
-      slot.reservedBy,
-      slot.reservedName,
-      `❌ Je ne peux pas déplacer ton cours à l'horaire proposé. Contacte-moi pour qu'on en discute.`,
-      true
-    );
-  }
-
-  await loadAdminDispo();
-}
 
 async function addDisponibilite(){
   const startVal =
@@ -2314,7 +1354,7 @@ async function reserverPack(){
     )
   ){
     alert(
-      `Ce forfait (${pack.total} séances) est en dehors des limites autorisées (${FORFAIT_MIN} à ${FORFAIT_MAX} séances). Corrige d'abord le forfait dans « Élèves & niveaux ».`
+      `Ce forfait (${pack.total} séances) est en dehors des limites autorisées (${FORFAIT_MIN} à ${FORFAIT_MAX} séances). Corrige d'abord le forfait dans la fiche de l'élève (onglet Forfait).`
     );
     return;
   }
@@ -2496,62 +1536,21 @@ async function notifyTeacherOfCancellation(
 }
 
 async function deleteDisponibilite(id){
-  const slot =
-    dispoData.find(
-      s=>s.id===id
-    );
-
-  if(
-    !confirm(
-      'Supprimer ce créneau ?'
-    )
-  ){
-    return;
-  }
-
+  /* Seuls les créneaux libres se suppriment : une séance réservée s'annule
+     (adminCancelReservation), ce qui conserve l'historique de l'élève et
+     applique la règle d'annulation. */
+  const slot = dispoData.find(s=>s.id===id);
   if(slot && slot.reservedBy){
-    try{
-      const r =
-        await processCancellation(
-          slot,
-          'teacher'
-        );
-
-      if(r.refundDue){
-        alert(
-          `⚠️ ${slot.reservedName} a droit à un remboursement (2 annulations tardives dépassées de ton côté sur 30 jours). Pense à le faire manuellement.`
-        );
-      }
-    }catch(e){
-      /* non bloquant */
-    }
-
-    await notifyCancellation(
-      slot.reservedEmail,
-      slot.reservedName,
-      fmtSlotDate(slot.date)
-    );
-
-    await postSystemMessage(
-      slot.reservedBy,
-      slot.reservedName,
-      `❌ Ton cours du ${fmtSlotDate(slot.date)} a été annulé.`,
-      true
-    );
-  }
-
-  try{
-    await db
-      .collection('disponibilites')
-      .doc(id)
-      .delete();
-  }catch(e){
-    alert(
-      'Impossible de supprimer pour le moment.'
-    );
+    alert("Ce créneau est réservé : annule d'abord la réservation depuis la fiche de la séance.");
     return;
   }
-
+  if(!confirm('Supprimer ce créneau libre ?')) return;
+  try{
+    await db.collection('disponibilites').doc(id).delete();
+  }catch(e){
+    alert('Impossible de supprimer pour le moment.');
+    return;
+  }
   await loadAdminDispo();
 }
 

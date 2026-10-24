@@ -53,7 +53,6 @@
   /* ---------------------------------------------------------------------------
      4. ÉLÈVES & NIVEAUX : recherche et filtres
      --------------------------------------------------------------------------- */
-  const studentFilter = {q:'', f:'tous'};
   function studentFlags(s){
     const p = (typeof packSlotsByStudent !== 'undefined' && packSlotsByStudent[s.id]) || null;
     const c = p && p.compteurs;
@@ -68,51 +67,6 @@
     };
   }
   window.uiStudentFlags = studentFlags;
-  const FILTERS = [
-    {id:'tous', label:'Tous'},
-    {id:'anomalie', label:'⚠️ À traiter'},
-    {id:'renouveler', label:'📦 Forfait à renouveler'},
-    {id:'paiement', label:'💳 Paiement en attente'},
-    {id:'sansNiveau', label:'Sans niveau'}
-  ];
-  window.uiSetStudentFilter = function(f){ studentFilter.f = f; renderStudentsFlatList(); };
-  window.uiSearchStudents = function(v){
-    studentFilter.q = v;
-    clearTimeout(window.__uiSearchT);
-    window.__uiSearchT = setTimeout(()=>{
-      renderStudentsFlatList();
-      const i = document.getElementById('ui-student-search');
-      if(i){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
-    }, 180);
-  };
-  if(typeof window.renderStudentsFlatList === 'function'){
-    const baseFlat = window.renderStudentsFlatList;
-    window.renderStudentsFlatList = function(){
-      const all = studentsData;
-      const q = studentFilter.q.trim().toLowerCase();
-      const counts = {};
-      FILTERS.forEach(f=> counts[f.id] = f.id === 'tous' ? all.length : all.filter(s=>studentFlags(s)[f.id]).length);
-      const filtered = all.filter(s=>{
-        if(studentFilter.f !== 'tous' && !studentFlags(s)[studentFilter.f]) return false;
-        if(!q) return true;
-        return `${s.prenom||''} ${s.nom||''} ${s.email||''}`.toLowerCase().includes(q);
-      });
-      studentsData = filtered;
-      try{ baseFlat(); } finally { studentsData = all; }
-      const body = document.getElementById('teacher-body');
-      if(!body || !all.length) return;
-      if(!filtered.length) body.innerHTML = `<p class="teacher-empty">Aucun élève ne correspond à ce filtre.</p>`;
-      const bar = document.createElement('div');
-      bar.innerHTML = `<div class="ui-filters" role="group" aria-label="Filtrer les élèves">
-          <label class="sr-only" for="ui-student-search">Rechercher un élève</label>
-          <input type="search" id="ui-student-search" placeholder="Rechercher (nom, e-mail)…" value="${(studentFilter.q||'').replace(/"/g,'&quot;')}" oninput="uiSearchStudents(this.value)">
-          ${FILTERS.map(f=>`<button type="button" class="ui-chip" aria-pressed="${studentFilter.f===f.id}" onclick="uiSetStudentFilter('${f.id}')">${f.label}<span class="n">${counts[f.id]}</span></button>`).join('')}
-        </div>
-        <p class="ui-results" aria-live="polite">${filtered.length} élève${filtered.length>1?'s':''} affiché${filtered.length>1?'s':''}${studentFilter.f!=='tous' || q ? ` sur ${all.length}` : ''}</p>`;
-      body.insertBefore(bar.lastElementChild, body.firstChild);
-      body.insertBefore(bar.firstElementChild, body.firstChild);
-    };
-  }
 
   /* ---------------------------------------------------------------------------
      5. ACCESSIBILITÉ

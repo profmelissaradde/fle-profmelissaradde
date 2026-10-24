@@ -1552,6 +1552,12 @@ function cancelUnpaidCourses() {
     const docId = doc.name.split("/").pop();
 
     const parisDate = formatDateInTimezone_(new Date(dateStr), "Europe/Paris");
+    /* Trace conservée avant de libérer le créneau (historique de l'élève). */
+    try {
+      const sl = { reservedBy: reservedBy, reservedName: reservedName, date: dateStr, isPack: false };
+      const ev = suiviEvenement_(docId, sl, "lesson_cancelled", "automatisation", "automatisation", "en_attente", "annule", { motif: "paiement non reçu 1 h avant le cours" }, "impaye");
+      suiviJournaliser_(token, ev, suiviNotification_(ev, `Le cours de ${reservedName || "l'élève"} du ${parisDate} a été annulé automatiquement : paiement non reçu.`, false));
+    } catch (e) { console.warn(e); }
 
     patchFirestoreFields_(baseUrl, "disponibilites", docId, token, {
 

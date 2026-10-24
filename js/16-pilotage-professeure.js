@@ -1,13 +1,9 @@
 /* ======================= ESPACE PROFESSEURE : PILOTAGE =======================
-   Onglets ajoutés par la refonte, construits sur les données et les fonctions existantes
-   (aucune règle métier nouvelle) :
-     accueil     Tableau de bord : cours du jour / à venir, ce qui demande une action,
-                 progression des élèves, actions rapides
-     anomalies   Reports & anomalies : séances passées en anomalie, demandes et propositions
-                 de report en attente, synchronisations Zoom à surveiller
-     finances    Forfaits, paiements à encaisser, historique, séances consommées, liens C6
+     accueil     Tableau de bord par priorité : à faire maintenant, à prévoir, vue d'ensemble
+                 (les séances et priorités viennent de 22-seances.js)
+     finances    Forfaits & paiements : à encaisser, notas à envoyer, forfaits, historique, liens C6
      annonces    Annonces générales (publication et historique)
-   + fiche élève centralisée (cours, parcours, enregistrements, messages, suivi)
+   + fiche élève centralisée (cours & confirmations, parcours, enregistrements, messages, suivi)
    + journal d'activité (journaliser), utilisé par tous les modules. */
 
 /* ---------------------------------------------------------------------------
@@ -52,51 +48,18 @@ function profStatHTML(label, valeur, ton, action){
 }
 function profBody(){ return document.getElementById('teacher-body'); }
 function profOnTab(tab){ return screen === 'teacher' && teacherTab === tab; }
-const profCache = {slots:null, slotsAt:0};
 
-/* Créneaux utiles au pilotage : 120 jours passés → futur, plus toutes les anomalies.
-   (Les écrans Planning et Historique gardent leurs propres chargements complets.) */
+
 async function profLoadSlots(force){
-  if(!force && profCache.slots && Date.now() - profCache.slotsAt < 60000) return profCache.slots;
-  const cut = new Date(Date.now() - 120*86400000).toISOString();
-  const byId = {};
-  try{
-    const snap = await db.collection('disponibilites').where('date', '>=', cut).orderBy('date').get();
-    snap.docs.forEach(d=>{ byId[d.id] = {id:d.id, ...d.data()}; });
-  }catch(e){ console.warn('Créneaux non chargés :', e && e.message); }
-  try{
-    const snap = await db.collection('disponibilites').where('anomalie', '==', true).get();
-    snap.docs.forEach(d=>{ byId[d.id] = {id:d.id, ...d.data()}; });
-  }catch(e){ /* non bloquant */ }
-  profCache.slots = Object.values(byId).sort((a,b)=> new Date(a.date) - new Date(b.date));
-  profCache.slotsAt = Date.now();
-  return profCache.slots;
+  /* Source commune des séances (22-seances.js). */
+  await seancesCharger(force);
+  return SEANCES.liste;
 }
 async function profEnsureStudents(){
   if(!studentsData.length) await loadTeacherStudentsQuiet();
   if(typeof loadPackSlotsByStudent === 'function' && !Object.keys(packSlotsByStudent || {}).length) await loadPackSlotsByStudent();
 }
 
-/* Ce qui demande une action (partagé par le tableau de bord, l'onglet Reports & anomalies et le compteur du menu). */
-function profIssues(slots){
-  const now = Date.now();
-  const res = {anomalies:[], demandesEleves:[], propositions:[], zoom:[]};
-  (slots || []).forEach(s=>{
-    if(!s.reservedBy || s.experimentalCancelled || s.definitivelyCancelled) return;
-    const req = s.rescheduleRequest || {};
-    if(s.anomalie && !rptPropositionEnAttente(s)) res.anomalies.push(s);
-    else if(rptPropositionEnAttente(s)) res.propositions.push(s);
-    if(req.by === 'student' && req.status === 'pending' && new Date(s.date).getTime() > now - 3600000) res.demandesEleves.push(s);
-    if(rptZoomSyncEnCours(s)) res.zoom.push(s);
-  });
-  res.total = res.anomalies.length + res.demandesEleves.length + res.zoom.filter(s=>s.zoomSync.status === 'error').length;
-  return res;
-}
-function profSetCount(n){
-  if(navCounts.aTraiter === n) return;
-  navCounts.aTraiter = n;
-  renderSidebar(); renderPageHead();
-}
 
 /* Progression d'un élève sur un thème (v1 ou parcours v2). */
 function profThemeProgress(s, tema){
@@ -125,190 +88,111 @@ function profThemeCourant(){
 }
 
 /* ---------------------------------------------------------------------------
-   TABLEAU DE BORD
+   TABLEAU DE BORD — trois niveaux : à faire maintenant, à prévoir, vue d'ensemble.
+   Les séances viennent de la source commune (22-seances.js) ; aucun calcul propre.
    --------------------------------------------------------------------------- */
 let profDash = null;
 async function profDashboardLoad(){
   const body = profBody();
-  if(body && !profDash) body.innerHTML = `<div class="dash-grid">${'<div class="ui-skeleton" style="height:120px"></div>'.repeat(4)}</div>`;
-  await Promise.all([profEnsureStudents(), (typeof tpLoadConfig === 'function' ? tpLoadConfig() : null)]);
-  const slots = await profLoadSlots(true);
-  profDash = {slots, issues: profIssues(slots)};
-  profSetCount(profDash.issues.total);
+  if(body && !profDash) body.innerHTML = `<div class="dash-grid">${'<div class="ui-skeleton" style="height:120px"></div>'.repeat(3)}</div>`;
+  await Promise.all([profEnsureStudents(), (typeof tpLoadConfig === 'function' ? tpLoadConfig() : null), seancesCharger(true), seancesEvenements()]);
+  profDash = {slots: SEANCES.liste};
   if(profOnTab('accueil')) profDashboardRender();
 }
 function profDashboardRender(){
   const body = profBody(); if(!body || !profDash) return;
   const now = Date.now();
-  const slots = profDash.slots, iss = profDash.issues;
+  const slots = SEANCES.liste;
+  const p = pilotage(slots, now);
   const debutJour = new Date(); debutJour.setHours(0,0,0,0);
   const finJour = new Date(debutJour.getTime() + 86400000);
-  const dans7 = now + 7*86400000;
-  const reserves = slots.filter(s => s.reservedBy && !s.experimentalCancelled && !s.definitivelyCancelled && !s.anomalie);
-  const aujourdhui = reserves.filter(s => { const t = new Date(s.date).getTime(); return t >= debutJour.getTime() && t < finJour.getTime(); });
-  const aVenir = reserves.filter(s => { const t = new Date(s.date).getTime(); return t >= Math.max(now - 3600000, finJour.getTime()) && t < dans7; });
+  const actifs = slots.filter(s => s.reservedBy && !s.experimentalCancelled && !s.definitivelyCancelled);
+  const aujourdhui = actifs.filter(s => { const t = new Date(s.date).getTime(); return t >= debutJour.getTime() && t < finJour.getTime(); });
+  const semaine = actifs.filter(s => { const t = new Date(s.date).getTime(); return t >= finJour.getTime() && t < finJour.getTime() + 6*86400000; });
   const libres = slots.filter(s => !s.reservedBy && !s.isExperimental && new Date(s.date).getTime() > now).length;
+  const debutMois = new Date(); debutMois.setDate(1); debutMois.setHours(0,0,0,0);
+  const realiseesMois = actifs.filter(s => new Date(s.date).getTime() >= debutMois.getTime() && seanceStatut(s, now) === 'realisee').length;
 
   const flags = s => (typeof uiStudentFlags === 'function' ? uiStudentFlags(s) : {});
   const aRenouveler = studentsData.filter(s => flags(s).renouveler);
   const paiementsPack = studentsData.filter(s => flags(s).paiement);
-  const coursImpayes = slots.filter(s => s.reservedBy && !s.isPack && !s.isExperimental && s.paymentStatus === 'pending');
+  const coursImpayes = slots.filter(s => s.reservedBy && !s.isPack && !s.isExperimental && s.paymentStatus === 'pending' && !s.experimentalCancelled);
+  const notas = slots.filter(s => s.reservedBy && !s.isPack && !s.isExperimental && s.paymentStatus === 'paid' && !s.notaFiscalSent).length
+    + studentsData.filter(s => s.pack && s.pack.paymentStatus === 'paid' && !s.pack.notaFiscalSent).length;
   const sansNiveau = studentsData.filter(s => !s.niveau);
   const tema = profThemeCourant();
   const progres = tema ? studentsData.filter(s=>s.niveau).map(s => ({s, p: profThemeProgress(s, tema)})) : [];
   const aCorriger = progres.reduce((n, x) => n + (x.p.aCorriger || 0), 0);
-  const profilsModifies = studentsData.filter(s => s.profilMaj && s.profilMaj.at && (now - new Date(s.profilMaj.at.toDate ? s.profilMaj.at.toDate() : s.profilMaj.at).getTime()) < 7*86400000);
   const unread = navUnreadProf();
+  const notifs = navCounts.notifs || 0;
 
-  const coursLigne = s => `<li class="course-row">
-      <span class="course-time">${uiIcon('clock')}${fmtSlotDate(s.date)}</span>
-      <span class="course-who">${esc(s.reservedName || 'Élève')}${s.isExperimental ? ' <span class="badge badge-info">Cours expérimental</span>' : ''}${s.isPack ? '' : (s.paymentStatus === 'pending' ? ' <span class="badge badge-warning">Paiement en attente</span>' : '')}</span>
-      ${rptBadgeHTML(s, true)}
-      <span class="course-actions">${s.zoomJoinUrl ? `<button type="button" class="btn btn-secondary btn-sm" onclick="profOuvrirZoom('${s.id}')">Ouvrir Zoom</button>` : '<span class="badge">Lien Zoom à venir</span>'}</span>
-    </li>`;
+  const prevoir = [];
+  const addP = (n, texte, action, label) => { if(n) prevoir.push(`<li class="todo-row"><span class="todo-n">${n}</span><span class="todo-txt">${texte}</span><button type="button" class="btn btn-ghost btn-sm" onclick="${action}">${label}</button></li>`); };
+  addP(p.prevoir.length, `séance${p.prevoir.length>1?'s':''} en attente (confirmation, nouvelle date, Zoom)`, "goTeacherTab('atraiter')", 'Suivre');
+  addP(aRenouveler.length, `forfait${aRenouveler.length>1?'s':''} bientôt épuisé${aRenouveler.length>1?'s':''}`, "goTeacherTab('finances')", 'Voir');
+  addP(paiementsPack.length + coursImpayes.length, `paiement${paiementsPack.length + coursImpayes.length>1?'s':''} à vérifier`, "goTeacherTab('finances')", 'Voir');
+  addP(notas, `nota${notas>1?'s':''} fiscal${notas>1?'es':''} à envoyer`, "goTeacherTab('finances')", 'Envoyer');
+  addP(aCorriger, `réponse${aCorriger>1?'s':''} du thème à corriger`, "goTeacherTab('temas')", 'Corriger');
+  addP(unread, `message${unread>1?'s':''} non lu${unread>1?'s':''}`, "goTeacherTab('messages')", 'Lire');
+  addP(notifs, `notification${notifs>1?'s':''} non lue${notifs>1?'s':''}`, "goTeacherTab('notifications')", 'Voir');
+  addP(sansNiveau.length, `élève${sansNiveau.length>1?'s':''} sans niveau attribué`, "profVoirSansNiveau()", 'Attribuer');
 
-  const todo = [];
-  const addTodo = (n, ton, texte, action, label) => { if(n) todo.push(`<li class="todo-row ${ton}"><span class="todo-n">${n}</span><span class="todo-txt">${texte}</span><button type="button" class="btn btn-secondary btn-sm" onclick="${action}">${label}</button></li>`); };
-  addTodo(iss.anomalies.length, 'danger', `séance${iss.anomalies.length>1?'s':''} en anomalie à replanifier`, "goTeacherTab('anomalies')", 'Traiter');
-  addTodo(iss.demandesEleves.length, 'warning', `demande${iss.demandesEleves.length>1?'s':''} de report d'élève${iss.demandesEleves.length>1?'s':''}`, "goTeacherTab('anomalies')", 'Répondre');
-  addTodo(iss.zoom.filter(s=>s.zoomSync.status==='error').length, 'danger', 'synchronisation Zoom en échec', "goTeacherTab('anomalies')", 'Voir');
-  addTodo(iss.propositions.length, 'info', `proposition${iss.propositions.length>1?'s':''} de report en attente de réponse`, "goTeacherTab('anomalies')", 'Suivre');
-  addTodo(unread, 'info', `message${unread>1?'s':''} non lu${unread>1?'s':''}`, "goTeacherTab('messages')", 'Lire');
-  addTodo(aCorriger, 'warning', `réponse${aCorriger>1?'s':''} du thème à corriger`, "goTeacherTab('temas')", 'Corriger');
-  addTodo(paiementsPack.length + coursImpayes.length, 'warning', `paiement${paiementsPack.length + coursImpayes.length>1?'s':''} en attente`, "goTeacherTab('finances')", 'Voir');
-  const aRegul = studentsData.filter(s => s.pack && Number(s.pack.total) && forfaitBilanEleve(s).statut === 'a_regulariser').length;
-  addTodo(aRegul, 'danger', `forfait${aRegul>1?'s':''} à régulariser (séances en anomalie ou à vérifier)`, "goTeacherTab('finances')", 'Voir');
-  addTodo(aRenouveler.length, 'warning', `forfait${aRenouveler.length>1?'s':''} à renouveler bientôt`, "goTeacherTab('finances')", 'Voir');
-  addTodo(sansNiveau.length, 'info', `élève${sansNiveau.length>1?'s':''} sans niveau attribué`, "profVoirSansNiveau()", 'Attribuer');
-  addTodo(profilsModifies.length, 'info', `profil${profilsModifies.length>1?'s':''} modifié${profilsModifies.length>1?'s':''} par ${profilsModifies.length>1?'des élèves':'un élève'} cette semaine`, `openAdminStudentSection('${profilsModifies[0] ? profilsModifies[0].id : ''}','profil')`, 'Voir');
-
-  const progresHTML = !tema ? '' : (progres.length ? `<ul class="progress-list">${progres.sort((a,b)=>(a.p.done/a.p.total||0)-(b.p.done/b.p.total||0)).slice(0, 8).map(({s,p})=>{
-      const pct = p.total ? Math.round(100*p.done/p.total) : 0;
-      return `<li><button type="button" class="progress-row" onclick="openAdminStudentSection('${s.id}','parcours')">
-        <span class="progress-name">${esc(s.prenom)} ${esc(s.nom || '')}</span>
-        <span class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Progression de ${esc(s.prenom)}"><span style="width:${pct}%"></span></span>
-        <span class="progress-val">${p.done}/${p.total}</span></button></li>`;
-    }).join('')}</ul>${progres.length > 8 ? `<button type="button" class="btn-link" onclick="goTeacherTab('temas')">Voir les ${progres.length} élèves</button>` : ''}`
-    : profEmptyHTML('users', 'Aucun élève avec un niveau', 'La progression apparaîtra dès qu\'un niveau sera attribué.'));
+  const urgentHTML = p.urgent.length
+    ? `<ul class="seance-list">${p.urgent.slice(0, 6).map(it => seanceLigneHTML(it.s, {label: PILOTAGE_TYPES[it.type].label, ton:'danger', detail: it.detail ? esc(it.detail) : ''})).join('')}</ul>
+       ${p.urgent.length > 6 ? `<button type="button" class="btn-link" onclick="goTeacherTab('atraiter')">Voir les ${p.urgent.length} éléments</button>` : ''}`
+    : `<p class="dash-calm">${uiIcon('check')} Rien d'urgent : aucune demande de report, anomalie ou erreur Zoom en attente.</p>`;
+  const activite = (SEANCES.events || []).slice(0, 6);
 
   body.innerHTML = `
     <p class="dash-hello">Bonjour ${esc(student.prenom || 'Melissa')} · ${profFmtJour(new Date())}</p>
-    <div class="stat-row">
-      ${profStatHTML('cours aujourd\'hui', aujourdhui.length, '', "goTeacherTab('dispo')")}
-      ${profStatHTML('cours dans les 7 jours', aVenir.length + aujourdhui.length, '', "goTeacherTab('dispo')")}
-      ${profStatHTML('à traiter', iss.total, iss.total ? 'danger' : 'ok', "goTeacherTab('anomalies')")}
-      ${profStatHTML('élèves inscrits', studentsData.length, '', "goTeacherTab('eleves')")}
-      ${profStatHTML('créneaux libres à venir', libres, '', "goTeacherTab('dispo')")}
-    </div>
-    <div class="dash-cols">
+    <section class="dash-card dash-urgent ${p.urgent.length ? 'has-items' : ''}" aria-labelledby="dash-urg-t">
+      <h2 id="dash-urg-t">${uiIcon('alert')} À faire maintenant ${p.urgent.length ? `<span class="count-pill danger">${p.urgent.length}</span>` : ''}</h2>
+      ${urgentHTML}
+    </section>
+    <div class="dash-cols dash-main-cols">
       <section class="dash-card dash-wide" aria-labelledby="dash-cours-t">
         <h2 id="dash-cours-t">${uiIcon('calendar')} Aujourd'hui</h2>
-        ${aujourdhui.length ? `<ul class="course-list">${aujourdhui.map(coursLigne).join('')}</ul>` : profEmptyHTML('calendar', 'Aucun cours aujourd\'hui', '')}
-        <h3 class="dash-sub-title">Les 7 prochains jours</h3>
-        ${aVenir.length ? `<ul class="course-list">${aVenir.slice(0, 8).map(coursLigne).join('')}</ul>${aVenir.length > 8 ? `<button type="button" class="btn-link" onclick="goTeacherTab('dispo')">Voir les ${aVenir.length} cours</button>` : ''}` : profEmptyHTML('calendar', 'Aucun cours réservé cette semaine', '')}
+        ${aujourdhui.length ? seanceListeHTML(aujourdhui, {heureSeule:true, zoom:true}) : profEmptyHTML('calendar', 'Aucun cours aujourd\'hui', '')}
+        <h3 class="dash-sub-title">Les 6 jours suivants</h3>
+        ${semaine.length ? seanceListeHTML(semaine.slice(0, 8)) + (semaine.length > 8 ? `<button type="button" class="btn-link" onclick="goTeacherTab('dispo')">Voir l'agenda (${semaine.length} cours)</button>` : '') : profEmptyHTML('calendar', 'Aucun cours réservé', '')}
       </section>
-      <section class="dash-card" aria-labelledby="dash-todo-t">
-        <h2 id="dash-todo-t">${uiIcon('alert')} À traiter</h2>
-        ${todo.length ? `<ul class="todo-list">${todo.join('')}</ul>` : profEmptyHTML('check', 'Tout est à jour', 'Rien ne demande ton attention pour le moment.')}
+      <section class="dash-card" aria-labelledby="dash-prev-t">
+        <h2 id="dash-prev-t">${uiIcon('clock')} À prévoir</h2>
+        ${prevoir.length ? `<ul class="todo-list">${prevoir.join('')}</ul>` : profEmptyHTML('check', 'Tout est à jour', '')}
+      </section>
+    </div>
+    <h2 class="section-title">Vue d'ensemble</h2>
+    <div class="stat-row">
+      ${profStatHTML('élèves inscrits', studentsData.length, '', "goTeacherTab('eleves')")}
+      ${profStatHTML('cours dans les 7 jours', aujourdhui.length + semaine.length, '', "goTeacherTab('dispo')")}
+      ${profStatHTML('séances réalisées ce mois-ci', realiseesMois, '')}
+      ${profStatHTML('créneaux libres à venir', libres, '', "goTeacherTab('disponibilites')")}
+    </div>
+    <div class="dash-cols">
+      <section class="dash-card" aria-labelledby="dash-act-t">
+        <h2 id="dash-act-t">${uiIcon('chat')} Activité récente</h2>
+        ${activite.length ? `<ul class="event-list">${activite.map(e => `<li><button type="button" class="event-row" onclick="seanceOuvrir('${e.seanceId}')">${suiviEvenementHTML(e).replace(/^<li>|<\/li>$/g, '')} — <b>${esc(e.eleveNom || '')}</b></button></li>`).join('')}</ul>` : '<p class="tp-dim">Les confirmations, annulations et reports apparaîtront ici.</p>'}
       </section>
       <section class="dash-card" aria-labelledby="dash-prog-t">
         <h2 id="dash-prog-t">${uiIcon('route')} Progression${tema ? ` — ${esc(tema.titre_fr)}` : ''}</h2>
-        ${progresHTML}
-      </section>
-      <section class="dash-card" aria-labelledby="dash-quick-t">
-        <h2 id="dash-quick-t">${uiIcon('plus')} Actions rapides</h2>
-        <div class="quick-grid">
-          <button type="button" class="quick-btn" onclick="goTeacherTab('dispo')">${uiIcon('calendar')}<span>Ajouter un créneau</span></button>
-          <button type="button" class="quick-btn" onclick="goTeacherTab('dispo')">${uiIcon('wallet')}<span>Créer un forfait</span></button>
-          <button type="button" class="quick-btn" onclick="goTeacherTab('annonces')">${uiIcon('megaphone')}<span>Publier une annonce</span></button>
-          <button type="button" class="quick-btn" onclick="goTeacherTab('temas')">${uiIcon('book')}<span>Gérer les thèmes</span></button>
-          <button type="button" class="quick-btn" onclick="goTeacherTab('messages')">${uiIcon('chat')}<span>Écrire à un élève</span></button>
-          <button type="button" class="quick-btn" onclick="goTeacherTab('ressources')">${uiIcon('library')}<span>Ajouter une ressource</span></button>
-        </div>
+        ${!tema ? '<p class="tp-dim">Aucun thème en cours.</p>' : (progres.length ? `<ul class="progress-list">${progres.sort((a,b)=>(a.p.done/a.p.total||0)-(b.p.done/b.p.total||0)).slice(0, 6).map(({s,p})=>{
+            const pct = p.total ? Math.round(100*p.done/p.total) : 0;
+            return `<li><button type="button" class="progress-row" onclick="openAdminStudentSection('${s.id}','parcours')">
+              <span class="progress-name">${esc(s.prenom)} ${esc(s.nom || '')}</span>
+              <span class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Progression de ${esc(s.prenom)}"><span style="width:${pct}%"></span></span>
+              <span class="progress-val">${p.done}/${p.total}</span></button></li>`; }).join('')}</ul>` : '<p class="tp-dim">La progression apparaîtra dès qu\'un niveau sera attribué.</p>')}
       </section>
     </div>`;
 }
 registerTeacherTab('accueil', ()=>{ profDash = null; profDashboardLoad(); });
 
-/* ---------------------------------------------------------------------------
-   REPORTS & ANOMALIES (réutilise l'historique existant, filtré)
-   --------------------------------------------------------------------------- */
-function profIsIssue(s){
-  if(!s.reservedBy) return false;
-  const req = s.rescheduleRequest || {};
-  return !!(s.anomalie || rptPropositionEnAttente(s) || (req.status === 'pending') || rptZoomSyncEnCours(s));
-}
-registerTeacherTab('anomalies', async ()=>{ await profEnsureStudents(); loadTeacherHistorique(); });
-(function(){
-  const baseHisto = window.renderTeacherHistorique;
-  window.renderTeacherHistorique = function(){
-    if(profOnTab('anomalies')) return profAnomaliesRender();
-    return baseHisto.apply(this, arguments);
-  };
-  const basePast = window.renderPastSessions;
-  window.renderPastSessions = function(){
-    if(!profOnTab('anomalies')) return basePast.apply(this, arguments);
-    const all = dispoData;
-    const filtres = all.filter(s => profIsIssue(s) || ['a_verifier'].includes(forfaitEtatSeance(s)) || (s.consommation && s.consommation.statut && s.anomalieHandled && (Date.now() - new Date(s.consommation.at).getTime()) < 7*86400000));
-    dispoData = filtres;
-    try{ basePast.apply(this, arguments); } finally { dispoData = all; }
-    /* Même ordre que la liste existante (passées, plus récentes d'abord) : on complète chaque carte. */
-    const passees = filtres.filter(s => s.reservedBy && new Date(s.date).getTime() < Date.now() - 3600000).sort((a,b)=> new Date(b.date) - new Date(a.date));
-    const cartes = document.querySelectorAll('#admin-past-list > .teacher-entry');
-    passees.forEach((x, i) => { if(cartes[i]) cartes[i].insertAdjacentHTML('beforeend', profAnomalieDetailHTML(x)); });
-    const el = document.getElementById('admin-past-list');
-    if(el && /Aucun cours passé/.test(el.textContent)) el.innerHTML = profEmptyHTML('check', 'Aucune séance passée à régulariser', 'Les séances en anomalie apparaîtront ici avec les actions pour proposer un report.');
-  };
-})();
-/* Détail d'une séance à régulariser : motif, forfait, proposition et relances, décision, historique. */
-function profAnomalieDetailHTML(x){
-  const etat = forfaitEtatSeance(x);
-  const motif = x.anomalie || etat === 'a_verifier'
-    ? (x.clickedByStudent && !x.clickedByTeacher ? "L'élève a rejoint Zoom, pas toi" : (!x.clickedByStudent && x.clickedByTeacher ? "Tu as rejoint Zoom, pas l'élève" : "Personne n'a rejoint le lien Zoom de la plateforme"))
-    : '';
-  const eleve = studentsData.find(e => e.id === x.reservedBy);
-  const forfait = x.isPack ? (eleve && eleve.pack && eleve.pack.total ? `Forfait de ${eleve.pack.total} séances — ${forfaitBilanEleve(eleve).utilisees}/${eleve.pack.total} utilisées` : 'Séance de forfait') : (x.isExperimental ? 'Cours expérimental' : "Cours à l'unité");
-  return `<div class="anomalie-detail">
-    <p class="meta">${forfaitEtatHTML(etat)} ${motif ? `· Motif : ${motif}` : ''} · ${forfait} · <b>${FORFAIT_ETATS[etat] && FORFAIT_ETATS[etat].decompte ? 'décomptée du forfait' : 'non décomptée'}</b></p>
-    ${forfaitPropositionHTML(x)}${forfaitDecisionFormHTML(x)}${forfaitHistoriqueHTML(x)}</div>`;
-}
 /* Ouvre Zoom depuis le tableau de bord EN ENREGISTRANT le clic (clickedByTeacher), comme le
    bouton du planning : c'est ce clic qui prouve que le cours a eu lieu (voir 20-forfaits.js). */
 function profOuvrirZoom(slotId){
-  const s = ((profDash && profDash.slots) || []).find(x => x.id === slotId);
+  const s = (typeof SEANCES !== 'undefined' ? SEANCES.liste : []).find(x => x.id === slotId);
   if(s && s.zoomJoinUrl) zoomUrlMap[slotId] = s.zoomJoinUrl;
   openZoomLink(slotId);
 }
-function profAnomaliesRender(){
-  const body = profBody(); if(!body) return;
-  const now = Date.now();
-  const iss = profIssues(dispoData);
-  profSetCount(iss.total);
-  const futurs = dispoData.filter(s => profIsIssue(s) && new Date(s.date).getTime() >= now - 3600000)
-    .sort((a,b)=> new Date(a.date) - new Date(b.date));
-  body.innerHTML = `
-    <p class="page-intro">Une séance est en anomalie quand toi et l'élève n'avez pas tous les deux rejoint le lien Zoom : elle n'est comptée ni comme effectuée ni comme à venir tant qu'elle n'est pas replanifiée.</p>
-    <div class="stat-row">
-      ${profStatHTML('séances en anomalie', iss.anomalies.length, iss.anomalies.length ? 'danger' : 'ok')}
-      ${profStatHTML('demandes d\'élèves', iss.demandesEleves.length, iss.demandesEleves.length ? 'warning' : '')}
-      ${profStatHTML('propositions en attente', iss.propositions.length, '')}
-      ${profStatHTML('synchronisations Zoom', iss.zoom.length, iss.zoom.some(s=>s.zoomSync.status==='error') ? 'danger' : '')}
-    </div>
-    <h2 class="section-title">Séances à venir à suivre</h2>
-    ${futurs.length ? futurs.map(s=>{
-      const req = s.rescheduleRequest || {};
-      return `<div class="teacher-entry">
-        <div class="who">${uiIcon('calendar')} ${fmtSlotDate(s.date)} <span class="tp-dim">— ${esc(s.reservedName || 'Élève')}</span></div>
-        <div class="meta">${req.by === 'student' && req.status === 'pending' ? '<span class="badge badge-warning">Demande de report de l\'élève</span> ' : ''}${rptBadgeHTML(s, true)}</div>
-        ${forfaitPropositionHTML(s)}
-        <div class="teacher-entry-actions"><button type="button" onclick="goTeacherTab('dispo')">Ouvrir dans le planning</button></div>
-      </div>`;
-    }).join('') : profEmptyHTML('check', 'Rien à suivre sur les séances à venir', '')}
-    <h2 class="section-title">Séances passées à régulariser</h2>
-    <div id="admin-past-list"></div>`;
-  renderPastSessions();
-}
-
 /* ---------------------------------------------------------------------------
    ÉVITER LES RENDUS D'UN AUTRE ONGLET
    Certaines actions existantes rechargent « leur » écran à la fin (ex. marquer un forfait
@@ -318,9 +202,10 @@ function profRefreshCurrent(){
   if(screen !== 'teacher') return;
   const loader = TEACHER_TABS[teacherTab];
   if(loader) loader();
+  if(typeof seanceRafraichir === 'function') seanceRafraichir();
 }
 (function(){
-  const owners = {renderTeacherStudentsList:['eleves'], renderAdminDispo:['dispo']};
+  const owners = {renderTeacherStudentsList:['eleves']};
   Object.keys(owners).forEach(name=>{
     const base = window[name];
     if(typeof base !== 'function') return;
@@ -415,9 +300,16 @@ function profFinancesRender(){
     <h2 class="section-title">À encaisser</h2>
     ${encaisser.length ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Objet</th><th scope="col">Montant (tarif actuel)</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${encaisser.join('')}</tbody></table></div>`
       : profEmptyHTML('check', 'Aucun paiement en attente', '')}
+    ${(()=>{
+      const notas = [
+        ...studentsData.filter(x => x.pack && x.pack.paymentStatus === 'paid' && !x.pack.notaFiscalSent).map(x => `<tr><td>${esc(x.prenom)} ${esc(x.nom||'')}</td><td>Forfait de ${x.pack.total} séances</td><td><button type="button" class="btn btn-secondary btn-sm" onclick="openAdminStudentSection('${x.id}','forfait')">Envoyer</button></td></tr>`),
+        ...slots.filter(x => x.reservedBy && !x.isPack && !x.isExperimental && x.paymentStatus === 'paid' && !x.notaFiscalSent).map(x => `<tr><td>${esc(x.reservedName || 'Élève')}</td><td>Cours du ${fmtSlotDate(x.date)}</td><td><button type="button" class="btn btn-secondary btn-sm" onclick="seanceOuvrir('${x.id}')">Envoyer</button></td></tr>`)
+      ];
+      return notas.length ? `<h2 class="section-title">Notas fiscais à envoyer</h2><div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Objet</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${notas.join('')}</tbody></table></div>` : '';
+    })()}
     <h2 class="section-title">Forfaits</h2>
     ${forfaits ? `<div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Élève</th><th scope="col">Forfait</th><th scope="col">Réalisées</th><th scope="col">Restantes</th><th scope="col">Programmées</th><th scope="col">Anomalies</th><th scope="col">Paiement</th><th scope="col">Statut</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody>${forfaits}</tbody></table></div>`
-      : profEmptyHTML('wallet', 'Aucun forfait en cours', 'Les forfaits se créent depuis Cours › Planning (« Réserver un forfait »).')}
+      : profEmptyHTML('wallet', 'Aucun forfait en cours', 'Les forfaits se créent depuis Forfaits & paiements › Nouveau forfait.')}
     <h2 class="section-title">Séances effectuées par mois</h2>
     <div class="table-wrap"><table class="ui-table"><thead><tr><th scope="col">Mois</th><th scope="col">Forfait</th><th scope="col">À l'unité</th><th scope="col">Cours expérimental</th><th scope="col">Total</th></tr></thead>
       <tbody>${mois.slice().reverse().map(m=>`<tr><td>${m.label}</td><td>${m.pack}</td><td>${m.unite}</td><td>${m.essai}</td><td><b>${m.pack+m.unite+m.essai}</b></td></tr>`).join('')}</tbody></table></div>
@@ -433,7 +325,7 @@ function profFinancesRender(){
 async function profFinAction(fn, libelle, eleveId){
   await fn();
   journaliser('paiement', libelle, {eleve: eleveId});
-  profCache.slotsAt = 0;
+  if(typeof SEANCES !== 'undefined') SEANCES.at = 0;
   await profFinancesLoad();
 }
 registerTeacherTab('finances', ()=>{ profFin = null; profFinancesLoad(); });
@@ -459,8 +351,7 @@ async function profAnnoncesLoad(){
         <div class="meta" style="white-space:pre-wrap;">${esc(a.text || '')}</div>
         <div class="teacher-entry-actions"><button type="button" class="btn-danger" onclick="profSupprimerAnnonce('${a.id}')">Supprimer</button></div>
       </div>`).join('') : profEmptyHTML('megaphone', 'Aucune annonce publiée', ''))}
-    <h2 class="section-title">Rappels automatiques</h2>
-    <div class="teacher-entry"><div class="meta">Envoyés par ton Apps Script, sans action de ta part : rappel par e-mail 24 h avant chaque cours, avec boutons confirmer / annuler / reporter ; annulation automatique des cours non payés ; e-mails de proposition et de confirmation de report ; nouvelles tentatives de synchronisation Zoom toutes les 10 minutes. Leur réglage reste dans l'Apps Script (voir Paramètres › Intégrations).</div></div>`;
+    <p class="tp-dim">Les e-mails automatiques (rappel 24 h, relances, annulations) se règlent dans Paramètres › Réglages › Annulations & automatisations.</p>`;
 }
 (function(){
   const base = window.publishAnnouncement;
@@ -488,7 +379,7 @@ registerTeacherTab('annonces', ()=>profAnnoncesLoad());
 /* ---------------------------------------------------------------------------
    FICHE ÉLÈVE CENTRALISÉE
    --------------------------------------------------------------------------- */
-const FICHE_SECTIONS = [['dossiers','Dossiers & bilans'],['parcours','Thèmes'],['cours','Cours'],['forfait','Forfait'],
+const FICHE_SECTIONS = [['dossiers','Dossiers & bilans'],['parcours','Thèmes'],['cours','Cours & confirmations'],['forfait','Forfait'],
   ['profil','Profil & niveau'],['suivi','Objectifs & difficultés'],['enregistrements','Enregistrements'],['messages','Messages']];
 function ficheSectionHTML(section, s){
   if(section === 'parcours') return ficheParcoursHTML(s);
@@ -526,16 +417,14 @@ async function ficheLoadAsync(section, s){
   const el = document.getElementById('fiche-async'); if(!el) return;
   try{
     if(section === 'cours'){
-      const snap = await db.collection('disponibilites').where('reservedBy', '==', s.id).get();
-      const slots = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=> new Date(b.date) - new Date(a.date));
+      await seancesCharger();
+      const slots = SEANCES.liste.filter(x => x.reservedBy === s.id).sort((a,b)=> new Date(b.date) - new Date(a.date));
       const c = rptCompteurs(slots);
-      const now = Date.now();
       el.innerHTML = `<p class="rpt-counters">${rptCompteursHTML(c)}</p>
-        ${slots.length ? `<ul class="course-list">${slots.map(x=>{
-          const etat = rptEtat(x, now);
-          const lab = {anomalie:'<span class="badge badge-danger">Anomalie</span>', report_propose:'<span class="badge badge-warning">Report proposé</span>', zoom_attente:'<span class="badge badge-warning">Zoom en attente</span>', zoom_erreur:'<span class="badge badge-danger">Zoom en échec</span>', a_venir:'<span class="badge badge-info">À venir</span>', effectuee:'<span class="badge badge-success">Effectuée</span>', a_verifier:'<span class="badge badge-warning">Passée, à vérifier</span>', annulee:'<span class="badge">Annulée</span>'}[etat] || '';
-          return `<li class="course-row"><span class="course-time">${uiIcon('clock')}${fmtSlotDate(x.date)}</span><span class="course-who">${lab}${x.isExperimental ? ' <span class="badge">Cours expérimental</span>' : ''}${x.isPack ? ' <span class="badge">Forfait</span>' : ''}${x.experimentalCancelled || x.definitivelyCancelled ? ' <span class="badge">Annulée</span>' : ''}</span>${x.vocab ? '<span class="tp-dim">Récap ajouté</span>' : ''}</li>`;
-        }).join('')}</ul>` : profEmptyHTML('calendar', 'Aucun cours réservé', '')}`;
+        ${slots.length ? seanceListeHTML(slots, {sansEleve:true}) : profEmptyHTML('calendar', 'Aucun cours réservé', '')}
+        <h3 class="sub-title">Réponses aux rappels et tolérances</h3>
+        <div id="fiche-reponses" aria-live="polite"><p class="teacher-empty" role="status">Chargement…</p></div>`;
+      suiviFicheCharger(s, false);
     }
     if(section === 'enregistrements'){
       const snap = await db.collection('enregistrements').where('uid', '==', s.id).get();

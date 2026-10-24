@@ -10,7 +10,7 @@ Une seule page (`index.html`) affiche un écran à la fois. Tout part de **`js/1
 
 | Rôle | Rubriques |
 | --- | --- |
-| Professeure | Tableau de bord · Élèves · Cours · Pédagogie · Finances · Communication · Paramètres |
+| Professeure | Tableau de bord · Élèves · Cours · Pédagogie · Forfaits & paiements · Communication · Paramètres |
 | Élève inscrit | Accueil · Mon parcours · Mes cours · Mes exercices · Mes ressources · Messages · Mon profil |
 | Élève sans niveau | Accueil · Mes cours · Messages · Mon profil |
 | Cours expérimental | Mon cours · Historique · Messages · Mon profil |
@@ -35,10 +35,21 @@ Plus aucun fichier ne redéfinit `render()` ou `renderSidebar()`.
 | `js/00` à `js/13` | Écrans existants : connexion, dossiers, thèmes, réservations, messagerie, espace professeure, reports |
 | `js/14-interface.js` | Notifications, filtres des élèves, accessibilité |
 | `js/15-navigation.js` | Rubriques, menus, contrôle d'accès, icônes |
-| `js/16-pilotage-professeure.js` | Tableau de bord, Reports & anomalies, Finances, Annonces, fiche élève centralisée, journal d'activité |
+| `js/16-pilotage-professeure.js` | Tableau de bord par priorité, Forfaits & paiements, Annonces, fiche élève centralisée, journal d'activité |
 | `js/17-parametres.js` | `config/plateforme` : tarifs, apparence (palettes, couleurs, saison, mode sombre), règles affichées, profil professeure, intégrations, journal |
 | `js/18-espace-eleve.js` | Accueil élève, Mon profil (modifiable), Mes exercices, Ressources (élève et professeure) |
 | `js/19-parcours-chemin.js` | Parcours en chemin, verrouillage configurable, ordre, attribution, archivage anticipé |
+| `js/20-forfaits.js` | Décompte réel des forfaits (seule source du nombre de séances utilisées / restantes), décisions, contrôle |
+| `js/21-suivi-cours.js` | Réponses aux rappels : statut de confirmation, notifications temps réel, historique dans la fiche élève, bouton élève « Confirmer » |
+| `js/22-seances.js` | Source unique des séances (`SEANCES`, `seancesCharger`), statut unique (`seanceStatut`), priorités (`pilotage`), **fiche séance** (`seanceOuvrir`), onglets Agenda, À traiter, Historique, Disponibilités et Nouveau forfait |
+
+## Règles de conception
+
+- **Une fonction, un emplacement de gestion.** Les résumés (tableau de bord, fiche élève) renvoient vers la fiche séance ou la fiche élève ; ils ne réimplémentent pas les actions.
+- **Une seule lecture des séances** : `seancesCharger()` (cache de 20 s). Ne pas relire `disponibilites` dans un nouvel onglet.
+- **Un seul statut** : `seanceStatut(s)` ; une seule liste de priorités : `pilotage(slots)` (elle alimente aussi le compteur du menu).
+- **Les changements de statut passent par le serveur** (Apps Script : `lessonAction`, `cancelReservation`, `refuseRescheduleRequest`, `proposeReschedule`, `applyTeacherReschedule`…). Le navigateur n'efface jamais une demande ni un historique.
+- Détail de la réorganisation : `docs/AUDIT-ORGANISATION.md`.
 
 ## Données ajoutées
 
