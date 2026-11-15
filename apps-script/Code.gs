@@ -3511,15 +3511,21 @@ function progInTree_(file) {
   return false;
 }
 
-/* Personnes ayant accès au fichier, en dehors de la propriétaire du Drive. */
+/* Adresse de la propriétaire du fichier (ton compte). On passe par DriveApp, couvert par le
+   scope Drive déjà autorisé : Session.getEffectiveUser exigerait un scope supplémentaire. */
+function progProprio_(file) {
+  try { const o = file.getOwner(); return String((o && o.getEmail()) || "").toLowerCase(); } catch (e) { return ""; }
+}
+
+/* Personnes ayant accès au fichier, en dehors de la propriétaire. */
 function progAutres_(file) {
-  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  const moi = progProprio_(file);
   return file.getEditors().concat(file.getViewers()).filter(function (u) { return String(u.getEmail() || "").toLowerCase() !== moi; });
 }
 
 function progMakePrivate_(file) {
   file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  const moi = progProprio_(file);
   file.getEditors().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeEditor(u); });
   file.getViewers().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeViewer(u); });
 }
