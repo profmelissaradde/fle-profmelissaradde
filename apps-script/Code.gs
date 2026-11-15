@@ -614,6 +614,11 @@ function doPost(e) {
     if (data.action === "notifyPackBooked") { requireTeacher_(authCtx); return handleNotifyPackBooked(data); }
     if (data.action === "notifyPaymentReceived") { requireTeacher_(authCtx); return handleNotifyPaymentReceived(data); }
     if (data.action === "notifyNotaFiscal") { requireTeacher_(authCtx); return handleNotifyNotaFiscal(data); }
+    // Programme pédagogique FLE : bibliothèque PowerPoint privée (professeure uniquement)
+    if (data.action === "progPptxUpload") { requireTeacher_(authCtx); return handleProgPptxUpload_(data); }
+    if (data.action === "progPptxDownload") { requireTeacher_(authCtx); return handleProgPptxDownload_(data); }
+    if (data.action === "progPptxDelete") { requireTeacher_(authCtx); return handleProgPptxDelete_(data); }
+    if (data.action === "progPptxAudit") { requireTeacher_(authCtx); return handleProgPptxAudit_(data); }
 
     return jsonResponse({ ok: false, error: "action inconnue" });
   } catch (err) {
@@ -3455,4 +3460,130 @@ function handleRefuseRescheduleRequest(data, authCtx) {
     }
     return jsonResponse({ ok: true, already: res.already === true });
   } catch (err) { return jsonResponse({ ok: false, error: rptErrMsg_(err) }); }
+}
+
+
+/* ============================================================================
+
+   PROGRAMME PÉDAGOGIQUE FLE — BIBLIOTHÈQUE POWERPOINT PRIVÉE
+
+   Les .pptx sont rangés dans un dossier Drive privé (propriété PROGRAMME_FOLDER_ID),
+   jamais partagés. Toutes les actions exigent le jeton Firebase de la professeure
+   (requireTeacher_ dans doPost) : un élève reçoit « Action réservée à la professeure ».
+   Le navigateur ne reçoit jamais d'URL publique : le fichier est renvoyé en base64.
+
+   ============================================================================ */
+
+const PPTX_MIME_ = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+function progRoot_() {
+  return DriveApp.getFolderById(requireProperty_("PROGRAMME_FOLDER_ID"));
+}
+
+/* Segment de chemin sûr : lettres, chiffres, tiret, tiret bas. */
+function progSegment_(s) {
+  const v = String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+  if (!v) throw new Error("Chemin invalide.");
+  return v;
+}
+
+function progSubFolder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+/* Vérifie qu'un fichier se trouve bien dans l'arborescence du programme (et pas ailleurs dans le Drive). */
+function progInTree_(file) {
+  const rootId = requireProperty_("PROGRAMME_FOLDER_ID");
+  let level = [file.getParents()];
+  for (let depth = 0; depth < 8; depth++) {
+    const next = [];
+    for (const it of level) {
+      while (it.hasNext()) {
+        const f = it.next();
+        if (f.getId() === rootId) return true;
+        next.push(f.getParents());
+      }
+    }
+    if (!next.length) return false;
+    level = next;
+  }
+  return false;
+}
+
+/* Personnes ayant accès au fichier, en dehors de la propriétaire du Drive. */
+function progAutres_(file) {
+  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  return file.getEditors().concat(file.getViewers()).filter(function (u) { return String(u.getEmail() || "").toLowerCase() !== moi; });
+}
+
+function progMakePrivate_(file) {
+  file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  file.getEditors().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeEditor(u); });
+  file.getViewers().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeViewer(u); });
+}
+
+function handleProgPptxUpload_(data) {
+  if (!data.base64) return jsonResponse({ ok: false, error: "fichier manquant" });
+  const name = String(data.fileName || "").replace(/[\/\\]/g, "_").slice(0, 140);
+  if (!/\.pptx$/i.test(name)) return jsonResponse({ ok: false, error: "seuls les fichiers .pptx sont acceptés" });
+  const bytes = Utilities.base64Decode(data.base64);
+  if (bytes.length > 40 * 1024 * 1024) return jsonResponse({ ok: false, error: "fichier trop volumineux" });
+  const segments = String(data.chemin || "").split("/").filter(Boolean).map(progSegment_);
+  if (segments.length < 2 || segments.length > 6) return jsonResponse({ ok: false, error: "chemin invalide" });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    let folder = progRoot_();
+    segments.forEach(function (seg) { folder = progSubFolder_(folder, seg); });
+    // Remplacement : l'ancienne version va à la corbeille (récupérable 30 jours).
+    const old = folder.getFilesByName(name);
+    while (old.hasNext()) old.next().setTrashed(true);
+    const file = folder.createFile(Utilities.newBlob(bytes, PPTX_MIME_, name));
+    progMakePrivate_(file);
+    return jsonResponse({ ok: true, fileId: file.getId(), taille: bytes.length, chemin: segments.join("/") + "/" + name });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function handleProgPptxDownload_(data) {
+  const file = DriveApp.getFileById(String(data.fileId || ""));
+  if (file.isTrashed() || !progInTree_(file)) return jsonResponse({ ok: false, error: "fichier introuvable dans la bibliothèque" });
+  const blob = file.getBlob();
+  return jsonResponse({ ok: true, nom: file.getName(), mime: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) });
+}
+
+function handleProgPptxDelete_(data) {
+  const file = DriveApp.getFileById(String(data.fileId || ""));
+  if (!progInTree_(file)) return jsonResponse({ ok: false, error: "fichier hors bibliothèque" });
+  file.setTrashed(true);
+  return jsonResponse({ ok: true });
+}
+
+/* Contrôle des accès : liste tout fichier de la bibliothèque qui ne serait pas strictement privé.
+   Avec corriger: true, remet chaque fichier en privé. */
+function handleProgPptxAudit_(data) {
+  const corriger = data.corriger === true;
+  const pb = [];
+  let total = 0;
+  (function walk(folder, chemin) {
+    if (folder.getSharingAccess() !== DriveApp.Access.PRIVATE) {
+      pb.push({ type: "dossier", chemin: chemin, acces: String(folder.getSharingAccess()) });
+      if (corriger) folder.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+    }
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next(); total++;
+      const acces = f.getSharingAccess(), partage = progAutres_(f).length;
+      if (acces !== DriveApp.Access.PRIVATE || partage > 0) {
+        pb.push({ type: "fichier", chemin: chemin + "/" + f.getName(), acces: String(acces), personnes: partage });
+        if (corriger) progMakePrivate_(f);
+      }
+    }
+    const subs = folder.getFolders();
+    while (subs.hasNext()) { const sub = subs.next(); walk(sub, chemin + "/" + sub.getName()); }
+  })(progRoot_(), "");
+  return jsonResponse({ ok: true, total: total, problemes: pb, corrige: corriger });
 }

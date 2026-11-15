@@ -75,6 +75,13 @@ const NAV_MODEL = {
       {tab:'rec', label:'Enregistrements'},
       {tab:'ressources', label:'Ressources'},
       {screen:'survie', label:'Phrases de survie'}]},
+    {id:'programme', label:'Programme pédagogique FLE', icon:'route', tabs:[
+      {tab:'prog-calendrier', label:'Calendrier'},
+      {tab:'prog-fiches', label:'Fiches & séances'},
+      {tab:'prog-bibliotheque', label:'Bibliothèque'},
+      {tab:'prog-pptx', label:'Mes PowerPoint pédagogiques'},
+      {tab:'prog-suivi', label:'Suivi'},
+      {tab:'prog-import', label:'Import'}]},
     {id:'finances', label:'Forfaits & paiements', icon:'wallet', tabs:[
       {tab:'finances', label:"Vue d'ensemble"},
       {tab:'forfait-nouveau', label:'Nouveau forfait'},
@@ -134,7 +141,7 @@ const NAV_BOTTOM = {prof:['accueil','eleves','cours','communication'], eleve:['a
   attente:['accueil','cours','messages','profil'], experimental:['accueil','cours','messages','profil']};
 /* Libellés courts pour la barre inférieure. */
 const NAV_SHORT = {accueil:'Accueil', eleves:'Élèves', cours:'Cours', communication:'Messages', parcours:'Parcours',
-  messages:'Messages', profil:'Profil', pedagogie:'Pédagogie', finances:'Finances', parametres:'Réglages'};
+  messages:'Messages', profil:'Profil', pedagogie:'Pédagogie', programme:'Programme', finances:'Finances', parametres:'Réglages'};
 
 function navSections(){ return NAV_MODEL[navRole()] || []; }
 function navTabMatches(t){

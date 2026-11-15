@@ -442,5 +442,30 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lu', 'luAt']);
       allow create, delete: if false;
     }
+
+    // =========================================================
+    // PROGRAMME PÉDAGOGIQUE FLE 2026-2027
+    // Calendrier détaillé, fiches (avec corrigés), index des PowerPoint et suivi :
+    // professeure uniquement. Les fichiers .pptx eux-mêmes sont dans un dossier
+    // Drive privé, servis par l'Apps Script après vérification de l'UID.
+    // =========================================================
+    match /programmeSemaines/{docId} {
+      allow get, list, create, update, delete: if isTeacher();
+    }
+    match /programmeFiches/{docId} {
+      allow get, list, create, update, delete: if isTeacher();
+    }
+    match /programmePptx/{docId} {
+      allow get, list, create, update, delete: if isTeacher();
+    }
+    match /programmeSuivi/{docId} {
+      allow get, list, create, update, delete: if isTeacher();
+    }
+    // Parcours élève (exercices interactifs, sans notes ni corrigés détaillés) :
+    // lisible par un élève seulement après publication explicite.
+    match /programmeEleve/{docId} {
+      allow get, list: if isTeacher() || (canUseStudentApp() && resource.data.publie == true);
+      allow create, update, delete: if isTeacher();
+    }
   }
 }
