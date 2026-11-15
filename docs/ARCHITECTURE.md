@@ -10,7 +10,7 @@ Une seule page (`index.html`) affiche un écran à la fois. Tout part de **`js/1
 
 | Rôle | Rubriques |
 | --- | --- |
-| Professeure | Tableau de bord · Élèves · Cours · Pédagogie · Forfaits & paiements · Communication · Paramètres |
+| Professeure | Tableau de bord · Élèves · Cours · Pédagogie · Programme pédagogique FLE · Forfaits & paiements · Communication · Paramètres |
 | Élève inscrit | Accueil · Mon parcours · Mes cours · Mes exercices · Mes ressources · Messages · Mon profil |
 | Élève sans niveau | Accueil · Mes cours · Messages · Mon profil |
 | Cours expérimental | Mon cours · Historique · Messages · Mon profil |
@@ -42,6 +42,7 @@ Plus aucun fichier ne redéfinit `render()` ou `renderSidebar()`.
 | `js/20-forfaits.js` | Décompte réel des forfaits (seule source du nombre de séances utilisées / restantes), décisions, contrôle |
 | `js/21-suivi-cours.js` | Réponses aux rappels : statut de confirmation, notifications temps réel, historique dans la fiche élève, bouton élève « Confirmer » |
 | `js/22-seances.js` | Source unique des séances (`SEANCES`, `seancesCharger`), statut unique (`seanceStatut`), priorités (`pilotage`), **fiche séance** (`seanceOuvrir`), onglets Agenda, À traiter, Historique, Disponibilités et Nouveau forfait |
+| `js/24-programme-fle.js` | Programme pédagogique FLE 2026-2027 : calendrier (année / mois / semaine), fiches et séances (parcours 1 à 4 séances, formats 15 / 20 / 30 min d'oral), bibliothèque filtrable, PowerPoint privés (Drive via Apps Script), suivi, import du paquet de contenus ; chargement des parcours élèves publiés. Voir `docs/PROGRAMME-FLE.md`. |
 
 ## Règles de conception
 
@@ -65,6 +66,8 @@ Aucune donnée existante n'est déplacée ni convertie. Revenir à la version pr
 | `suiviEleves/{uid}` | objectifs, difficultés, notes privées | professeure (jamais lisible par l'élève) |
 | `journal/{id}` | type, message, details, par, parNom, ts | tout compte connecté, en ajout seul ; lecture professeure ; ni modification ni suppression |
 | `annonces/{id}` | suppression autorisée à la professeure | professeure |
+| `programmeSemaines`, `programmeFiches`, `programmePptx`, `programmeSuivi` | calendrier, fiches avec corrigés, index des PowerPoint, attributions et notes | professeure (lecture professeure seule) |
+| `programmeEleve/{themeId}` | parcours d'exercices interactifs d'une semaine (JSON), `publie` | professeure ; lisible par les élèves seulement si `publie == true` |
 
 ## Mise en ligne
 

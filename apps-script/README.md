@@ -71,3 +71,16 @@ Si l'application est en ligne avant le nouveau script :
 - le bouton « Confirmer mon cours » affiche un message d'indisponibilité.
 
 Rien n'est perdu.
+
+## Mise à jour du 15/11/2026 — bibliothèque PowerPoint privée (Programme pédagogique FLE)
+Nouvelles actions `doPost`, **toutes réservées à la professeure** (`requireTeacher_`) :
+- `progPptxUpload` : range un .pptx dans `PROGRAMME_FOLDER_ID/année/Semaine_XX/Thème/Niveau/`, en privé (l'ancienne version va à la corbeille) ;
+- `progPptxDownload` : renvoie le fichier en base64, seulement s'il est dans le dossier du programme ;
+- `progPptxDelete` : met à la corbeille un fichier du programme ;
+- `progPptxAudit` : liste les fichiers ou dossiers partagés et, avec `corriger: true`, les remet en privé.
+
+À faire :
+1. Créer un dossier Drive **non partagé** et ajouter la propriété du script `PROGRAMME_FOLDER_ID` (son identifiant).
+2. Coller `Code.gs`, puis **Nouvelle version** du déploiement existant (l'URL ne change pas). Aucune nouvelle autorisation (scope Drive déjà présent).
+
+Détails : `docs/PROGRAMME-FLE.md`.

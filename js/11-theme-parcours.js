@@ -24,7 +24,7 @@
    PILOTAGE (professeure) : config/temas — publication, vidéos, contenus modifiés, nouveaux thèmes.
 */
 
-const TP_NIVEAUX = ['A0','A1','A2','B1','B2'];
+const TP_NIVEAUX = ['A0','A1','A2','B1','B2','C1','C2'];
 const TP_COMP = {
   intro:       {icone:'🧭', fr:'Introduction',            pt:'Introdução'},
   vocabulaire: {icone:'📚', fr:'Vocabulaire en contexte', pt:'Vocabulário em contexto'},
@@ -60,6 +60,9 @@ async function tpLoadConfig(force){
       tpConfig.themes = tpConfig.themes || {}; tpConfig.nouveaux = tpConfig.nouveaux || {};
       tpConfig.error = (e && e.message) || String(e);
     }
+    /* Parcours du programme pédagogique FLE (collection programmeEleve, js/24) : chargés AVANT
+       la publication du calendrier d'archivage, pour que les règles Firestore les connaissent. */
+    if(typeof progEleveCharger === 'function'){ try{ await progEleveCharger(); }catch(e){ console.warn('Programme FLE non chargé :', e && e.message); } }
     /* Thèmes créés depuis l'espace enseignante : ajoutés à la fin de la liste (= plus récents). */
     Object.keys(tpConfig.nouveaux).forEach(id=>{
       if(temasSemanas.some(t=>t.id===id)) return;
@@ -111,12 +114,14 @@ function tpLevelData(t, lvl, draftOverride){
 function tpNiveauxDisponibles(t){ return TP_NIVEAUX.filter(l => t && t.niveaux && (t.niveaux[l] || (tpThemeCfg(t.id).contenu||{})[l])); }
 
 /* Niveau du parcours pour un élève : niveau forcé par la professeure (ex. A0), sinon niveau
-   attribué ; C1/C2 → B2 (niveau le plus proche) ; à défaut, le plus proche disponible. */
+   attribué ; C1/C2 utilisent leur propre parcours s'il existe (programme 2026-2027), sinon
+   C2 → C1 → B2 ; à défaut, le plus proche disponible. */
 function tpNiveauPour(t, niveauEleve, niveauForce){
   const dispo = tpNiveauxDisponibles(t);
   if(niveauForce && dispo.includes(niveauForce)) return niveauForce;
   let n = niveauEleve;
-  if(n === 'C1' || n === 'C2') n = 'B2';
+  if(n === 'C2' && !dispo.includes('C2')) n = 'C1';
+  if(n === 'C1' && !dispo.includes('C1')) n = 'B2';
   if(dispo.includes(n)) return n;
   const order = TP_NIVEAUX.indexOf(n);
   if(order >= 0){
@@ -948,7 +953,7 @@ function tpRenderTeacher(body, tema){
   }).join('') : '<p class="teacher-empty">Aucun élève inscrit pour le moment.</p>';
 
   body.innerHTML = `<div class="tema-week-tabs">${tpTeacherWeeksHTML()}</div>${pilotage}
-    <div class="storage-note">🍅 Suivi des élèves — le parcours utilisé est celui du niveau attribué (C1/C2 → B2), sauf si tu forces un niveau de thème (ex. A0) dans la fiche de l'élève.</div>${elevesHTML}`;
+    <div class="storage-note">🍅 Suivi des élèves — le parcours utilisé est celui du niveau attribué (C1/C2 → B2 si le thème n'a pas de parcours C1/C2), sauf si tu forces un niveau de thème (ex. A0) dans la fiche de l'élève.</div>${elevesHTML}`;
   if(tpTeacherPreviewLvl) tpMountTeacherPreview(tema, tpTeacherPreviewLvl);
 }
 function tpStateOf(s, temaId){
