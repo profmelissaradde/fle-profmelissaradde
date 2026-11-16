@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Mon cours — Prof Melissa Radde</title>
+<!-- Page ouverte par les boutons des e-mails (confirmer, annuler, déplacer, accepter / refuser un report).
+     Elle transmet la réponse à l'Apps Script en arrière-plan : on n'ouvre jamais script.google.com
+     dans le navigateur, ce qui échoue chez les personnes connectées à plusieurs comptes Google.
+     L'autorisation est le jeton de l'e-mail, vérifié côté serveur. Aucune donnée n'est stockée ici. -->
+<style>
+  body{font-family:Inter,Arial,sans-serif;background:#F8F7F4;margin:0;padding:30px 15px;color:#1d2433;}
+  .card{max-width:500px;margin:40px auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 8px 30px rgba(0,0,0,.08);}
+  .brand{text-align:center;color:#9A4F63;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px;}
+  h1{font-size:23px;text-align:center;margin:0 0 14px;color:#1F3A5F;}
+  p{line-height:1.6;color:#4a5160;}
+  label{display:block;font-weight:700;margin:15px 0 6px;}
+  input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:8px;font-size:15px;}
+  button{width:100%;margin-top:20px;padding:14px 24px;border:0;border-radius:10px;background:#1F3A5F;color:#fff;font-size:15px;font-weight:700;cursor:pointer;}
+  button.ok{background:#167c5a;} button.danger{background:#b4233d;}
+  button:disabled{opacity:.6;cursor:default;}
+  .info{background:#f4f6f8;padding:12px;border-radius:8px;font-size:13px;margin-top:15px;}
+  #result{margin-top:20px;text-align:center;}
+  .err{color:#b00020;}
+</style>
+</head>
+<body>
+<main class="card" id="card"><p class="brand">Prof Melissa Radde · FLE</p><h1>Chargement…</h1></main>
+<script>
+(function(){
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjVN3__9qJC3gsAkTUBE5oy2z9J0iu08gL1DadZceMaxONg-srJgDkccKDXobiSZleYA/exec";
+  var q = new URLSearchParams(location.search);
+  var action = q.get('action'), slot = q.get('slot'), token = q.get('token');
+  var card = document.getElementById('card');
+  var esc = function(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var PAGES = {
+    confirm: {t:'Confirmer mon cours', m:'Souhaites-tu confirmer ta présence à ce cours ?', b:'Oui, je confirme', c:'ok'},
+    cancel: {t:'Annuler mon cours', m:'Souhaites-tu vraiment annuler ce cours ?', b:'Oui, annuler mon cours', c:'danger'},
+    reschedule: {t:'Demander une replanification', m:"Propose exactement 3 disponibilités. Ton cours actuel reste réservé tant qu'un nouveau créneau n'a pas été validé.", b:'Envoyer mes 3 disponibilités', c:''},
+    acceptproposal: {t:'Accepter le nouvel horaire', m:'Confirme que le nouvel horaire te convient. Ton cours sera déplacé et la réunion Zoom mise à jour automatiquement.', b:"Oui, j'accepte", c:'ok'},
+    refuseproposal: {t:'Refuser le nouvel horaire', m:'Confirme que ce nouvel horaire ne te convient pas. Melissa te proposera une autre date.', b:'Je refuse ce créneau', c:'danger'}
+  };
+  var P = PAGES[action];
+  if(!P || !slot || !token){
+    card.innerHTML = '<p class="brand">Prof Melissa Radde · FLE</p><h1>Lien invalide</h1><p style="text-align:center">Ce lien est incomplet ou n\'est plus valide.</p>';
+    return;
+  }
+  var dispo = action === 'reschedule' ? [1,2,3].map(function(i){ return '<label for="d'+i+'">Disponibilité '+i+'</label><input type="datetime-local" id="d'+i+'" required>'; }).join('') +
+    '<div class="info">Les 3 propositions sont obligatoires et doivent être différentes. Ton cours actuel reste réservé jusqu\'à la validation d\'un nouveau créneau.</div>' : '';
+  card.innerHTML = '<p class="brand">Prof Melissa Radde · FLE</p><h1>'+esc(P.t)+'</h1><p>'+esc(P.m)+'</p>'+dispo+
+    '<button id="go" class="'+P.c+'">'+esc(P.b)+'</button><div id="result" role="status" aria-live="polite"></div>';
+  var btn = document.getElementById('go'), res = document.getElementById('result');
+  btn.addEventListener('click', function(){
+    var availability = [];
+    if(action === 'reschedule'){
+      availability = [1,2,3].map(function(i){ return document.getElementById('d'+i).value; });
+      if(availability.some(function(v){ return !v; })){ res.innerHTML = '<p class="err">Merci de renseigner les 3 disponibilités.</p>'; return; }
+      if(new Set(availability).size !== 3){ res.innerHTML = '<p class="err">Les 3 disponibilités doivent être différentes.</p>'; return; }
+    }
+    btn.disabled = true; btn.textContent = 'Traitement…'; res.innerHTML = '';
+    fetch(APPS_SCRIPT_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({action:'lienEmail', lien:action, slot:slot, token:token, availability:availability})})
+      .then(function(r){ if(!r.ok) throw new Error('Réponse HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        if(d && d.ok){ btn.style.display = 'none'; res.innerHTML = '<p><strong>'+esc(d.message || 'C\'est enregistré.')+'</strong></p>'; }
+        else throw new Error((d && d.error) || 'Ta réponse n\'a pas pu être enregistrée.');
+      })
+      .catch(function(e){ btn.disabled = false; btn.textContent = P.b; res.innerHTML = '<p class="err">Une erreur est survenue : '+esc(e.message)+'</p>'; });
+  });
+})();
+</script>
+</body>
+</html>

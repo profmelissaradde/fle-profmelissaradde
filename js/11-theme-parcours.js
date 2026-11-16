@@ -62,7 +62,12 @@ async function tpLoadConfig(force){
     }
     /* Parcours du programme pédagogique FLE (collection programmeEleve, js/24) : chargés AVANT
        la publication du calendrier d'archivage, pour que les règles Firestore les connaissent. */
-    if(typeof progEleveCharger === 'function'){ try{ await progEleveCharger(); }catch(e){ console.warn('Programme FLE non chargé :', e && e.message); } }
+    if(typeof progEleveCharger === 'function'){
+      /* Jamais bloquant : si la lecture échoue ou traîne (règles non publiées, réseau), les
+         thèmes existants s'affichent quand même au bout de 6 secondes au plus. */
+      try{ await Promise.race([progEleveCharger(), new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé')), 6000))]); }
+      catch(e){ console.warn('Programme FLE non chargé :', e && e.message); }
+    }
     /* Thèmes créés depuis l'espace enseignante : ajoutés à la fin de la liste (= plus récents). */
     Object.keys(tpConfig.nouveaux).forEach(id=>{
       if(temasSemanas.some(t=>t.id===id)) return;

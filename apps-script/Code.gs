@@ -587,6 +587,13 @@ function doPost(e) {
       return handleLegacyExperimentalZoom_(data);
     }
 
+    // Boutons des e-mails (confirmer, annuler, déplacer, accepter / refuser un report) ouverts
+    // depuis la page lien.html du site : l'autorisation est le jeton à usage unique de l'e-mail,
+    // vérifié par processReminderAction / processProposalAction, exactement comme pour doGet.
+    // (Ouvrir script.google.com directement échoue chez les personnes connectées à plusieurs
+    // comptes Google : Google y insère /u/1/ et affiche « Impossible d'ouvrir le fichier ».)
+    if (data.action === "lienEmail") { return handleLienEmail_(data); }
+
     const authCtx = verifyFirebaseIdToken_(data.idToken);
     delete data.idToken;
 
@@ -1864,11 +1871,31 @@ function sendReminderEmail(email, prenom, dateStr, slotId, actionToken) {
 
    ============================================================================ */
 
+/* Page du site qui affiche les boutons des e-mails (voir lien.html). Les anciens liens vers
+   WEB_APP_URL restent valides grâce à doGet. */
+const LIEN_EMAIL_URL = getProperty_("LIEN_EMAIL_URL", "https://profmelissaradde.github.io/fle-profmelissaradde/lien.html");
+
+function handleLienEmail_(data) {
+  try {
+    const lien = String(data.lien || "");
+    let message;
+    if (lien === "acceptproposal" || lien === "refuseproposal") {
+      message = processProposalAction(lien, String(data.slot || ""), String(data.token || ""));
+    } else {
+      const dispo = Array.isArray(data.availability) ? data.availability.slice(0, 3).map(String) : [];
+      message = processReminderAction(lien, String(data.slot || ""), String(data.token || ""), dispo);
+    }
+    return jsonResponse({ ok: true, message: message });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: (err && err.message) || String(err) });
+  }
+}
+
 function reminderActionUrl_(action, slotId, actionToken) {
 
   return (
 
-    WEB_APP_URL +
+    LIEN_EMAIL_URL +
 
     "?action=" + encodeURIComponent(action) +
 
@@ -3511,15 +3538,21 @@ function progInTree_(file) {
   return false;
 }
 
-/* Personnes ayant accès au fichier, en dehors de la propriétaire du Drive. */
+/* Adresse de la propriétaire du fichier (ton compte). On passe par DriveApp, couvert par le
+   scope Drive déjà autorisé : Session.getEffectiveUser exigerait un scope supplémentaire. */
+function progProprio_(file) {
+  try { const o = file.getOwner(); return String((o && o.getEmail()) || "").toLowerCase(); } catch (e) { return ""; }
+}
+
+/* Personnes ayant accès au fichier, en dehors de la propriétaire. */
 function progAutres_(file) {
-  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  const moi = progProprio_(file);
   return file.getEditors().concat(file.getViewers()).filter(function (u) { return String(u.getEmail() || "").toLowerCase() !== moi; });
 }
 
 function progMakePrivate_(file) {
   file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-  const moi = String(Session.getEffectiveUser().getEmail() || "").toLowerCase();
+  const moi = progProprio_(file);
   file.getEditors().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeEditor(u); });
   file.getViewers().forEach(function (u) { if (String(u.getEmail() || "").toLowerCase() !== moi) file.removeViewer(u); });
 }
